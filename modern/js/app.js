@@ -88,7 +88,11 @@ class PharmacyApp {
     // User authentication
     const userBtn = document.getElementById('user-btn');
     if (userBtn) {
-      userBtn.addEventListener('click', () => this.auth.showAuthModal());
+      userBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.auth.showAuthModal();
+      });
     }
 
     // Cart modal
@@ -420,9 +424,10 @@ class PharmacyApp {
       return;
     }
 
-    console.log('Searching for:', query);
-    this.ui.showInfo(`Buscando por "${query}"...`);
-    // TODO: Implement actual search functionality
+    // Redirect to produtos.html with search query
+    const searchUrl = new URL('produtos.html', window.location.origin);
+    searchUrl.searchParams.set('search', query);
+    window.location.href = searchUrl.toString();
   }
 
   filterProductsByCategory(categoryId) {
