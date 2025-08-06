@@ -1,11 +1,13 @@
 // Products Firebase Integration
 import { FirebaseService } from './services/firebase-service.js';
-import { ComponentLoader } from './services/component-loader.js';
+import { ModalsManager } from './services/modals-service.js';
+import ComponentLoader from './services/component-loader.js';
 
 class ProdutosFirebaseApp {
     constructor() {
         this.firebaseService = new FirebaseService();
         this.componentLoader = new ComponentLoader();
+        this.modals = new ModalsManager();
         this.products = [];
         this.currentFilter = 'all';
         this.currentSort = 'name';
@@ -14,27 +16,44 @@ class ProdutosFirebaseApp {
 
     async init() {
         try {
+            console.log('Initializing Products Firebase App...');
+            
             // Check for search query in URL
             this.checkSearchQuery();
             
+            // Show loading while initializing
+            this.showLoading();
+            
             // Load components first
-            await this.componentLoader.loadComponent('header', '#header-container');
-            await this.componentLoader.loadComponent('footer', '#footer-container');
+            console.log('Loading components...');
+            await this.componentLoader.loadHeader();
+            await this.componentLoader.loadFooter();
+            console.log('Components loaded successfully');
             
             // Initialize Firebase
+            console.log('Initializing Firebase...');
             await this.firebaseService.init();
+            console.log('Firebase initialized');
             
-            // Hide loading spinner
-            this.hideLoading();
+            // Initialize modals
+            console.log('Initializing modals...');
+            await this.modals.init();
+            window.modalsManager = this.modals;
+            console.log('Modals initialized');
             
             // Load products from Firebase
+            console.log('Loading products...');
             await this.loadProducts();
             
             // Setup event listeners
+            console.log('Setting up event listeners...');
             this.setupEventListeners();
+            
+            console.log('Products Firebase App initialized successfully');
             
         } catch (error) {
             console.error('Error initializing products app:', error);
+            this.hideLoading();
             this.showError();
         }
     }
@@ -171,17 +190,26 @@ class ProdutosFirebaseApp {
 
     showLoading() {
         const spinner = document.getElementById('loading-spinner');
-        if (spinner) spinner.style.display = 'flex';
+        if (spinner) {
+            spinner.style.display = 'flex';
+            spinner.classList.add('active');
+        }
     }
 
     hideLoading() {
         const spinner = document.getElementById('loading-spinner');
-        if (spinner) spinner.style.display = 'none';
+        if (spinner) {
+            spinner.style.display = 'none';
+            spinner.classList.remove('active');
+        }
     }
 
     showError() {
         const errorMessage = document.getElementById('error-message');
-        if (errorMessage) errorMessage.style.display = 'flex';
+        if (errorMessage) {
+            errorMessage.style.display = 'flex';
+            errorMessage.classList.add('active');
+        }
         this.hideLoading();
     }
 
@@ -273,6 +301,9 @@ class ProdutosFirebaseApp {
         const discountPercentage = precoMaximo && precoComDesconto ? 
             Math.round(((precoMaximo - precoComDesconto) / precoMaximo) * 100) : 
             (product.desconto ? Math.round(product.desconto * 100) : 0);
+
+        // Check if product is featured
+        const isFeatured = product.destaque || product.featured || false;
 
         return `
             <div class="product-card" data-category="${categoria}">
@@ -437,11 +468,41 @@ window.addToCart = function(productId) {
     alert('Produto adicionado ao carrinho!');
 };
 
+// Global functions for onclick events
 window.addToCartWithQuantity = function(productId) {
     const quantityInput = document.getElementById(`quantity-${productId}`);
     const quantity = quantityInput ? parseInt(quantityInput.value) : 1;
-    console.log('Adding product to cart:', productId, 'with quantity:', quantity);
-    alert(`${quantity} unidade(s) adicionada(s) ao carrinho!`);
+    
+    // Find the product
+    const app = window.produtosApp;
+    if (!app) {
+        console.error('Products app not available');
+        return;
+    }
+    
+    const product = app.products.find(p => p.id === productId);
+    if (!product) {
+        console.error('Product not found:', productId);
+        return;
+    }
+    
+    // Create product object for cart
+    const cartProduct = {
+        id: product.id,
+        name: product.nome || product.name,
+        price: product.precoComDesconto || product.price || 0,
+        quantity: quantity
+    };
+    
+    // Use modals manager if available
+    if (window.modalsManager) {
+        for (let i = 0; i < quantity; i++) {
+            window.modalsManager.addToCart(cartProduct);
+        }
+    } else {
+        console.log('Adding product to cart:', productId, 'with quantity:', quantity);
+        alert(`${quantity} unidade(s) adicionada(s) ao carrinho!`);
+    }
 };
 
 window.changeQuantity = function(productId, change) {
@@ -461,5 +522,6 @@ window.addToWishlist = function(productId) {
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', async function() {
     const app = new ProdutosFirebaseApp();
+    window.produtosApp = app; // Make app globally available
     await app.init();
 });
