@@ -333,15 +333,10 @@ class ProdutosFirebaseApp {
                                 <i class="fas fa-plus"></i>
                             </button>
                         </div>
-                        <div class="action-buttons">
-                            <button class="btn btn--primary btn--add-cart" onclick="addToCartWithQuantity('${product.id}')" ${product.quantidade <= 0 ? 'disabled' : ''}>
-                                <i class="fas fa-shopping-cart"></i>
-                                Adicionar
-                            </button>
-                            <button class="btn--wishlist" onclick="addToWishlist('${product.id}')">
-                                <i class="fas fa-heart"></i>
-                            </button>
-                        </div>
+                        <button class="btn btn--primary btn--add-cart" onclick="addToCartWithQuantity('${product.id}')" ${product.quantidade <= 0 ? 'disabled' : ''}>
+                            <i class="fas fa-shopping-cart"></i>
+                            Adicionar
+                        </button>
                     </div>
                 </div>
             </div>
@@ -512,11 +507,6 @@ window.changeQuantity = function(productId, change) {
     const currentValue = parseInt(quantityInput.value);
     const newValue = Math.max(1, Math.min(currentValue + change, parseInt(quantityInput.max)));
     quantityInput.value = newValue;
-};
-
-window.addToWishlist = function(productId) {
-    console.log('Adding product to wishlist:', productId);
-    alert('Produto adicionado à lista de desejos!');
 };
 
 // Initialize the app when DOM is loaded
