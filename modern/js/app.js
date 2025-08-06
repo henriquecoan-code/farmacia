@@ -3,6 +3,7 @@ import { FirebaseService } from './services/firebase-service.js';
 import { CartService } from './services/cart-service.js';
 import { AuthService } from './services/auth-service.js';
 import { UIService } from './services/ui-service.js';
+import { ModalsManager } from './services/modals-service.js';
 import ComponentLoader from './services/component-loader.js';
 
 class PharmacyApp {
@@ -11,6 +12,7 @@ class PharmacyApp {
     this.cart = new CartService();
     this.auth = new AuthService();
     this.ui = new UIService();
+    this.modals = new ModalsManager();
     this.componentLoader = new ComponentLoader();
     
     this.init();
@@ -36,6 +38,12 @@ class PharmacyApp {
       this.cart.init();
       this.auth.init();
       this.auth.setFirebaseService(this.firebase);
+      
+      // Initialize modals
+      await this.modals.init();
+      
+      // Make modals globally available
+      window.modalsManager = this.modals;
       
       // Setup event listeners (this must work regardless of Firebase)
       this.setupEventListeners();
@@ -110,7 +118,7 @@ class PharmacyApp {
       });
     }
 
-    // User authentication - always show modal, even if Firebase isn't loaded
+    // User authentication - use modals manager
     const userBtn = document.getElementById('user-btn');
     if (userBtn && !userBtn.hasAttribute('data-listener-attached')) {
       userBtn.setAttribute('data-listener-attached', 'true');
@@ -126,17 +134,29 @@ class PharmacyApp {
           return;
         }
         
-        // Otherwise, show auth modal
-        this.auth.showAuthModal();
+        // Use modals manager
+        if (window.modalsManager) {
+          window.modalsManager.openAuthModal('login');
+        } else {
+          // Fallback to old method
+          this.auth.showAuthModal();
+        }
       });
       
       console.log('User button event listener attached successfully');
     }
 
-    // Cart modal
+    // Cart modal - use modals manager
     const cartBtn = document.getElementById('cart-btn');
     if (cartBtn) {
-      cartBtn.addEventListener('click', () => this.cart.showCartModal());
+      cartBtn.addEventListener('click', () => {
+        if (window.modalsManager) {
+          window.modalsManager.openCartModal();
+        } else {
+          // Fallback to old method
+          this.cart.showCartModal();
+        }
+      });
     }
 
     // Mobile menu toggle
@@ -345,8 +365,15 @@ class PharmacyApp {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const product = JSON.parse(btn.dataset.product);
-          this.cart.addItem(product);
-          this.ui.showSuccess(`${product.name} adicionado ao carrinho!`);
+          
+          // Use modals manager if available
+          if (window.modalsManager) {
+            window.modalsManager.addToCart(product);
+          } else {
+            // Fallback to old method
+            this.cart.addItem(product);
+            this.ui.showSuccess(`${product.name} adicionado ao carrinho!`);
+          }
         });
       });
 
@@ -438,8 +465,15 @@ class PharmacyApp {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const product = JSON.parse(btn.dataset.product);
-        this.cart.addItem(product);
-        this.ui.showSuccess(`${product.name} adicionado ao carrinho!`);
+        
+        // Use modals manager if available
+        if (window.modalsManager) {
+          window.modalsManager.addToCart(product);
+        } else {
+          // Fallback to old method
+          this.cart.addItem(product);
+          this.ui.showSuccess(`${product.name} adicionado ao carrinho!`);
+        }
       });
     });
 
