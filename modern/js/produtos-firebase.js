@@ -9,10 +9,14 @@ class ProdutosFirebaseApp {
         this.products = [];
         this.currentFilter = 'all';
         this.currentSort = 'name';
+        this.searchQuery = '';
     }
 
     async init() {
         try {
+            // Check for search query in URL
+            this.checkSearchQuery();
+            
             // Load components first
             await this.componentLoader.loadComponent('header', '#header-container');
             await this.componentLoader.loadComponent('footer', '#footer-container');
@@ -35,6 +39,17 @@ class ProdutosFirebaseApp {
         }
     }
 
+    checkSearchQuery() {
+        const urlParams = new URLSearchParams(window.location.search);
+        this.searchQuery = urlParams.get('search') || '';
+        
+        // Update search input if it exists
+        const searchInput = document.querySelector('.search-box__input');
+        if (searchInput && this.searchQuery) {
+            searchInput.value = this.searchQuery;
+        }
+    }
+
     async loadProducts() {
         try {
             this.showLoading();
@@ -44,8 +59,114 @@ class ProdutosFirebaseApp {
             this.hideLoading();
         } catch (error) {
             console.error('Error loading products:', error);
-            this.showError();
+            // Load sample products as fallback
+            this.loadSampleProducts();
+            this.hideLoading();
         }
+    }
+
+    loadSampleProducts() {
+        // Sample products for testing/demo
+        this.products = [
+            {
+                id: '1',
+                nome: 'Dipirona 500mg',
+                descricao: 'Analgésico e antitérmico - 20 comprimidos',
+                categoria: 'medicamentos',
+                precoComDesconto: 8.90,
+                precoMaximo: 12.50,
+                quantidade: 50,
+                codRed: 'DIP001',
+                laboratorio: 'Medley',
+                fotos: ['img/produtos/dipirona.jpg']
+            },
+            {
+                id: '2',
+                nome: 'Protetor Solar FPS 60',
+                descricao: 'Proteção solar para todos os tipos de pele - 120ml',
+                categoria: 'dermocosmeticos',
+                precoComDesconto: 45.90,
+                precoMaximo: 55.90,
+                quantidade: 25,
+                codRed: 'PS001',
+                laboratorio: 'La Roche Posay',
+                fotos: ['img/produtos/protetor.jpg']
+            },
+            {
+                id: '3',
+                nome: 'Vitamina C 1g',
+                descricao: 'Suplemento vitamínico - 30 cápsulas',
+                categoria: 'suplementos',
+                precoComDesconto: 25.90,
+                precoMaximo: 32.90,
+                quantidade: 100,
+                codRed: 'VIT001',
+                laboratorio: 'Vitafor',
+                fotos: ['img/produtos/vitamina-c.jpg']
+            },
+            {
+                id: '4',
+                nome: 'Termômetro Digital',
+                descricao: 'Termômetro digital com display LCD',
+                categoria: 'equipamentos',
+                precoComDesconto: 18.90,
+                quantidade: 15,
+                codRed: 'TERM001',
+                laboratorio: 'G-Tech',
+                fotos: ['img/produtos/termometro.jpg']
+            },
+            {
+                id: '5',
+                nome: 'Shampoo Anticaspa',
+                descricao: 'Shampoo medicinal contra caspa - 400ml',
+                categoria: 'dermocosmeticos',
+                precoComDesconto: 29.90,
+                precoMaximo: 35.90,
+                quantidade: 30,
+                codRed: 'SHA001',
+                laboratorio: 'Vichy',
+                fotos: ['img/produtos/shampoo.jpg']
+            },
+            {
+                id: '6',
+                nome: 'Ibuprofeno 600mg',
+                descricao: 'Anti-inflamatório - 10 comprimidos',
+                categoria: 'medicamentos',
+                precoComDesconto: 15.50,
+                precoMaximo: 18.90,
+                quantidade: 40,
+                codRed: 'IBU001',
+                laboratorio: 'EMS',
+                fotos: ['img/produtos/ibuprofeno.jpg']
+            },
+            {
+                id: '7',
+                nome: 'Whey Protein',
+                descricao: 'Proteína do soro do leite - 900g',
+                categoria: 'suplementos',
+                precoComDesconto: 89.90,
+                precoMaximo: 110.00,
+                quantidade: 20,
+                codRed: 'WHE001',
+                laboratorio: 'Optimum',
+                fotos: ['img/produtos/whey.jpg']
+            },
+            {
+                id: '8',
+                nome: 'Fralda Infantil',
+                descricao: 'Fralda descartável tamanho M - 30 unidades',
+                categoria: 'infantil',
+                precoComDesconto: 39.90,
+                precoMaximo: 45.90,
+                quantidade: 60,
+                codRed: 'FRA001',
+                laboratorio: 'Pampers',
+                fotos: ['img/produtos/fralda.jpg']
+            }
+        ];
+        
+        console.log('Loaded sample products:', this.products);
+        this.renderProducts();
     }
 
     showLoading() {
@@ -65,6 +186,17 @@ class ProdutosFirebaseApp {
     }
 
     setupEventListeners() {
+        // Search functionality
+        const searchInput = document.querySelector('.search-box__input');
+        const searchButton = document.querySelector('.search-box__button');
+        
+        if (searchInput && searchButton) {
+            searchButton.addEventListener('click', () => this.handleSearch());
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.handleSearch();
+            });
+        }
+
         // Filter buttons
         const filterButtons = document.querySelectorAll('.filter-btn');
         filterButtons.forEach(btn => {
@@ -93,6 +225,12 @@ class ProdutosFirebaseApp {
         if (mobileOverlay) {
             mobileOverlay.addEventListener('click', this.closeMobileSidebar);
         }
+    }
+
+    handleSearch() {
+        const searchInput = document.querySelector('.search-box__input');
+        this.searchQuery = searchInput ? searchInput.value.trim() : '';
+        this.renderProducts();
     }
 
     renderProducts() {
@@ -131,15 +269,17 @@ class ProdutosFirebaseApp {
             imageUrl = product.image;
         }
 
-        // Check if product is featured
-        const isFeatured = product.featured || false;
+        // Calculate discount percentage if we have both prices
+        const discountPercentage = precoMaximo && precoComDesconto ? 
+            Math.round(((precoMaximo - precoComDesconto) / precoMaximo) * 100) : 
+            (product.desconto ? Math.round(product.desconto * 100) : 0);
 
         return `
             <div class="product-card" data-category="${categoria}">
                 <div class="product-card__image">
                     <img src="${imageUrl}" alt="${nome}" loading="lazy" onerror="this.src='img/produtos/default-product.svg'">
                     ${isFeatured ? '<div class="product-card__badge">Destaque</div>' : ''}
-                    ${product.laboratorio ? `<div class="product-card__brand">${product.laboratorio}</div>` : ''}
+                    ${discountPercentage > 0 ? `<div class="product-card__discount-badge">${discountPercentage}% OFF</div>` : ''}
                 </div>
                 <div class="product-card__content">
                     <h3 class="product-card__title">${nome}</h3>
@@ -148,19 +288,29 @@ class ProdutosFirebaseApp {
                     <div class="product-card__price">
                         <span class="product-card__price-current">R$ ${precoComDesconto.toFixed(2).replace('.', ',')}</span>
                         ${precoMaximo ? `<span class="product-card__price-old">R$ ${precoMaximo.toFixed(2).replace('.', ',')}</span>` : ''}
-                        ${product.desconto ? `<span class="product-card__discount">${(product.desconto * 100).toFixed(0)}% OFF</span>` : ''}
                     </div>
                     <div class="product-card__stock">
                         ${product.quantidade > 0 ? `<span class="in-stock">Em estoque (${product.quantidade})</span>` : '<span class="out-of-stock">Fora de estoque</span>'}
                     </div>
                     <div class="product-card__actions">
-                        <button class="btn btn--primary btn--add-cart" onclick="addToCart('${product.id}')" ${product.quantidade <= 0 ? 'disabled' : ''}>
-                            <i class="fas fa-shopping-cart"></i>
-                            Adicionar
-                        </button>
-                        <button class="btn--wishlist" onclick="addToWishlist('${product.id}')">
-                            <i class="fas fa-heart"></i>
-                        </button>
+                        <div class="quantity-selector">
+                            <button class="quantity-btn quantity-btn--minus" onclick="changeQuantity('${product.id}', -1)">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <input type="number" class="quantity-input" id="quantity-${product.id}" value="1" min="1" max="${product.quantidade || 99}">
+                            <button class="quantity-btn quantity-btn--plus" onclick="changeQuantity('${product.id}', 1)">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn--primary btn--add-cart" onclick="addToCartWithQuantity('${product.id}')" ${product.quantidade <= 0 ? 'disabled' : ''}>
+                                <i class="fas fa-shopping-cart"></i>
+                                Adicionar
+                            </button>
+                            <button class="btn--wishlist" onclick="addToWishlist('${product.id}')">
+                                <i class="fas fa-heart"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -168,13 +318,39 @@ class ProdutosFirebaseApp {
     }
 
     filterProducts() {
-        if (this.currentFilter === 'all') {
-            return this.products;
+        let filtered = this.products;
+        
+        // Apply category filter
+        if (this.currentFilter !== 'all') {
+            filtered = filtered.filter(product => {
+                const categoria = product.categoria || product.category || '';
+                return categoria.toLowerCase() === this.currentFilter.toLowerCase();
+            });
         }
-        return this.products.filter(product => {
-            const categoria = product.categoria || product.category || '';
-            return categoria.toLowerCase() === this.currentFilter.toLowerCase();
-        });
+        
+        // Apply search filter
+        if (this.searchQuery) {
+            const query = this.searchQuery.toLowerCase();
+            filtered = filtered.filter(product => {
+                const nome = (product.nome || product.name || '').toLowerCase();
+                const descricao = (product.descricao || product.description || '').toLowerCase();
+                const dcb = (product.dcb || '').toLowerCase();
+                const codRed = (product.codRed || product.codigo || '').toLowerCase();
+                const ean = (product.ean || product.codigoBarras || '').toLowerCase();
+                const laboratorio = (product.laboratorio || product.marca || '').toLowerCase();
+                const categoria = (product.categoria || product.category || '').toLowerCase();
+                
+                return nome.includes(query) || 
+                       descricao.includes(query) || 
+                       dcb.includes(query) || 
+                       codRed.includes(query) || 
+                       ean.includes(query) || 
+                       laboratorio.includes(query) || 
+                       categoria.includes(query);
+            });
+        }
+        
+        return filtered;
     }
 
     sortProducts(products) {
@@ -259,6 +435,22 @@ class ProdutosFirebaseApp {
 window.addToCart = function(productId) {
     console.log('Adding product to cart:', productId);
     alert('Produto adicionado ao carrinho!');
+};
+
+window.addToCartWithQuantity = function(productId) {
+    const quantityInput = document.getElementById(`quantity-${productId}`);
+    const quantity = quantityInput ? parseInt(quantityInput.value) : 1;
+    console.log('Adding product to cart:', productId, 'with quantity:', quantity);
+    alert(`${quantity} unidade(s) adicionada(s) ao carrinho!`);
+};
+
+window.changeQuantity = function(productId, change) {
+    const quantityInput = document.getElementById(`quantity-${productId}`);
+    if (!quantityInput) return;
+    
+    const currentValue = parseInt(quantityInput.value);
+    const newValue = Math.max(1, Math.min(currentValue + change, parseInt(quantityInput.max)));
+    quantityInput.value = newValue;
 };
 
 window.addToWishlist = function(productId) {
