@@ -126,4 +126,5 @@ class ComponentLoader {
 }
 
 // Export for use in other modules
+export { ComponentLoader };
 export default ComponentLoader;

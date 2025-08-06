@@ -70,7 +70,12 @@ export class FirebaseService {
       
       const products = [];
       querySnapshot.forEach((doc) => {
-        products.push(Object.assign({ id: doc.id }, doc.data()));
+        const data = doc.data();
+        // Transform Firebase timestamp to JavaScript Date if it exists
+        if (data.criadoEm && data.criadoEm.toDate) {
+          data.criadoEm = data.criadoEm.toDate();
+        }
+        products.push(Object.assign({ id: doc.id }, data));
       });
       
       return products;
