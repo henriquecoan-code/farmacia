@@ -21,134 +21,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <!-- Header -->
-    <header class="header" id="header">
-        <div class="container">
-            <div class="header__content">
-                <!-- Logo -->
-                <div class="header__logo">
-                    <a href="modern-index.html" class="logo">
-                        <i class="fas fa-pills logo__icon"></i>
-                        <span class="logo__text">Farmácia São Benedito</span>
-                    </a>
-                </div>
-
-                <!-- Search -->
-                <div class="header__search">
-                    <div class="search-box">
-                        <input type="text" class="search-box__input" placeholder="Buscar medicamentos, produtos...">
-                        <button class="search-box__button">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Actions -->
-                <div class="header__actions">
-                    <button class="action-btn" id="user-btn">
-                        <i class="fas fa-user"></i>
-                        <span>Entrar</span>
-                        <div class="user-tooltip">
-                            Clique para fazer login<br>
-                            <small>Ou criar sua conta</small>
-                        </div>
-                    </button>
-                    <button class="action-btn cart-btn" id="cart-btn">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span class="cart-counter" id="cart-counter">0</span>
-                    </button>
-                </div>
-
-                <!-- Mobile Menu Toggle -->
-                <button class="mobile-menu-toggle" id="mobile-menu-toggle">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Navigation -->
-    <nav class="nav" id="nav">
-        <div class="container">
-            <ul class="nav__list">
-                <li class="nav__item">
-                    <a href="modern-index.html" class="nav__link">
-                        <i class="fas fa-home"></i>
-                        Início
-                    </a>
-                </li>
-                <li class="nav__item">
-                    <a href="produtos.html" class="nav__link nav__link--active">
-                        <i class="fas fa-pills"></i>
-                        Medicamentos
-                    </a>
-                </li>
-                <li class="nav__item">
-                    <a href="#" class="nav__link">
-                        <i class="fas fa-percent"></i>
-                        Ofertas
-                    </a>
-                </li>
-                <li class="nav__item">
-                    <a href="#" class="nav__link">
-                        <i class="fas fa-heart"></i>
-                        Dermocosméticos
-                    </a>
-                </li>
-                <li class="nav__item">
-                    <a href="#" class="nav__link">
-                        <i class="fas fa-dumbbell"></i>
-                        Suplementos
-                    </a>
-                </li>
-                <li class="nav__item">
-                    <a href="#" class="nav__link">
-                        <i class="fas fa-phone"></i>
-                        Contato
-                    </a>
-                </li>
-            </ul>
-        </div>
-    </nav>
-
-    <!-- Mobile Sidebar -->
-    <div class="mobile-overlay" id="mobile-overlay"></div>
-    <div class="mobile-sidebar" id="mobile-sidebar">
-        <div class="mobile-sidebar__header">
-            <h3 class="mobile-sidebar__title">Menu</h3>
-            <button class="mobile-sidebar__close" id="mobile-sidebar-close">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <nav class="mobile-sidebar__nav">
-            <a href="modern-index.html" class="nav__link">
-                <i class="fas fa-home"></i>
-                Início
-            </a>
-            <a href="produtos.html" class="nav__link nav__link--active">
-                <i class="fas fa-pills"></i>
-                Medicamentos
-            </a>
-            <a href="#" class="nav__link">
-                <i class="fas fa-percent"></i>
-                Ofertas
-            </a>
-            <a href="#" class="nav__link">
-                <i class="fas fa-heart"></i>
-                Dermocosméticos
-            </a>
-            <a href="#" class="nav__link">
-                <i class="fas fa-dumbbell"></i>
-                Suplementos
-            </a>
-            <a href="#" class="nav__link">
-                <i class="fas fa-phone"></i>
-                Contato
-            </a>
-        </nav>
-    </div>
+    <!-- Header Container -->
+    <div id="header-container"></div>
 
     <!-- Main Content -->
     <main class="main">
@@ -195,47 +69,8 @@
         </section>
     </main>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer__content">
-                <div class="footer__section">
-                    <div class="footer__brand">
-                        <h3 class="footer__title">Farmácia São Benedito</h3>
-                        <p class="footer__description">Cuidando da sua saúde com qualidade e dedicação desde 1985.</p>
-                        <div class="footer__social">
-                            <a href="#" class="social-link"><i class="fab fa-facebook"></i></a>
-                            <a href="#" class="social-link"><i class="fab fa-instagram"></i></a>
-                            <a href="#" class="social-link"><i class="fab fa-whatsapp"></i></a>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="footer__section">
-                    <h4 class="footer__section-title">Links Úteis</h4>
-                    <ul class="footer__links">
-                        <li><a href="#" class="footer__link">Sobre Nós</a></li>
-                        <li><a href="#" class="footer__link">Política de Privacidade</a></li>
-                        <li><a href="#" class="footer__link">Termos de Uso</a></li>
-                        <li><a href="#" class="footer__link">FAQ</a></li>
-                    </ul>
-                </div>
-                
-                <div class="footer__section">
-                    <h4 class="footer__section-title">Contato</h4>
-                    <div class="footer__contact">
-                        <p><i class="fas fa-phone"></i> (11) 99999-9999</p>
-                        <p><i class="fas fa-envelope"></i> contato@farmaciasaobenedito.com.br</p>
-                        <p><i class="fas fa-map-marker-alt"></i> Rua das Flores, 123 - Centro</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="footer__bottom">
-                <p>&copy; 2024 Farmácia São Benedito. Todos os direitos reservados.</p>
-            </div>
-        </div>
-    </footer>
+    <!-- Footer Container -->
+    <div id="footer-container"></div>
 
     <!-- Loading Spinner -->
     <div class="loading-spinner" id="loading-spinner">
@@ -250,6 +85,7 @@
     </div>
 
     <!-- Scripts -->
+    <script type="module" src="modern/js/produtos-app.js"></script>
     <script>
         // Simple products page functionality without external dependencies
         document.addEventListener('DOMContentLoaded', function() {

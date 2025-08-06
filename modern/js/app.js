@@ -3,6 +3,7 @@ import { FirebaseService } from './services/firebase-service.js';
 import { CartService } from './services/cart-service.js';
 import { AuthService } from './services/auth-service.js';
 import { UIService } from './services/ui-service.js';
+import ComponentLoader from './services/component-loader.js';
 
 class PharmacyApp {
   constructor() {
@@ -10,6 +11,7 @@ class PharmacyApp {
     this.cart = new CartService();
     this.auth = new AuthService();
     this.ui = new UIService();
+    this.componentLoader = new ComponentLoader();
     
     this.init();
   }
@@ -18,6 +20,9 @@ class PharmacyApp {
     try {
       // Show loading
       this.ui.showLoading();
+      
+      // Load components first
+      await this.loadComponents();
       
       // Initialize Firebase
       await this.firebase.init();
@@ -44,7 +49,31 @@ class PharmacyApp {
     }
   }
 
+  async loadComponents() {
+    try {
+      // Load header and footer components
+      await this.componentLoader.loadHeader();
+      await this.componentLoader.loadFooter();
+      
+      console.log('Components loaded successfully');
+    } catch (error) {
+      console.error('Error loading components:', error);
+    }
+  }
+
   setupEventListeners() {
+    // Wait for components to be loaded before setting up event listeners
+    document.addEventListener('componentLoaded', (event) => {
+      if (event.detail.componentName === 'header') {
+        this.setupHeaderEventListeners();
+      }
+    });
+    
+    // Setup other general event listeners
+    this.setupGeneralEventListeners();
+  }
+
+  setupHeaderEventListeners() {
     // Header search
     const searchInput = document.querySelector('.search-box__input');
     const searchButton = document.querySelector('.search-box__button');
@@ -85,7 +114,9 @@ class PharmacyApp {
     if (mobileOverlay) {
       mobileOverlay.addEventListener('click', () => this.closeMobileSidebar());
     }
+  }
 
+  setupGeneralEventListeners() {
     // Hero buttons
     const heroButtons = document.querySelectorAll('.hero__actions .btn');
     heroButtons.forEach((btn, index) => {
