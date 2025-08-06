@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmácia São Benedito - Sua Saúde em Primeiro Lugar</title>
+    <meta name="description" content="Farmácia online com medicamentos de qualidade, entrega rápida e os melhores preços. Sua saúde em primeiro lugar.">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="img/favicon.ico">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="modern/css/modern-styles.css">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header" id="header">
+        <div class="container">
+            <div class="header__content">
+                <!-- Logo -->
+                <div class="header__logo">
+                    <a href="#" class="logo">
+                        <i class="fas fa-pills logo__icon"></i>
+                        <span class="logo__text">Farmácia São Benedito</span>
+                    </a>
+                </div>
+
+                <!-- Search -->
+                <div class="header__search">
+                    <div class="search-box">
+                        <input type="text" class="search-box__input" placeholder="Buscar medicamentos, produtos...">
+                        <button class="search-box__button">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="header__actions">
+                    <button class="action-btn" id="user-btn">
+                        <i class="fas fa-user"></i>
+                        <span>Entrar</span>
+                    </button>
+                    <button class="action-btn cart-btn" id="cart-btn">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-counter" id="cart-counter">0</span>
+                    </button>
+                </div>
+
+                <!-- Mobile Menu Toggle -->
+                <button class="mobile-menu-toggle" id="mobile-menu-toggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav" id="nav">
+        <div class="container">
+            <ul class="nav__list">
+                <li class="nav__item">
+                    <a href="#" class="nav__link nav__link--active">
+                        <i class="fas fa-home"></i>
+                        Início
+                    </a>
+                </li>
+                <li class="nav__item">
+                    <a href="#" class="nav__link">
+                        <i class="fas fa-pills"></i>
+                        Medicamentos
+                    </a>
+                </li>
+                <li class="nav__item">
+                    <a href="#" class="nav__link">
+                        <i class="fas fa-percent"></i>
+                        Ofertas
+                    </a>
+                </li>
+                <li class="nav__item">
+                    <a href="#" class="nav__link">
+                        <i class="fas fa-heart"></i>
+                        Dermocosméticos
+                    </a>
+                </li>
+                <li class="nav__item">
+                    <a href="#" class="nav__link">
+                        <i class="fas fa-dumbbell"></i>
+                        Suplementos
+                    </a>
+                </li>
+                <li class="nav__item">
+                    <a href="#" class="nav__link">
+                        <i class="fas fa-phone"></i>
+                        Contato
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container">
+                <div class="hero__content">
+                    <div class="hero__text">
+                        <h1 class="hero__title">Sua saúde em primeiro lugar</h1>
+                        <p class="hero__subtitle">Medicamentos de qualidade com entrega rápida e segura na sua casa</p>
+                        <div class="hero__actions">
+                            <button class="btn btn--primary">Ver Produtos</button>
+                            <button class="btn btn--secondary">Nossas Ofertas</button>
+                        </div>
+                    </div>
+                    <div class="hero__image">
+                        <i class="fas fa-prescription-bottle-alt hero__icon"></i>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section class="features">
+            <div class="container">
+                <div class="features__grid">
+                    <div class="feature">
+                        <div class="feature__icon">
+                            <i class="fas fa-shipping-fast"></i>
+                        </div>
+                        <h3 class="feature__title">Entrega Rápida</h3>
+                        <p class="feature__text">Receba seus medicamentos em até 2 horas</p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature__icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h3 class="feature__title">Segurança</h3>
+                        <p class="feature__text">Produtos originais e certificados</p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature__icon">
+                            <i class="fas fa-tags"></i>
+                        </div>
+                        <h3 class="feature__title">Melhores Preços</h3>
+                        <p class="feature__text">Ofertas especiais todos os dias</p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature__icon">
+                            <i class="fas fa-user-md"></i>
+                        </div>
+                        <h3 class="feature__title">Atendimento Especializado</h3>
+                        <p class="feature__text">Farmacêuticos qualificados para te ajudar</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Product Categories -->
+        <section class="categories">
+            <div class="container">
+                <h2 class="section-title">Categorias</h2>
+                <div class="categories__grid" id="categories-grid">
+                    <!-- Categories will be loaded here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Featured Products -->
+        <section class="products">
+            <div class="container">
+                <h2 class="section-title">Produtos em Destaque</h2>
+                <div class="products__grid" id="products-grid">
+                    <!-- Products will be loaded here -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer__content">
+                <div class="footer__section">
+                    <h3 class="footer__title">Farmácia São Benedito</h3>
+                    <p class="footer__text">Cuidando da sua saúde com qualidade e dedicação desde 1985.</p>
+                    <div class="footer__social">
+                        <a href="#" class="social-link"><i class="fab fa-facebook"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-whatsapp"></i></a>
+                    </div>
+                </div>
+                <div class="footer__section">
+                    <h4 class="footer__subtitle">Links Úteis</h4>
+                    <ul class="footer__links">
+                        <li><a href="#">Sobre Nós</a></li>
+                        <li><a href="#">Política de Privacidade</a></li>
+                        <li><a href="#">Termos de Uso</a></li>
+                        <li><a href="#">FAQ</a></li>
+                    </ul>
+                </div>
+                <div class="footer__section">
+                    <h4 class="footer__subtitle">Contato</h4>
+                    <div class="footer__contact">
+                        <p><i class="fas fa-phone"></i> (11) 99999-9999</p>
+                        <p><i class="fas fa-envelope"></i> contato@farmaciasaobenedito.com.br</p>
+                        <p><i class="fas fa-map-marker-alt"></i> Rua das Flores, 123 - Centro</p>
+                    </div>
+                </div>
+            </div>
+            <div class="footer__bottom">
+                <p>&copy; 2024 Farmácia São Benedito. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Cart Modal -->
+    <div class="modal" id="cart-modal">
+        <div class="modal__backdrop" id="cart-modal-backdrop"></div>
+        <div class="modal__content">
+            <div class="modal__header">
+                <h3>Carrinho de Compras</h3>
+                <button class="modal__close" id="cart-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal__body" id="cart-items">
+                <!-- Cart items will be loaded here -->
+            </div>
+            <div class="modal__footer">
+                <div class="cart-total" id="cart-total">Total: R$ 0,00</div>
+                <button class="btn btn--primary btn--full">Finalizar Compra</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div class="modal" id="auth-modal">
+        <div class="modal__backdrop" id="auth-modal-backdrop"></div>
+        <div class="modal__content">
+            <div class="modal__header">
+                <h3 id="auth-modal-title">Entrar</h3>
+                <button class="modal__close" id="auth-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal__body">
+                <form id="auth-form">
+                    <div class="form-group">
+                        <input type="email" id="auth-email" placeholder="E-mail" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="auth-password" placeholder="Senha" required>
+                    </div>
+                    <button type="submit" class="btn btn--primary btn--full">Entrar</button>
+                </form>
+                <p class="auth-switch">
+                    Não tem conta? <a href="#" id="auth-toggle">Cadastre-se</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="modern/js/app.js"></script>
+</body>
+</html>
