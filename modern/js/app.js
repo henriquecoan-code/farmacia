@@ -24,16 +24,22 @@ class PharmacyApp {
       // Load components first
       await this.loadComponents();
       
-      // Initialize Firebase
-      await this.firebase.init();
+      // Setup event listeners early (before Firebase init)
+      this.setupEventListeners();
       
-      // Initialize services
+      // Initialize services that don't depend on Firebase
       this.cart.init();
       this.auth.init();
-      this.auth.setFirebaseService(this.firebase);
       
-      // Setup event listeners
-      this.setupEventListeners();
+      // Try to initialize Firebase
+      try {
+        await this.firebase.init();
+        this.auth.setFirebaseService(this.firebase);
+        console.log('Firebase initialized successfully');
+      } catch (firebaseError) {
+        console.warn('Firebase initialization failed, continuing without Firebase:', firebaseError);
+        // App can continue to work without Firebase
+      }
       
       // Load initial data
       await this.loadInitialData();
@@ -45,6 +51,15 @@ class PharmacyApp {
     } catch (error) {
       console.error('Error initializing app:', error);
       this.ui.hideLoading();
+      
+      // Even if app fails to fully initialize, try to set up basic event listeners
+      try {
+        this.setupEventListeners();
+        console.log('Basic event listeners set up despite initialization error');
+      } catch (listenerError) {
+        console.error('Failed to set up event listeners:', listenerError);
+      }
+      
       this.ui.showError('Erro ao carregar a aplicação. Tente novamente.');
     }
   }
@@ -62,7 +77,13 @@ class PharmacyApp {
   }
 
   setupEventListeners() {
-    // Wait for components to be loaded before setting up event listeners
+    // Check if header is already loaded and set up event listeners immediately
+    const headerContainer = document.getElementById('header-container');
+    if (headerContainer && headerContainer.innerHTML.trim()) {
+      this.setupHeaderEventListeners();
+    }
+    
+    // Also listen for future component loads
     document.addEventListener('componentLoaded', (event) => {
       if (event.detail.componentName === 'header') {
         this.setupHeaderEventListeners();
