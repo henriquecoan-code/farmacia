@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produtos - Farmácia São Benedito</title>
+    <meta name="description" content="Confira todos os produtos da Farmácia São Benedito: medicamentos, dermocosméticos, suplementos e muito mais.">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="img/favicon.ico">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="modern/css/modern-styles.css">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header" id="header">
+        <div class="container">
+            <div class="header__content">
+                <!-- Logo -->
+                <div class="header__logo">
+                    <a href="modern-index.html" class="logo">
+                        <i class="fas fa-pills logo__icon"></i>
+                        <span class="logo__text">Farmácia São Benedito</span>
+                    </a>
+                </div>
+
+                <!-- Search -->
+                <div class="header__search">
+                    <div class="search-box">
+                        <input type="text" class="search-box__input" placeholder="Buscar medicamentos, produtos...">
+                        <button class="search-box__button">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="header__actions">
+                    <button class="action-btn" id="user-btn">
+                        <i class="fas fa-user"></i>
+                        <span>Entrar</span>
+                        <div class="user-tooltip">
+                            Clique para fazer login<br>
+                            <small>Ou criar sua conta</small>
+                        </div>
+                    </button>
+                    <button class="action-btn cart-btn" id="cart-btn">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-counter" id="cart-counter">0</span>
+                    </button>
+                </div>
+
+                <!-- Mobile Menu Toggle -->
+                <button class="mobile-menu-toggle" id="mobile-menu-toggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav" id="nav">
+        <div class="container">
+            <ul class="nav__list">
+                <li class="nav__item">
+                    <a href="modern-index.html" class="nav__link">
+                        <i class="fas fa-home"></i>
+                        Início
+                    </a>
+                </li>
+                <li class="nav__item">
+                    <a href="produtos.html" class="nav__link nav__link--active">
+                        <i class="fas fa-pills"></i>
+                        Medicamentos
+                    </a>
+                </li>
+                <li class="nav__item">
+                    <a href="#" class="nav__link">
+                        <i class="fas fa-percent"></i>
+                        Ofertas
+                    </a>
+                </li>
+                <li class="nav__item">
+                    <a href="#" class="nav__link">
+                        <i class="fas fa-heart"></i>
+                        Dermocosméticos
+                    </a>
+                </li>
+                <li class="nav__item">
+                    <a href="#" class="nav__link">
+                        <i class="fas fa-dumbbell"></i>
+                        Suplementos
+                    </a>
+                </li>
+                <li class="nav__item">
+                    <a href="#" class="nav__link">
+                        <i class="fas fa-phone"></i>
+                        Contato
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Mobile Sidebar -->
+    <div class="mobile-overlay" id="mobile-overlay"></div>
+    <div class="mobile-sidebar" id="mobile-sidebar">
+        <div class="mobile-sidebar__header">
+            <h3 class="mobile-sidebar__title">Menu</h3>
+            <button class="mobile-sidebar__close" id="mobile-sidebar-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <nav class="mobile-sidebar__nav">
+            <a href="modern-index.html" class="nav__link">
+                <i class="fas fa-home"></i>
+                Início
+            </a>
+            <a href="produtos.html" class="nav__link nav__link--active">
+                <i class="fas fa-pills"></i>
+                Medicamentos
+            </a>
+            <a href="#" class="nav__link">
+                <i class="fas fa-percent"></i>
+                Ofertas
+            </a>
+            <a href="#" class="nav__link">
+                <i class="fas fa-heart"></i>
+                Dermocosméticos
+            </a>
+            <a href="#" class="nav__link">
+                <i class="fas fa-dumbbell"></i>
+                Suplementos
+            </a>
+            <a href="#" class="nav__link">
+                <i class="fas fa-phone"></i>
+                Contato
+            </a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Page Header -->
+        <section class="page-header">
+            <div class="container">
+                <div class="page-header__content">
+                    <h1 class="page-header__title">Nossos Produtos</h1>
+                    <p class="page-header__subtitle">Encontre todos os medicamentos e produtos para sua saúde</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filters -->
+        <section class="filters">
+            <div class="container">
+                <div class="filters__content">
+                    <div class="filters__categories">
+                        <button class="filter-btn filter-btn--active" data-category="all">Todos</button>
+                        <button class="filter-btn" data-category="medicamentos">Medicamentos</button>
+                        <button class="filter-btn" data-category="dermocosmeticos">Dermocosméticos</button>
+                        <button class="filter-btn" data-category="suplementos">Suplementos</button>
+                        <button class="filter-btn" data-category="infantil">Infantil</button>
+                    </div>
+                    <div class="filters__sort">
+                        <select class="sort-select">
+                            <option value="name">Nome A-Z</option>
+                            <option value="price-low">Menor Preço</option>
+                            <option value="price-high">Maior Preço</option>
+                            <option value="featured">Em Destaque</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Products Grid -->
+        <section class="products-grid">
+            <div class="container">
+                <div class="products-grid__container" id="products-container">
+                    <!-- Products will be dynamically loaded here -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer__content">
+                <div class="footer__section">
+                    <div class="footer__brand">
+                        <h3 class="footer__title">Farmácia São Benedito</h3>
+                        <p class="footer__description">Cuidando da sua saúde com qualidade e dedicação desde 1985.</p>
+                        <div class="footer__social">
+                            <a href="#" class="social-link"><i class="fab fa-facebook"></i></a>
+                            <a href="#" class="social-link"><i class="fab fa-instagram"></i></a>
+                            <a href="#" class="social-link"><i class="fab fa-whatsapp"></i></a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="footer__section">
+                    <h4 class="footer__section-title">Links Úteis</h4>
+                    <ul class="footer__links">
+                        <li><a href="#" class="footer__link">Sobre Nós</a></li>
+                        <li><a href="#" class="footer__link">Política de Privacidade</a></li>
+                        <li><a href="#" class="footer__link">Termos de Uso</a></li>
+                        <li><a href="#" class="footer__link">FAQ</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer__section">
+                    <h4 class="footer__section-title">Contato</h4>
+                    <div class="footer__contact">
+                        <p><i class="fas fa-phone"></i> (11) 99999-9999</p>
+                        <p><i class="fas fa-envelope"></i> contato@farmaciasaobenedito.com.br</p>
+                        <p><i class="fas fa-map-marker-alt"></i> Rua das Flores, 123 - Centro</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer__bottom">
+                <p>&copy; 2024 Farmácia São Benedito. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loading-spinner">
+        <div class="spinner"></div>
+        <p>Carregando produtos...</p>
+    </div>
+
+    <!-- Error Message -->
+    <div class="error-message" id="error-message">
+        <p>Erro ao carregar produtos. Tente novamente.</p>
+        <button class="btn btn--primary" onclick="location.reload()">Recarregar</button>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Simple products page functionality without external dependencies
+        document.addEventListener('DOMContentLoaded', function() {
+            // Sample products data
+            const products = [
+                {
+                    id: 1,
+                    name: 'Dipirona 500mg',
+                    description: 'Analgésico e antitérmico para dores e febre',
+                    price: 12.50,
+                    oldPrice: 15.00,
+                    image: 'img/produtos/produto1.jpg',
+                    category: 'medicamentos',
+                    featured: true
+                },
+                {
+                    id: 2,
+                    name: 'Vitamina D 50k UI',
+                    description: 'Suplemento vitamínico para fortalecimento ósseo',
+                    price: 28.90,
+                    image: 'img/produtos/vitaminad50k8un.png',
+                    category: 'suplementos',
+                    featured: true
+                },
+                {
+                    id: 3,
+                    name: 'Pampers Shampoo 400ml',
+                    description: 'Shampoo infantil para cabelos delicados',
+                    price: 18.50,
+                    oldPrice: 22.00,
+                    image: 'img/produtos/pampers-shampoo-400ml.jpg',
+                    category: 'infantil',
+                    featured: false
+                },
+                {
+                    id: 4,
+                    name: 'Pomada Prati',
+                    description: 'Pomada cicatrizante e anti-inflamatória',
+                    price: 24.90,
+                    image: 'img/produtos/pomadaprati.png',
+                    category: 'medicamentos',
+                    featured: true
+                },
+                {
+                    id: 5,
+                    name: 'Fluitoss Xarope',
+                    description: 'Xarope expectorante para tosse com catarro',
+                    price: 16.80,
+                    image: 'img/produtos/FLUITOSS.png',
+                    category: 'medicamentos',
+                    featured: false
+                },
+                {
+                    id: 6,
+                    name: 'Pampers Condicionador 200ml',
+                    description: 'Condicionador infantil hipoalergênico',
+                    price: 14.90,
+                    image: 'img/produtos/pampers-condicionador-200ml.jpg',
+                    category: 'infantil',
+                    featured: false
+                },
+                {
+                    id: 7,
+                    name: 'Toalha Mili Love',
+                    description: 'Toalha umedecida para bebês e crianças',
+                    price: 8.50,
+                    oldPrice: 10.00,
+                    image: 'img/produtos/toalha-mili-love.jpg',
+                    category: 'infantil',
+                    featured: false
+                },
+                {
+                    id: 8,
+                    name: 'Creme Germed Rosa',
+                    description: 'Creme dermatológico hidratante e calmante',
+                    price: 32.50,
+                    image: 'img/produtos/GERMEDROSA.png',
+                    category: 'dermocosmeticos',
+                    featured: true
+                }
+            ];
+
+            let currentFilter = 'all';
+            let currentSort = 'name';
+
+            // Initialize page
+            function init() {
+                hideLoading();
+                renderProducts();
+                setupEventListeners();
+            }
+
+            function hideLoading() {
+                const spinner = document.getElementById('loading-spinner');
+                if (spinner) spinner.style.display = 'none';
+            }
+
+            function setupEventListeners() {
+                // Filter buttons
+                const filterButtons = document.querySelectorAll('.filter-btn');
+                filterButtons.forEach(btn => {
+                    btn.addEventListener('click', () => handleFilter(btn.dataset.category));
+                });
+
+                // Sort dropdown
+                const sortSelect = document.querySelector('.sort-select');
+                if (sortSelect) {
+                    sortSelect.addEventListener('change', (e) => handleSort(e.target.value));
+                }
+
+                // Mobile menu
+                const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+                if (mobileMenuToggle) {
+                    mobileMenuToggle.addEventListener('click', toggleMobileMenu);
+                }
+
+                const mobileSidebarClose = document.getElementById('mobile-sidebar-close');
+                const mobileOverlay = document.getElementById('mobile-overlay');
+                
+                if (mobileSidebarClose) {
+                    mobileSidebarClose.addEventListener('click', closeMobileSidebar);
+                }
+                
+                if (mobileOverlay) {
+                    mobileOverlay.addEventListener('click', closeMobileSidebar);
+                }
+            }
+
+            function renderProducts() {
+                const container = document.getElementById('products-container');
+                if (!container) return;
+
+                const filteredProducts = filterProducts();
+                const sortedProducts = sortProducts(filteredProducts);
+
+                if (sortedProducts.length === 0) {
+                    container.innerHTML = `
+                        <div style="grid-column: 1 / -1; text-align: center; padding: 2rem;">
+                            <p>Nenhum produto encontrado com os filtros selecionados.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = sortedProducts.map(product => `
+                    <div class="product-card" data-category="${product.category}">
+                        <div class="product-card__image">
+                            <img src="${product.image}" alt="${product.name}" loading="lazy">
+                            ${product.featured ? '<div class="product-card__badge">Destaque</div>' : ''}
+                        </div>
+                        <div class="product-card__content">
+                            <h3 class="product-card__title">${product.name}</h3>
+                            <p class="product-card__description">${product.description}</p>
+                            <div class="product-card__price">
+                                <span class="product-card__price-current">R$ ${product.price.toFixed(2).replace('.', ',')}</span>
+                                ${product.oldPrice ? `<span class="product-card__price-old">R$ ${product.oldPrice.toFixed(2).replace('.', ',')}</span>` : ''}
+                            </div>
+                            <div class="product-card__actions">
+                                <button class="btn btn--primary btn--add-cart" onclick="addToCart(${product.id})">
+                                    <i class="fas fa-shopping-cart"></i>
+                                    Adicionar
+                                </button>
+                                <button class="btn--wishlist" onclick="addToWishlist(${product.id})">
+                                    <i class="fas fa-heart"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            function filterProducts() {
+                if (currentFilter === 'all') {
+                    return products;
+                }
+                return products.filter(product => product.category === currentFilter);
+            }
+
+            function sortProducts(products) {
+                const sortedProducts = [...products];
+                
+                switch (currentSort) {
+                    case 'price-low':
+                        return sortedProducts.sort((a, b) => a.price - b.price);
+                    case 'price-high':
+                        return sortedProducts.sort((a, b) => b.price - a.price);
+                    case 'featured':
+                        return sortedProducts.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
+                    case 'name':
+                    default:
+                        return sortedProducts.sort((a, b) => a.name.localeCompare(b.name));
+                }
+            }
+
+            function handleFilter(category) {
+                currentFilter = category;
+                
+                // Update active filter button
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.classList.remove('filter-btn--active');
+                });
+                
+                document.querySelector(`[data-category="${category}"]`).classList.add('filter-btn--active');
+                
+                renderProducts();
+            }
+
+            function handleSort(sortType) {
+                currentSort = sortType;
+                renderProducts();
+            }
+
+            function toggleMobileMenu() {
+                const sidebar = document.getElementById('mobile-sidebar');
+                const overlay = document.getElementById('mobile-overlay');
+                const toggle = document.getElementById('mobile-menu-toggle');
+                
+                if (sidebar && overlay && toggle) {
+                    sidebar.classList.toggle('active');
+                    overlay.classList.toggle('active');
+                    toggle.classList.toggle('active');
+                    
+                    if (sidebar.classList.contains('active')) {
+                        document.body.style.overflow = 'hidden';
+                    } else {
+                        document.body.style.overflow = '';
+                    }
+                }
+            }
+
+            function closeMobileSidebar() {
+                const sidebar = document.getElementById('mobile-sidebar');
+                const overlay = document.getElementById('mobile-overlay');
+                const toggle = document.getElementById('mobile-menu-toggle');
+                
+                if (sidebar && overlay && toggle) {
+                    sidebar.classList.remove('active');
+                    overlay.classList.remove('active');
+                    toggle.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            }
+
+            // Global functions
+            window.addToCart = function(productId) {
+                alert('Produto adicionado ao carrinho!');
+            };
+
+            window.addToWishlist = function(productId) {
+                alert('Produto adicionado à lista de desejos!');
+            };
+
+            // Initialize
+            init();
+        });
+    </script>
+</body>
+</html>
