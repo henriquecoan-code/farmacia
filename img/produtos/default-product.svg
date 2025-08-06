@@ -1,0 +1,9 @@
+<!-- SVG placeholder for default product image -->
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" fill="#f3f4f6"/>
+  <g transform="translate(100,100)">
+    <circle cx="0" cy="-15" r="15" fill="#9ca3af"/>
+    <rect x="-20" y="5" width="40" height="30" rx="5" fill="#9ca3af"/>
+    <text x="0" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#6b7280">Produto</text>
+  </g>
+</svg>

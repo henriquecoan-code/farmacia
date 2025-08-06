@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Firebase Products</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .product { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .price { color: green; font-weight: bold; }
+        .error { color: red; padding: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <h1>Firebase Products Test</h1>
+    <div id="products-container"></div>
+    
+    <script type="module">
+        import { FirebaseService } from './modern/js/services/firebase-service.js';
+        
+        async function testFirebaseConnection() {
+            const container = document.getElementById('products-container');
+            
+            try {
+                const firebaseService = new FirebaseService();
+                await firebaseService.init();
+                
+                container.innerHTML = '<p>Firebase connected successfully! Loading products...</p>';
+                
+                const products = await firebaseService.getProducts();
+                
+                if (products.length === 0) {
+                    container.innerHTML = `
+                        <div class="error">
+                            <h2>No products found in Firestore</h2>
+                            <p>The Firebase connection is working, but no products are available.</p>
+                            <p>Expected Firestore structure:</p>
+                            <pre style="text-align: left; background: #f5f5f5; padding: 10px;">
+{
+  "categoria": "medicamentos",
+  "codRed": "35429",
+  "criadoEm": "2025-08-04T12:18:13Z",
+  "dcb": "",
+  "desconto": -0.311746031904762,
+  "descricao": "Analgésico e antitérmico",
+  "ean": "7,89601E+12",
+  "fotos": ["url1", "url2"],
+  "laboratorio": "HALEON",
+  "nome": "ADVIL MULHER 400MG 10CAP LIQ",
+  "precoComDesconto": 27.54666667,
+  "precoMaximo": 21,
+  "quantidade": 0,
+  "subcategoria": [],
+  "tags": [],
+  "valorComDesconto": 27.54666667
+}
+                            </pre>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = '<h2>Products found:</h2>' + 
+                        products.map(product => `
+                            <div class="product">
+                                <h3>${product.nome || product.name || 'No name'}</h3>
+                                <p><strong>Categoria:</strong> ${product.categoria || product.category || 'N/A'}</p>
+                                <p><strong>Descrição:</strong> ${product.descricao || product.description || 'N/A'}</p>
+                                <p><strong>Laboratório:</strong> ${product.laboratorio || 'N/A'}</p>
+                                <p class="price">Preço: R$ ${(product.precoComDesconto || product.valorComDesconto || product.price || 0).toFixed(2).replace('.', ',')}</p>
+                                <p><strong>Quantidade:</strong> ${product.quantidade !== undefined ? product.quantidade : 'N/A'}</p>
+                                <p><strong>Código:</strong> ${product.codRed || product.id || 'N/A'}</p>
+                            </div>
+                        `).join('');
+                }
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="error">
+                        <h2>Firebase connection failed</h2>
+                        <p>Error: ${error.message}</p>
+                        <p>This is expected if you haven't set up Firebase or if the network blocks external requests.</p>
+                    </div>
+                `;
+            }
+        }
+        
+        testFirebaseConnection();
+    </script>
+</body>
+</html>
