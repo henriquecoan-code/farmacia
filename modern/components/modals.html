@@ -1,0 +1,51 @@
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+</div>
+
+<!-- Cart Modal -->
+<div class="modal" id="cart-modal">
+    <div class="modal__backdrop" id="cart-modal-backdrop"></div>
+    <div class="modal__content">
+        <div class="modal__header">
+            <h3>Carrinho de Compras</h3>
+            <button class="modal__close" id="cart-modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal__body" id="cart-items">
+            <!-- Cart items will be loaded here -->
+        </div>
+        <div class="modal__footer">
+            <div class="cart-total" id="cart-total">Total: R$ 0,00</div>
+            <button class="btn btn--primary btn--full">Finalizar Compra</button>
+        </div>
+    </div>
+</div>
+
+<!-- Auth Modal -->
+<div class="modal" id="auth-modal">
+    <div class="modal__backdrop" id="auth-modal-backdrop"></div>
+    <div class="modal__content">
+        <div class="modal__header">
+            <h3 id="auth-modal-title">Entrar</h3>
+            <button class="modal__close" id="auth-modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal__body">
+            <form id="auth-form">
+                <div class="form-group">
+                    <input type="email" id="auth-email" placeholder="E-mail" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="auth-password" placeholder="Senha" required>
+                </div>
+                <button type="submit" class="btn btn--primary btn--full">Entrar</button>
+            </form>
+            <p class="auth-switch">
+                Não tem conta? <a href="#" id="auth-toggle">Cadastre-se</a>
+            </p>
+        </div>
+    </div>
+</div>

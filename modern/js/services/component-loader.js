@@ -69,9 +69,37 @@ class ComponentLoader {
         if (success && type === 'default') {
             // Set active navigation link based on current page
             this.setActiveNavigation();
+            
+            // Setup header event listeners for modals
+            this.setupHeaderEventListeners();
         }
         
         return success;
+    }
+
+    /**
+     * Setup event listeners for header buttons
+     */
+    setupHeaderEventListeners() {
+        // User button - open auth modal
+        const userBtn = document.getElementById('user-btn');
+        if (userBtn) {
+            userBtn.addEventListener('click', () => {
+                if (window.modalsManager) {
+                    window.modalsManager.openAuthModal('login');
+                }
+            });
+        }
+
+        // Cart button - open cart modal
+        const cartBtn = document.getElementById('cart-btn');
+        if (cartBtn) {
+            cartBtn.addEventListener('click', () => {
+                if (window.modalsManager) {
+                    window.modalsManager.openCartModal();
+                }
+            });
+        }
     }
 
     /**
