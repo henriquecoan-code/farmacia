@@ -74,6 +74,18 @@ class PharmacyApp {
       mobileMenuToggle.addEventListener('click', () => this.toggleMobileMenu());
     }
 
+    // Mobile sidebar close events
+    const mobileSidebarClose = document.getElementById('mobile-sidebar-close');
+    const mobileOverlay = document.getElementById('mobile-overlay');
+    
+    if (mobileSidebarClose) {
+      mobileSidebarClose.addEventListener('click', () => this.closeMobileSidebar());
+    }
+    
+    if (mobileOverlay) {
+      mobileOverlay.addEventListener('click', () => this.closeMobileSidebar());
+    }
+
     // Hero buttons
     const heroButtons = document.querySelectorAll('.hero__actions .btn');
     heroButtons.forEach((btn, index) => {
@@ -402,12 +414,34 @@ class PharmacyApp {
   }
 
   toggleMobileMenu() {
-    const nav = document.getElementById('nav');
+    const sidebar = document.getElementById('mobile-sidebar');
+    const overlay = document.getElementById('mobile-overlay');
     const toggle = document.getElementById('mobile-menu-toggle');
     
-    if (nav && toggle) {
-      nav.style.display = nav.style.display === 'block' ? 'none' : 'block';
+    if (sidebar && overlay && toggle) {
+      sidebar.classList.toggle('active');
+      overlay.classList.toggle('active');
       toggle.classList.toggle('active');
+      
+      // Prevent body scroll when sidebar is open
+      if (sidebar.classList.contains('active')) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
+    }
+  }
+
+  closeMobileSidebar() {
+    const sidebar = document.getElementById('mobile-sidebar');
+    const overlay = document.getElementById('mobile-overlay');
+    const toggle = document.getElementById('mobile-menu-toggle');
+    
+    if (sidebar && overlay && toggle) {
+      sidebar.classList.remove('active');
+      overlay.classList.remove('active');
+      toggle.classList.remove('active');
+      document.body.style.overflow = '';
     }
   }
 }
