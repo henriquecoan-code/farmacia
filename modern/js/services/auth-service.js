@@ -31,6 +31,10 @@ export class AuthService {
       this.updateAuthModalUI();
       modal.classList.add('active');
       document.body.style.overflow = 'hidden';
+    } else {
+      console.error('Auth modal not found');
+      // Fallback: show a basic alert
+      alert('Por favor, recarregue a página e tente novamente.');
     }
   }
 
@@ -97,7 +101,7 @@ export class AuthService {
     }
 
     if (!this.firebaseService) {
-      this.showError('Serviço de autenticação não disponível');
+      this.showError('Serviço de autenticação não disponível. Verifique sua conexão e recarregue a página.');
       return;
     }
 
