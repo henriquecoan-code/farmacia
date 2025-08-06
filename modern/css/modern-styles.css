@@ -992,7 +992,11 @@ a:hover {
   flex-wrap: wrap;
 }
 
+/* Filter buttons with icons */
 .filter-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
   padding: var(--spacing-2) var(--spacing-4);
   background-color: var(--white);
   color: var(--gray-600);
@@ -1009,6 +1013,10 @@ a:hover {
   background-color: var(--primary-color);
   color: var(--white);
   border-color: var(--primary-color);
+}
+
+.filter-btn i {
+  font-size: var(--font-size-sm);
 }
 
 .sort-select {
@@ -1075,6 +1083,18 @@ a:hover {
   font-weight: 600;
 }
 
+.product-card__brand {
+  position: absolute;
+  top: var(--spacing-3);
+  right: var(--spacing-3);
+  background-color: var(--secondary-color);
+  color: var(--white);
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
 .product-card__content {
   padding: var(--spacing-4);
 }
@@ -1097,7 +1117,8 @@ a:hover {
   display: flex;
   align-items: center;
   gap: var(--spacing-2);
-  margin-bottom: var(--spacing-4);
+  margin-bottom: var(--spacing-3);
+  flex-wrap: wrap;
 }
 
 .product-card__price-current {
@@ -1110,6 +1131,36 @@ a:hover {
   font-size: var(--font-size-sm);
   color: var(--gray-500);
   text-decoration: line-through;
+}
+
+.product-card__discount {
+  background-color: var(--accent-color);
+  color: var(--white);
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.product-card__code {
+  color: var(--gray-500);
+  font-size: var(--font-size-xs);
+  margin-bottom: var(--spacing-2);
+}
+
+.product-card__stock {
+  margin-bottom: var(--spacing-3);
+  font-size: var(--font-size-sm);
+}
+
+.in-stock {
+  color: var(--success-color);
+  font-weight: 500;
+}
+
+.out-of-stock {
+  color: var(--accent-color);
+  font-weight: 500;
 }
 
 .product-card__actions {
