@@ -1,5 +1,6 @@
 // Modern Admin Panel
 import { FirebaseService } from './services/firebase-service.js';
+// import ComponentLoader from './services/component-loader.js';
 
 class AdminApp {
   constructor() {
@@ -8,12 +9,16 @@ class AdminApp {
     this.clients = [];
     this.editingProduct = null;
     this.firebase = new FirebaseService();
+    // this.componentLoader = new ComponentLoader();
     
     this.init();
   }
 
   async init() {
     try {
+      // Load components first
+      // await this.loadComponents();
+      
       // Initialize Firebase
       await this.firebase.init();
       
@@ -39,7 +44,24 @@ class AdminApp {
     }
   }
 
+  // async loadComponents() {
+  //   try {
+  //     // Load admin header component
+  //     await this.componentLoader.loadHeader('admin');
+      
+  //     console.log('Admin components loaded successfully');
+  //   } catch (error) {
+  //     console.error('Error loading admin components:', error);
+  //   }
+  // }
+
   setupEventListeners() {
+    // Admin logout
+    const logoutBtn = document.getElementById('admin-logout');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => this.handleLogout());
+    }
+
     // Navigation
     document.querySelectorAll('.admin-nav__link').forEach(link => {
       link.addEventListener('click', (e) => {
@@ -73,12 +95,6 @@ class AdminApp {
     const categoryFilter = document.getElementById('category-filter');
     if (categoryFilter) {
       categoryFilter.addEventListener('change', () => this.filterProducts());
-    }
-
-    // Logout
-    const logoutBtn = document.getElementById('admin-logout');
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => this.handleLogout());
     }
   }
 

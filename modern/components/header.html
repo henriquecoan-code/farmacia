@@ -1,0 +1,128 @@
+<!-- Header -->
+<header class="header" id="header">
+    <div class="container">
+        <div class="header__content">
+            <!-- Logo -->
+            <div class="header__logo">
+                <a href="modern-index.html" class="logo">
+                    <i class="fas fa-pills logo__icon"></i>
+                    <span class="logo__text">Farmácia São Benedito</span>
+                </a>
+            </div>
+
+            <!-- Search -->
+            <div class="header__search">
+                <div class="search-box">
+                    <input type="text" class="search-box__input" placeholder="Buscar medicamentos, produtos...">
+                    <button class="search-box__button">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="header__actions">
+                <button class="action-btn" id="user-btn">
+                    <i class="fas fa-user"></i>
+                    <span>Entrar</span>
+                    <div class="user-tooltip">
+                        Clique para fazer login<br>
+                        <small>Ou criar sua conta</small>
+                    </div>
+                </button>
+                <button class="action-btn cart-btn" id="cart-btn">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span class="cart-counter" id="cart-counter">0</span>
+                </button>
+            </div>
+
+            <!-- Mobile Menu Toggle -->
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </div>
+</header>
+
+<!-- Navigation -->
+<nav class="nav" id="nav">
+    <div class="container">
+        <ul class="nav__list">
+            <li class="nav__item">
+                <a href="modern-index.html" class="nav__link">
+                    <i class="fas fa-home"></i>
+                    Início
+                </a>
+            </li>
+            <li class="nav__item">
+                <a href="produtos.html" class="nav__link">
+                    <i class="fas fa-pills"></i>
+                    Medicamentos
+                </a>
+            </li>
+            <li class="nav__item">
+                <a href="#" class="nav__link">
+                    <i class="fas fa-percent"></i>
+                    Ofertas
+                </a>
+            </li>
+            <li class="nav__item">
+                <a href="#" class="nav__link">
+                    <i class="fas fa-heart"></i>
+                    Dermocosméticos
+                </a>
+            </li>
+            <li class="nav__item">
+                <a href="#" class="nav__link">
+                    <i class="fas fa-dumbbell"></i>
+                    Suplementos
+                </a>
+            </li>
+            <li class="nav__item">
+                <a href="#" class="nav__link">
+                    <i class="fas fa-phone"></i>
+                    Contato
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<!-- Mobile Sidebar -->
+<div class="mobile-overlay" id="mobile-overlay"></div>
+<div class="mobile-sidebar" id="mobile-sidebar">
+    <div class="mobile-sidebar__header">
+        <h3 class="mobile-sidebar__title">Menu</h3>
+        <button class="mobile-sidebar__close" id="mobile-sidebar-close">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <nav class="mobile-sidebar__nav">
+        <a href="modern-index.html" class="nav__link">
+            <i class="fas fa-home"></i>
+            Início
+        </a>
+        <a href="produtos.html" class="nav__link">
+            <i class="fas fa-pills"></i>
+            Medicamentos
+        </a>
+        <a href="#" class="nav__link">
+            <i class="fas fa-percent"></i>
+            Ofertas
+        </a>
+        <a href="#" class="nav__link">
+            <i class="fas fa-heart"></i>
+            Dermocosméticos
+        </a>
+        <a href="#" class="nav__link">
+            <i class="fas fa-dumbbell"></i>
+            Suplementos
+        </a>
+        <a href="#" class="nav__link">
+            <i class="fas fa-phone"></i>
+            Contato
+        </a>
+    </nav>
+</div>
