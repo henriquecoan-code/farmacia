@@ -16,11 +16,15 @@ export class AuthService {
   }
 
   setupAuthStateListener() {
-    if (this.firebaseService) {
+    if (this.firebaseService && this.firebaseService.isInitialized) {
       this.firebaseService.onAuthStateChanged((user) => {
         this.user = user;
         this.updateUserUI();
       });
+    } else {
+      // Update UI immediately with no user when Firebase is not available
+      this.user = null;
+      this.updateUserUI();
     }
   }
 
@@ -69,15 +73,7 @@ export class AuthService {
         authToggle.textContent = 'Entrar';
         authSwitchText.innerHTML = 'Já tem conta? <a href="#" id="auth-toggle">Entrar</a>';
       }
-
-      // Re-attach event listener
-      const newAuthToggle = document.getElementById('auth-toggle');
-      if (newAuthToggle) {
-        newAuthToggle.addEventListener('click', (e) => {
-          e.preventDefault();
-          this.toggleAuthMode();
-        });
-      }
+      // Note: Event listener is handled by event delegation in main app, no need to reattach
     }
   }
 
@@ -96,8 +92,8 @@ export class AuthService {
       return;
     }
 
-    if (!this.firebaseService) {
-      this.showError('Serviço de autenticação não disponível');
+    if (!this.firebaseService || !this.firebaseService.isInitialized) {
+      this.showError('Modo offline: Autenticação não disponível no momento. Tente novamente quando a conexão for restaurada.');
       return;
     }
 
@@ -123,7 +119,10 @@ export class AuthService {
 
   // Sign out user
   async signOut() {
-    if (!this.firebaseService) return;
+    if (!this.firebaseService || !this.firebaseService.isInitialized) {
+      this.showError('Modo offline: Logout não disponível no momento.');
+      return;
+    }
 
     try {
       await this.firebaseService.signOut();

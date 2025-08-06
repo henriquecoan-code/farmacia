@@ -33,8 +33,9 @@ export class FirebaseService {
 
       console.log('Firebase initialized successfully');
     } catch (error) {
-      console.error('Error initializing Firebase:', error);
-      throw error;
+      console.warn('Firebase initialization failed, running in offline mode:', error);
+      // Don't throw error, just mark as not initialized so fallback can be used
+      this.isInitialized = false;
     }
   }
 
