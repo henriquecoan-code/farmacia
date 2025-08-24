@@ -3,6 +3,7 @@ import { FirebaseService } from './services/firebase-service.js';
 import { CartService } from './services/cart-service.js';
 import { AuthService } from './services/auth-service.js';
 import { UIService } from './services/ui-service.js';
+import { ModalsManager } from './services/modals-service.js';
 import ComponentLoader from './services/component-loader.js';
 
 class PharmacyApp {
@@ -11,6 +12,7 @@ class PharmacyApp {
     this.cart = new CartService();
     this.auth = new AuthService();
     this.ui = new UIService();
+    this.modals = new ModalsManager();
     this.componentLoader = new ComponentLoader();
     
     this.init();
@@ -24,15 +26,26 @@ class PharmacyApp {
       // Load components first
       await this.loadComponents();
       
-      // Initialize Firebase
-      await this.firebase.init();
+      // Initialize Firebase (but don't fail if it doesn't work)
+      try {
+        await this.firebase.init();
+        console.log('Firebase initialized successfully');
+      } catch (firebaseError) {
+        console.warn('Firebase initialization failed, continuing without it:', firebaseError);
+      }
       
-      // Initialize services
+      // Initialize services (always continue even if Firebase failed)
       this.cart.init();
       this.auth.init();
       this.auth.setFirebaseService(this.firebase);
       
-      // Setup event listeners
+      // Initialize modals
+      await this.modals.init();
+      
+      // Make modals globally available
+      window.modalsManager = this.modals;
+      
+      // Setup event listeners (this must work regardless of Firebase)
       this.setupEventListeners();
       
       // Load initial data
@@ -45,7 +58,16 @@ class PharmacyApp {
     } catch (error) {
       console.error('Error initializing app:', error);
       this.ui.hideLoading();
-      this.ui.showError('Erro ao carregar a aplicação. Tente novamente.');
+      
+      // Still try to setup basic functionality even if initialization failed
+      try {
+        await this.loadComponents();
+        this.setupEventListeners();
+        console.log('Basic functionality loaded without full initialization');
+      } catch (fallbackError) {
+        console.error('Complete initialization failure:', fallbackError);
+        this.ui.showError('Erro ao carregar a aplicação. Tente novamente.');
+      }
     }
   }
 
@@ -62,15 +84,26 @@ class PharmacyApp {
   }
 
   setupEventListeners() {
-    // Wait for components to be loaded before setting up event listeners
+    // Setup general event listeners first
+    this.setupGeneralEventListeners();
+    
+    // Wait for components to be loaded before setting up header event listeners
     document.addEventListener('componentLoaded', (event) => {
       if (event.detail.componentName === 'header') {
-        this.setupHeaderEventListeners();
+        // Add a small delay to ensure the DOM is fully rendered
+        setTimeout(() => {
+          this.setupHeaderEventListeners();
+        }, 100);
       }
     });
     
-    // Setup other general event listeners
-    this.setupGeneralEventListeners();
+    // Also try to setup header listeners immediately in case the component is already loaded
+    setTimeout(() => {
+      const userBtn = document.getElementById('user-btn');
+      if (userBtn && !userBtn.hasAttribute('data-listener-attached')) {
+        this.setupHeaderEventListeners();
+      }
+    }, 500);
   }
 
   setupHeaderEventListeners() {
@@ -85,20 +118,45 @@ class PharmacyApp {
       });
     }
 
-    // User authentication
+    // User authentication - use modals manager
     const userBtn = document.getElementById('user-btn');
-    if (userBtn) {
+    if (userBtn && !userBtn.hasAttribute('data-listener-attached')) {
+      userBtn.setAttribute('data-listener-attached', 'true');
       userBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        this.auth.showAuthModal();
+        
+        console.log('User button clicked - showing auth modal');
+        
+        // If user is already logged in and Firebase is available, show dropdown
+        if (this.auth.user && this.firebase.isInitialized) {
+          // Let the existing dropdown functionality handle this
+          return;
+        }
+        
+        // Use modals manager
+        if (window.modalsManager) {
+          window.modalsManager.openAuthModal('login');
+        } else {
+          // Fallback to old method
+          this.auth.showAuthModal();
+        }
       });
+      
+      console.log('User button event listener attached successfully');
     }
 
-    // Cart modal
+    // Cart modal - use modals manager
     const cartBtn = document.getElementById('cart-btn');
     if (cartBtn) {
-      cartBtn.addEventListener('click', () => this.cart.showCartModal());
+      cartBtn.addEventListener('click', () => {
+        if (window.modalsManager) {
+          window.modalsManager.openCartModal();
+        } else {
+          // Fallback to old method
+          this.cart.showCartModal();
+        }
+      });
     }
 
     // Mobile menu toggle
@@ -168,14 +226,13 @@ class PharmacyApp {
       authForm.addEventListener('submit', (e) => this.auth.handleAuthSubmit(e));
     }
 
-    // Auth toggle
-    const authToggle = document.getElementById('auth-toggle');
-    if (authToggle) {
-      authToggle.addEventListener('click', (e) => {
+    // Auth toggle - Use event delegation to handle dynamically created elements
+    document.addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'auth-toggle') {
         e.preventDefault();
         this.auth.toggleAuthMode();
-      });
-    }
+      }
+    });
   }
 
   async loadInitialData() {
@@ -308,8 +365,15 @@ class PharmacyApp {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const product = JSON.parse(btn.dataset.product);
-          this.cart.addItem(product);
-          this.ui.showSuccess(`${product.name} adicionado ao carrinho!`);
+          
+          // Use modals manager if available
+          if (window.modalsManager) {
+            window.modalsManager.addToCart(product);
+          } else {
+            // Fallback to old method
+            this.cart.addItem(product);
+            this.ui.showSuccess(`${product.name} adicionado ao carrinho!`);
+          }
         });
       });
 
@@ -401,8 +465,15 @@ class PharmacyApp {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const product = JSON.parse(btn.dataset.product);
-        this.cart.addItem(product);
-        this.ui.showSuccess(`${product.name} adicionado ao carrinho!`);
+        
+        // Use modals manager if available
+        if (window.modalsManager) {
+          window.modalsManager.addToCart(product);
+        } else {
+          // Fallback to old method
+          this.cart.addItem(product);
+          this.ui.showSuccess(`${product.name} adicionado ao carrinho!`);
+        }
       });
     });
 
