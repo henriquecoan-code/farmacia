@@ -162,7 +162,7 @@
                 <div class="section-header">
                     <h2>Pedidos</h2>
                     <div class="section-filters">
-                        <select class="filter-select">
+                        <select class="filter-select" id="orders-status-filter">
                             <option value="">Todos os status</option>
                             <option value="pending">Pendente</option>
                             <option value="processing">Processando</option>
@@ -174,7 +174,7 @@
                 </div>
 
                 <div class="orders-table-container">
-                    <table class="orders-table">
+                    <table class="orders-table" id="orders-table">
                         <thead>
                             <tr>
                                 <th>Pedido</th>
@@ -185,29 +185,8 @@
                                 <th>Ações</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr>
-                                <td>#001</td>
-                                <td>João Silva</td>
-                                <td>04/08/2024</td>
-                                <td>R$ 45,90</td>
-                                <td><span class="status status--pending">Pendente</span></td>
-                                <td>
-                                    <button class="btn-icon" title="Ver detalhes">👁️</button>
-                                    <button class="btn-icon" title="Editar">✏️</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>#002</td>
-                                <td>Maria Santos</td>
-                                <td>04/08/2024</td>
-                                <td>R$ 78,50</td>
-                                <td><span class="status status--processing">Processando</span></td>
-                                <td>
-                                    <button class="btn-icon" title="Ver detalhes">👁️</button>
-                                    <button class="btn-icon" title="Editar">✏️</button>
-                                </td>
-                            </tr>
+                        <tbody id="orders-table-body">
+                            <!-- Orders loaded dynamically -->
                         </tbody>
                     </table>
                 </div>

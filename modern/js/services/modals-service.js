@@ -41,6 +41,7 @@ export class ModalsManager {
     // Cart Modal Events
     const cartCloseBtn = document.getElementById('cart-modal-close');
     const cartBackdrop = document.getElementById('cart-modal-backdrop');
+  const goCheckoutBtn = document.getElementById('go-checkout-btn');
     
     if (cartCloseBtn) {
       cartCloseBtn.addEventListener('click', () => this.closeCartModal());
@@ -48,6 +49,12 @@ export class ModalsManager {
     
     if (cartBackdrop) {
       cartBackdrop.addEventListener('click', () => this.closeCartModal());
+    }
+    if (goCheckoutBtn) {
+      goCheckoutBtn.addEventListener('click', () => {
+        this.closeCartModal();
+        window.location.href = 'checkout.html';
+      });
     }
 
     // Auth Modal Events
@@ -133,11 +140,13 @@ export class ModalsManager {
     }
 
     // Render cart items
-    cartItemsContainer.innerHTML = cart.map(item => `
+    cartItemsContainer.innerHTML = cart.map(item => {
+      const total = (item.price * item.quantity).toFixed(2);
+      return `
       <div class="cart-item" data-id="${item.id}">
         <div class="cart-item__info">
           <h4>${item.name}</h4>
-          <p>R$ ${item.price.toFixed(2)}</p>
+          <p class="cart-item__price">R$ ${item.price.toFixed(2)} <span class="cart-item__mult">x${item.quantity}</span> <span class="cart-item__total">= R$ ${total}</span></p>
         </div>
         <div class="cart-item__controls">
           <button class="btn-qty" onclick="window.modalsManager.updateCartItemQuantity('${item.id}', ${item.quantity - 1})">-</button>
@@ -147,8 +156,10 @@ export class ModalsManager {
             <i class="fas fa-trash"></i>
           </button>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
+
+    this.ensureCartPriceStyles();
 
     // Calculate total
     const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -235,7 +246,7 @@ export class ModalsManager {
     const password = document.getElementById('auth-password').value;
     
     if (!email || !password) {
-      alert('Por favor, preencha todos os campos');
+      window.toast?.warn('Preencha todos os campos.');
       return;
     }
 
@@ -248,13 +259,13 @@ export class ModalsManager {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Success
-      alert(`${this.currentAuthMode === 'login' ? 'Login' : 'Cadastro'} realizado com sucesso!`);
+  // Success
+  window.toast?.success(`${this.currentAuthMode === 'login' ? 'Login' : 'Cadastro'} realizado!`);
       this.closeAuthModal();
       
     } catch (error) {
       console.error('Auth error:', error);
-      alert('Erro na autenticação. Tente novamente.');
+      window.toast?.error('Erro na autenticação.');
     } finally {
       this.hideLoading();
     }
@@ -316,6 +327,19 @@ export class ModalsManager {
     this.showToast(`${qty}x ${product.name} adicionad${qty > 1 ? 'os' : 'o'} ao carrinho!`);
   }
 
+  ensureCartPriceStyles() {
+    if (document.getElementById('cart-price-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'cart-price-styles';
+    style.textContent = `
+      .cart-item__price { font-weight: 600; margin: 4px 0 0; }
+      .cart-item__mult { color: var(--gray-500); font-weight: 400; margin: 0 4px; }
+      .cart-item__total { color: var(--primary-color); font-weight: 700; }
+      .dark-mode .cart-item__total { color: var(--secondary-color); }
+    `;
+    document.head.appendChild(style);
+  }
+
   addToCartWithQuantity(id, name, price, quantity) {
     this.addToCart({ id, name, price, quantity });
   }
@@ -340,21 +364,16 @@ export class ModalsManager {
   }
 
   showToast(message, type = 'success') {
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.className = `toast toast--${type}`;
-    toast.textContent = message;
-    
-    document.body.appendChild(toast);
-    
-    // Show toast
-    setTimeout(() => toast.classList.add('toast--show'), 100);
-    
-    // Hide and remove toast
-    setTimeout(() => {
-      toast.classList.remove('toast--show');
-      setTimeout(() => document.body.removeChild(toast), 300);
-    }, 3000);
+    // Delegate to unified toast service
+    if (window.toast) {
+      if (type === 'error') window.toast.error(message);
+      else if (type === 'warning' || type === 'warn') window.toast.warn(message);
+      else if (type === 'info') window.toast.info(message);
+      else window.toast.success(message);
+      return;
+    }
+    // Fallback minimal
+    console.log(`[toast:${type}]`, message);
   }
 
   // Focus trap implementation

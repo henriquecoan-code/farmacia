@@ -1,650 +1,212 @@
-// Modern Admin Panel
+// Clean rebuilt Admin Panel (products + orders)
 import { FirebaseService } from './services/firebase-service.js';
-// import ComponentLoader from './services/component-loader.js';
 
 class AdminApp {
-  constructor() {
-    this.currentSection = 'dashboard';
-    this.products = [];
-    this.clients = [];
-    this.editingProduct = null;
-    this.firebase = new FirebaseService();
-    // this.componentLoader = new ComponentLoader();
-    
+  constructor(){
+    this.currentSection='dashboard';
+    this.products=[]; this.clients=[]; this.orders=[]; this.ordersLoaded=false;
+    this.editingProduct=null;
+    this.firebase=new FirebaseService();
     this.init();
   }
 
-  async init() {
+  async init(){
     try {
-      // Load components first
-      // await this.loadComponents();
-      
-      // Initialize Firebase
       await this.firebase.init();
-      
-      // Initialize sample data if needed
-      await this.firebase.initializeSampleData();
-      
-      // Setup event listeners
+      if (this.firebase.isInitialized) await this.firebase.initializeSampleData();
       this.setupEventListeners();
-      
-      // Load data from Firestore
       await this.loadFirestoreData();
-      
-      // Render initial data
+      await this.loadAndRenderOrders();
       this.renderProducts();
       this.updateDashboard();
-      
-      console.log('Admin app initialized successfully');
-    } catch (error) {
-      console.error('Error initializing admin app:', error);
-      this.showNotification('Erro ao inicializar aplicação. Usando dados locais.', 'warning');
-      this.loadSampleData();
-      this.renderProducts();
+    } catch(err){
+      console.warn('Init fallback', err); this.loadSampleData(); this.renderProducts(); this.updateDashboard();
+      this.showNotification('Falha ao conectar dados remotos. Modo local.', 'warning');
     }
   }
 
-  // async loadComponents() {
-  //   try {
-  //     // Load admin header component
-  //     await this.componentLoader.loadHeader('admin');
-      
-  //     console.log('Admin components loaded successfully');
-  //   } catch (error) {
-  //     console.error('Error loading admin components:', error);
-  //   }
-  // }
-
-  setupEventListeners() {
-    // Admin logout
-    const logoutBtn = document.getElementById('admin-logout');
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => this.handleLogout());
-    }
-
-    // Navigation
-    document.querySelectorAll('.admin-nav__link').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const section = link.dataset.section;
-        this.showSection(section);
-      });
-    });
-
-    // Add Product Button
-    const addProductBtn = document.getElementById('add-product-btn');
-    if (addProductBtn) {
-      addProductBtn.addEventListener('click', () => this.showProductModal());
-    }
-
-    // Product Modal Events
+  // Navigation
+  setupEventListeners(){
+    document.querySelectorAll('.admin-nav__link').forEach(a=> a.addEventListener('click',e=>{e.preventDefault();this.showSection(a.dataset.section);}));
+    document.getElementById('add-product-btn')?.addEventListener('click',()=> this.showProductModal());
+    document.getElementById('product-form')?.addEventListener('submit',e=> this.handleProductSubmit(e));
+    document.getElementById('products-search')?.addEventListener('input',()=> this.filterProducts());
+    document.getElementById('category-filter')?.addEventListener('change',()=> this.filterProducts());
+    document.getElementById('orders-status-filter')?.addEventListener('change',()=> this.renderOrders());
+    document.getElementById('admin-logout')?.addEventListener('click', ()=> this.handleLogout());
     this.setupProductModalEvents();
-
-    // Product Form
-    const productForm = document.getElementById('product-form');
-    if (productForm) {
-      productForm.addEventListener('submit', (e) => this.handleProductSubmit(e));
-    }
-
-    // Search and Filters
-    const searchInput = document.getElementById('products-search');
-    if (searchInput) {
-      searchInput.addEventListener('input', () => this.filterProducts());
-    }
-
-    const categoryFilter = document.getElementById('category-filter');
-    if (categoryFilter) {
-      categoryFilter.addEventListener('change', () => this.filterProducts());
-    }
+  }
+  showSection(id){
+    document.querySelectorAll('.admin-nav__link').forEach(a=>a.classList.remove('admin-nav__link--active'));
+    document.querySelector(`[data-section="${id}"]`)?.classList.add('admin-nav__link--active');
+    document.querySelectorAll('.admin-section').forEach(s=>s.classList.remove('admin-section--active'));
+    document.getElementById(`${id}-section`)?.classList.add('admin-section--active');
+    this.currentSection=id;
   }
 
-  setupProductModalEvents() {
-    const modal = document.getElementById('product-modal');
-    const closeBtn = document.getElementById('product-modal-close');
-    const cancelBtn = document.getElementById('product-cancel');
-    const backdrop = modal && modal.querySelector('.modal__backdrop');
-
-    const hideModal = () => {
-      if (modal) {
-        modal.classList.remove('active');
-        document.body.style.overflow = '';
-        this.resetProductForm();
-      }
-    };
-
-    if (closeBtn) closeBtn.addEventListener('click', hideModal);
-    if (cancelBtn) cancelBtn.addEventListener('click', hideModal);
-    if (backdrop) backdrop.addEventListener('click', hideModal);
+  // Product modal
+  setupProductModalEvents(){
+    const modal=document.getElementById('product-modal'); if(!modal) return;
+    const hide=()=>{ modal.classList.remove('active'); document.body.style.overflow=''; this.resetProductForm(); };
+    document.getElementById('product-modal-close')?.addEventListener('click',hide);
+    document.getElementById('product-cancel')?.addEventListener('click',hide);
+    modal.querySelector('.modal__backdrop')?.addEventListener('click',hide);
   }
-
-  showSection(sectionId) {
-    // Update navigation
-    document.querySelectorAll('.admin-nav__link').forEach(link => {
-      link.classList.remove('admin-nav__link--active');
-    });
-    
-    const activeLink = document.querySelector(`[data-section="${sectionId}"]`);
-    if (activeLink) {
-      activeLink.classList.add('admin-nav__link--active');
-    }
-
-    // Show section
-    document.querySelectorAll('.admin-section').forEach(section => {
-      section.classList.remove('admin-section--active');
-    });
-
-    const targetSection = document.getElementById(`${sectionId}-section`);
-    if (targetSection) {
-      targetSection.classList.add('admin-section--active');
-    }
-
-    this.currentSection = sectionId;
+  showProductModal(product=null){
+    const modal=document.getElementById('product-modal'); const title=document.getElementById('product-modal-title'); if(!modal||!title) return;
+    this.editingProduct=product; title.textContent = product? 'Editar Produto':'Adicionar Produto';
+    product? this.fillProductForm(product): this.resetProductForm();
+    modal.classList.add('active'); document.body.style.overflow='hidden';
   }
-
-  showProductModal(product = null) {
-    const modal = document.getElementById('product-modal');
-    const title = document.getElementById('product-modal-title');
-    
-    if (modal && title) {
-      this.editingProduct = product;
-      
-      if (product) {
-        title.textContent = 'Editar Produto';
-        this.fillProductForm(product);
-      } else {
-        title.textContent = 'Adicionar Produto';
-        this.resetProductForm();
-      }
-      
-      modal.classList.add('active');
-      document.body.style.overflow = 'hidden';
-    }
+  fillProductForm(p){
+    document.getElementById('product-name').value=p.name||'';
+    document.getElementById('product-category').value=p.category||'';
+    document.getElementById('product-price').value=p.price||'';
+    document.getElementById('product-stock').value=p.stock||'';
+    document.getElementById('product-description').value=p.description||'';
+    document.getElementById('product-status').value=p.status||'active';
+    document.getElementById('product-featured').checked=!!p.featured;
   }
+  resetProductForm(){ document.getElementById('product-form')?.reset(); this.editingProduct=null; }
 
-  fillProductForm(product) {
-    document.getElementById('product-name').value = product.name || '';
-    document.getElementById('product-category').value = product.category || '';
-    document.getElementById('product-price').value = product.price || '';
-    document.getElementById('product-stock').value = product.stock || '';
-    document.getElementById('product-description').value = product.description || '';
-    document.getElementById('product-status').value = product.status || 'active';
-    document.getElementById('product-featured').checked = product.featured || false;
-  }
+  // Data
+  async loadFirestoreData(){ if(!this.firebase.isInitialized) return; this.products=await this.firebase.getProducts(); this.clients=await this.firebase.getClients(); }
 
-  resetProductForm() {
-    const form = document.getElementById('product-form');
-    if (form) {
-      form.reset();
-    }
-    this.editingProduct = null;
-  }
-
-  async loadFirestoreData() {
-    try {
-      // Load products from Firestore
-      this.products = await this.firebase.getProducts();
-      console.log('Loaded products from Firestore:', this.products.length);
-      
-      // Load clients from Firestore
-      this.clients = await this.firebase.getClients();
-      console.log('Loaded clients from Firestore:', this.clients.length);
-    } catch (error) {
-      console.error('Error loading Firestore data:', error);
-      throw error;
-    }
-  }
-
-  updateDashboard() {
-    // Update dashboard metrics
-    const totalSales = this.products.reduce((sum, product) => sum + (product.price * (50 - product.stock)), 0);
-    const totalOrders = Math.floor(Math.random() * 50) + 20;
-    const activeProducts = this.products.filter(p => p.status === 'active').length;
-    const totalClients = this.clients.length;
-
-    // Update dashboard elements
-    this.updateDashboardCard('sales-value', `R$ ${totalSales.toFixed(2).replace('.', ',')}`);
-    this.updateDashboardCard('orders-count', totalOrders);
+  // Dashboard
+  updateDashboard(){
+    const totalSales = this.orders.reduce((s,o)=> s + (o.totals?.total||0),0);
+    const activeProducts = this.products.filter(p=>p.status==='active').length;
+    this.updateDashboardCard('sales-value', 'R$ '+ totalSales.toFixed(2).replace('.',','));
+    this.updateDashboardCard('orders-count', this.orders.length);
     this.updateDashboardCard('products-count', activeProducts);
-    this.updateDashboardCard('clients-count', totalClients);
+    this.updateDashboardCard('clients-count', this.clients.length);
   }
+  updateDashboardCard(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; }
 
-  updateDashboardCard(elementId, value) {
-    const element = document.getElementById(elementId);
-    if (element) {
-      element.textContent = value;
-    }
-  }
-
-  async handleProductSubmit(e) {
+  // Product CRUD
+  async handleProductSubmit(e){
     e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const product = {
-      name: formData.get('name'),
-      category: formData.get('category'),
-      price: parseFloat(formData.get('price')),
-      stock: parseInt(formData.get('stock')),
-      description: formData.get('description'),
-      status: formData.get('status'),
-      featured: formData.has('featured'),
-      updatedAt: new Date().toISOString()
-    };
-
+    const fd=new FormData(e.target);
+    const product={ name:fd.get('name'), category:fd.get('category'), price:parseFloat(fd.get('price')), stock:parseInt(fd.get('stock')), description:fd.get('description'), status:fd.get('status'), featured:fd.has('featured'), updatedAt:new Date().toISOString() };
     try {
-      if (this.editingProduct) {
-        // Update existing product in Firestore
+      if(this.editingProduct){
         await this.firebase.updateProduct(this.editingProduct.id, product);
-        
-        // Update local array
-        const index = this.products.findIndex(p => p.id === this.editingProduct.id);
-        if (index !== -1) {
-          this.products[index] = Object.assign({}, this.editingProduct, product);
-        }
-        
-        this.showNotification('Produto atualizado com sucesso!', 'success');
+        const idx=this.products.findIndex(p=>p.id===this.editingProduct.id); if(idx>-1) this.products[idx]={...this.editingProduct,...product};
+        this.showNotification('Produto atualizado','success');
       } else {
-        // Add new product to Firestore
-        product.createdAt = new Date().toISOString();
-        const newId = await this.firebase.addProduct(product);
-        
-        // Add to local array
-        this.products.push(Object.assign({ id: newId }, product));
-        
-        this.showNotification('Produto adicionado com sucesso!', 'success');
+        product.createdAt=new Date().toISOString();
+        const id=await this.firebase.addProduct(product); this.products.push({id,...product});
+        this.showNotification('Produto adicionado','success');
       }
-
-      // Refresh data and UI
-      this.renderProducts();
-      this.updateDashboard();
-      
-      // Hide modal
-      const modal = document.getElementById('product-modal');
-      if (modal) {
-        modal.classList.remove('active');
-        document.body.style.overflow = '';
-      }
-      
-      this.resetProductForm();
-    } catch (error) {
-      console.error('Error saving product:', error);
-      this.showNotification('Erro ao salvar produto. Tente novamente.', 'error');
-    }
+      document.getElementById('product-modal')?.classList.remove('active'); document.body.style.overflow='';
+      this.resetProductForm(); this.renderProducts(); this.updateDashboard();
+    }catch(err){ console.error(err); this.showNotification('Erro ao salvar produto','error'); }
   }
-    
-    this.resetProductForm();
+  editProduct(id){ const p=this.products.find(x=>x.id===id); if(p) this.showProductModal(p); }
+  async deleteProduct(id){ if(!confirm('Excluir produto?')) return; try { await this.firebase.deleteProduct(id); this.products=this.products.filter(p=>p.id!==id); this.renderProducts(); this.updateDashboard(); this.showNotification('Produto excluído','success'); } catch(e){ this.showNotification('Erro ao excluir','error'); } }
+  async toggleProductStatus(id){ const p=this.products.find(pr=>pr.id===id); if(!p) return; const ns=p.status==='active'?'inactive':'active'; try { await this.firebase.updateProduct(id,{status:ns,updatedAt:new Date().toISOString()}); p.status=ns; this.renderProducts(); this.updateDashboard(); } catch(e){ this.showNotification('Erro status','error'); } }
+
+  // Products list
+  filterProducts(){ const term=(document.getElementById('products-search')?.value||'').toLowerCase(); const cat=document.getElementById('category-filter')?.value||''; let list=[...this.products]; if(term) list=list.filter(p=>(p.name||'').toLowerCase().includes(term)||(p.description||'').toLowerCase().includes(term)); if(cat) list=list.filter(p=>p.category===cat); this.renderProducts(list); }
+  renderProducts(list=null){
+    const tbody=document.getElementById('products-table-body'); if(!tbody) return; const data=list||this.products;
+    if(!data.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum produto</td></tr>'; return; }
+    tbody.innerHTML=data.map(p=>`<tr>
+      <td><div class="product-image">${this.getCategoryIcon(p.category)}</div></td>
+      <td><strong>${p.name}</strong><br><small style="color:var(--gray-500);">${p.description||'—'}</small></td>
+      <td>${this.getCategoryName(p.category)}</td>
+      <td>R$ ${p.price.toFixed(2).replace('.',',')}</td>
+      <td>${p.stock}</td>
+      <td><span class="status status--${p.status}">${p.status==='active'?'Ativo':'Inativo'}</span></td>
+      <td style="white-space:nowrap;">
+        <button class="btn-icon" onclick="adminApp.editProduct('${p.id}')">✏️</button>
+        <button class="btn-icon" onclick="adminApp.toggleProductStatus('${p.id}')">${p.status==='active'?'🔒':'🔓'}</button>
+        <button class="btn-icon" onclick="adminApp.deleteProduct('${p.id}')">🗑️</button>
+      </td>
+    </tr>`).join('');
   }
+  getCategoryIcon(c){ return ({medicamentos:'💊',dermocosmeticos:'💄',suplementos:'💪',higiene:'🧼',bebes:'👶',equipamentos:'🩺'})[c]||'📦'; }
+  getCategoryName(c){ const names={medicamentos:'Medicamentos',dermocosmeticos:'Dermocosméticos',suplementos:'Suplementos',higiene:'Higiene',bebes:'Bebês',equipamentos:'Equipamentos'}; return names[c]||c; }
 
-  editProduct(productId) {
-    const product = this.products.find(p => p.id === productId);
-    if (product) {
-      this.showProductModal(product);
-    }
-  }
-
-  async deleteProduct(productId) {
-    if (confirm('Tem certeza que deseja excluir este produto?')) {
-      try {
-        // Delete from Firestore
-        await this.firebase.deleteProduct(productId);
-        
-        // Remove from local array
-        this.products = this.products.filter(p => p.id !== productId);
-        
-        // Update UI
-        this.renderProducts();
-        this.updateDashboard();
-        this.showNotification('Produto excluído com sucesso!', 'success');
-      } catch (error) {
-        console.error('Error deleting product:', error);
-        this.showNotification('Erro ao excluir produto. Tente novamente.', 'error');
-      }
-    }
-  }
-
-  async toggleProductStatus(productId) {
-    const product = this.products.find(p => p.id === productId);
-    if (product) {
-      try {
-        const newStatus = product.status === 'active' ? 'inactive' : 'active';
-        
-        // Update in Firestore
-        await this.firebase.updateProduct(productId, { 
-          status: newStatus, 
-          updatedAt: new Date().toISOString() 
-        });
-        
-        // Update local array
-        product.status = newStatus;
-        
-        // Update UI
-        this.renderProducts();
-        this.updateDashboard();
-        this.showNotification(`Produto ${newStatus === 'active' ? 'ativado' : 'desativado'} com sucesso!`, 'success');
-      } catch (error) {
-        console.error('Error updating product status:', error);
-        this.showNotification('Erro ao atualizar status do produto. Tente novamente.', 'error');
-      }
-    }
-  }
-
-  filterProducts() {
-    const searchInput = document.getElementById('products-search');
-    const categoryFilterEl = document.getElementById('category-filter');
-    
-    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
-    const categoryFilter = categoryFilterEl ? categoryFilterEl.value : '';
-    
-    let filteredProducts = this.products;
-    
-    if (searchTerm) {
-      filteredProducts = filteredProducts.filter(product => 
-        product.name.toLowerCase().includes(searchTerm) ||
-        product.description.toLowerCase().includes(searchTerm)
-      );
-    }
-    
-    if (categoryFilter) {
-      filteredProducts = filteredProducts.filter(product => 
-        product.category === categoryFilter
-      );
-    }
-    
-    this.renderProducts(filteredProducts);
-  }
-
-  renderProducts(productsToRender = null) {
-    const tbody = document.getElementById('products-table-body');
-    if (!tbody) return;
-
-    const products = productsToRender || this.products;
-    
-    if (products.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="7" style="text-align: center; padding: var(--spacing-8); color: var(--gray-500);">
-            ${productsToRender ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado'}
-          </td>
-        </tr>
-      `;
+  // Orders
+  async loadAndRenderOrders(force=false){ if(!this.firebase.isInitialized) return; if(this.ordersLoaded && !force) return; try { this.orders=await this.firebase.listOrders({limit:200}); this.ordersLoaded=true; this.renderOrders(); } catch(e){ console.warn('Orders load fail', e); } }
+  async loadAndRenderOrders(force=false){
+    if(!this.firebase.isInitialized){
+      console.info('[Admin] Firebase não inicializado - pulando carregamento de pedidos');
       return;
     }
-
-    tbody.innerHTML = products.map(product => `
-      <tr>
-        <td>
-          <div class="product-image">
-            ${this.getCategoryIcon(product.category)}
-          </div>
-        </td>
-        <td>
-          <strong>${product.name}</strong>
-          <br>
-          <small style="color: var(--gray-500);">${product.description || 'Sem descrição'}</small>
-        </td>
-        <td>${this.getCategoryName(product.category)}</td>
-        <td>R$ ${product.price.toFixed(2).replace('.', ',')}</td>
-        <td>${product.stock}</td>
-        <td>
-          <span class="status status--${product.status}">
-            ${product.status === 'active' ? 'Ativo' : 'Inativo'}
-          </span>
-        </td>
-        <td>
-          <button class="btn-icon" onclick="adminApp.editProduct('${product.id}')" title="Editar">
-            ✏️
-          </button>
-          <button class="btn-icon" onclick="adminApp.toggleProductStatus('${product.id}')" title="${product.status === 'active' ? 'Desativar' : 'Ativar'}">
-            ${product.status === 'active' ? '🔒' : '🔓'}
-          </button>
-          <button class="btn-icon" onclick="adminApp.deleteProduct('${product.id}')" title="Excluir">
-            🗑️
-          </button>
-        </td>
-      </tr>
-    `).join('');
-  }
-
-  getCategoryIcon(category) {
-    const icons = {
-      medicamentos: '💊',
-      dermocosmeticos: '💄',
-      suplementos: '💪',
-      higiene: '🧼',
-      bebes: '👶',
-      equipamentos: '🩺'
-    };
-    return icons[category] || '📦';
-  }
-
-  getCategoryName(category) {
-    const names = {
-      medicamentos: 'Medicamentos',
-      dermocosmeticos: 'Dermocosméticos',
-      suplementos: 'Suplementos',
-      higiene: 'Higiene',
-      bebes: 'Bebês',
-      equipamentos: 'Equipamentos'
-    };
-    return names[category] || category;
-  }
-
-  loadSampleData() {
-    // Fallback sample data if Firebase fails
-    this.products = [
-      {
-        id: '1',
-        name: 'Dipirona 500mg',
-        category: 'medicamentos',
-        price: 8.90,
-        stock: 50,
-        description: 'Analgésico e antitérmico - 20 comprimidos',
-        status: 'active',
-        featured: true,
-        createdAt: '2024-08-01T10:00:00Z',
-        updatedAt: '2024-08-01T10:00:00Z'
-      },
-      {
-        id: '2',
-        name: 'Protetor Solar FPS 60',
-        category: 'dermocosmeticos',
-        price: 45.90,
-        stock: 25,
-        description: 'Proteção solar para todos os tipos de pele',
-        status: 'active',
-        featured: true,
-        createdAt: '2024-08-01T11:00:00Z',
-        updatedAt: '2024-08-01T11:00:00Z'
-      },
-      {
-        id: '3',
-        name: 'Vitamina C 1g',
-        category: 'suplementos',
-        price: 25.90,
-        stock: 30,
-        description: 'Suplemento vitamínico - 30 cápsulas',
-        status: 'active',
-        featured: false,
-        createdAt: '2024-08-01T12:00:00Z',
-        updatedAt: '2024-08-01T12:00:00Z'
-      },
-      {
-        id: '4',
-        name: 'Termômetro Digital',
-        category: 'equipamentos',
-        price: 18.90,
-        stock: 15,
-        description: 'Termômetro digital com display LCD',
-        status: 'active',
-        featured: false,
-        createdAt: '2024-08-01T13:00:00Z',
-        updatedAt: '2024-08-01T13:00:00Z'
-      },
-      {
-        id: '5',
-        name: 'Shampoo Infantil',
-        category: 'bebes',
-        price: 12.50,
-        stock: 40,
-        description: 'Shampoo suave para bebês - 200ml',
-        status: 'active',
-        featured: false,
-        createdAt: '2024-08-01T14:00:00Z',
-        updatedAt: '2024-08-01T14:00:00Z'
-      }
-    ];
-    
-    this.clients = [
-      {
-        id: '1',
-        name: 'Maria Silva',
-        email: 'maria.silva@email.com',
-        phone: '(11) 99999-1234',
-        createdAt: '2024-08-01T10:00:00Z'
-      },
-      {
-        id: '2',
-        name: 'João Santos',
-        email: 'joao.santos@email.com',
-        phone: '(11) 98888-5678',
-        createdAt: '2024-08-01T11:00:00Z'
-      }
-    ];
-  }
-
-  generateId() {
-    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  }
-
-  handleLogout() {
-    if (confirm('Tem certeza que deseja sair?')) {
-      this.showNotification('Logout realizado com sucesso!', 'success');
-      // In a real app, this would redirect to login page
-      setTimeout(() => {
-        window.location.href = 'modern-index.html';
-      }, 1000);
+    if(this.ordersLoaded && !force) return;
+    try {
+      this.orders = await this.firebase.listOrders({ limit:200 });
+      console.debug('[Admin] Pedidos Firestore carregados:', this.orders.length);
+    } catch(e){
+      console.warn('[Admin] Falha ao buscar pedidos Firestore', e);
+      this.orders = [];
     }
-  }
-
-  showNotification(message, type = 'info') {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `notification notification--${type}`;
-    notification.innerHTML = `
-      <div class="notification__content">
-        <span>${this.getNotificationIcon(type)}</span>
-        <span>${message}</span>
-        <button class="notification__close">❌</button>
-      </div>
-    `;
-
-    // Add styles if not exists
-    this.addNotificationStyles();
-
-    // Add to page
-    document.body.appendChild(notification);
-
-    // Add close event
-    const closeBtn = notification.querySelector('.notification__close');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        this.hideNotification(notification);
-      });
+    // Fallback: mostrar último pedido local (checkout) se nenhum no Firestore
+    if(!this.orders.length){
+      try {
+        const raw = localStorage.getItem('last_order');
+        if(raw){
+          const localOrder = JSON.parse(raw);
+            if(localOrder){
+              // Ajusta para formato esperado
+              if(!localOrder._docId) localOrder._docId = 'local-'+localOrder.id;
+              this.orders = [ localOrder ];
+              this.showNotification('Mostrando pedido local (nenhum no Firestore).','warning');
+              console.info('[Admin] Usando fallback last_order do localStorage');
+            }
+        }
+      } catch(err){ console.warn('Fallback last_order falhou', err); }
     }
-
-    // Show notification
-    setTimeout(() => notification.classList.add('show'), 100);
-
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-      this.hideNotification(notification);
-    }, 5000);
-
-    return notification;
+    this.ordersLoaded = true;
+    this.renderOrders();
   }
+  formatDate(iso){ try { const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});} catch{return iso;} }
+  getOrderStatusLabel(s){ return ({pending:'Pendente',processing:'Processando',shipped:'Enviado',delivered:'Entregue',cancelled:'Cancelado'})[s]||s; }
+  nextStatus(s){ const flow=['pending','processing','shipped','delivered']; const i=flow.indexOf(s); return (i>-1 && i<flow.length-1)?flow[i+1]:null; }
+  renderOrders(){ const tbody=document.getElementById('orders-table-body'); if(!tbody) return; const filter=document.getElementById('orders-status-filter')?.value||''; let list=[...this.orders]; if(filter) list=list.filter(o=>o.status===filter); if(!list.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum pedido'+(filter?' filtrado':'')+'</td></tr>'; this.updateDashboard(); return; } tbody.innerHTML=list.map(o=>`<tr>
+      <td>#${o.id}</td>
+      <td>${o.user||'-'}</td>
+      <td>${this.formatDate(o.createdAt)}</td>
+      <td>R$ ${(o.totals?.total||0).toFixed(2).replace('.',',')}</td>
+      <td><span class="status status--${o.status}">${this.getOrderStatusLabel(o.status)}</span></td>
+      <td style="display:flex;gap:.35rem;">
+        <button class="btn-icon" data-action="view" data-id="${o._docId}">👁️</button>
+        <button class="btn-icon" data-action="advance" data-id="${o._docId}">⏭️</button>
+      </td>
+    </tr>`).join('');
+    tbody.querySelectorAll('button[data-action]').forEach(btn=> btn.addEventListener('click',()=>{ const id=btn.getAttribute('data-id'); const action=btn.getAttribute('data-action'); const order=this.orders.find(o=>o._docId===id); if(!order) return; if(action==='view') this.showOrderDetail(order); if(action==='advance') this.advanceOrderStatus(order); })); this.updateDashboard(); }
+  async advanceOrderStatus(order){ const next=this.nextStatus(order.status); if(!next){ this.showNotification('Status final','warning'); return; } if(!confirm(`Avançar pedido #${order.id} para ${this.getOrderStatusLabel(next)}?`)) return; try { await this.firebase.updateOrderStatus(order._docId,next,'Avanço manual'); order.status=next; (order.history=order.history||[]).push({status:next,at:new Date().toISOString(),note:'Avanço manual (admin)'}); this.renderOrders(); this.showNotification('Status atualizado','success'); } catch(e){ this.showNotification('Falha status','error'); } }
+  showOrderDetail(order){ let modal=document.getElementById('order-detail-modal'); if(!modal){ modal=document.createElement('div'); modal.id='order-detail-modal'; Object.assign(modal.style,{position:'fixed',inset:'0',background:'rgba(0,0,0,.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:'10000'}); modal.innerHTML=`<div style="background:var(--white);padding:1rem 1.25rem;max-width:640px;width:100%;border-radius:12px;max-height:80vh;overflow:auto;box-shadow:var(--shadow-lg);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;">
+          <h3 style="margin:0;">Pedido #<span id="od-id"></span></h3>
+          <button id="od-close" style="background:none;border:none;font-size:1rem;cursor:pointer;">❌</button>
+        </div>
+        <div id="od-body" style="margin-top:.75rem;font-size:.85rem;line-height:1.4;"></div>
+      </div>`; document.body.appendChild(modal); modal.addEventListener('click',e=>{ if(e.target===modal) modal.remove(); }); modal.querySelector('#od-close').addEventListener('click',()=> modal.remove()); }
+    modal.querySelector('#od-id').textContent=order.id; const body=modal.querySelector('#od-body'); const itemsHTML=(order.items||[]).map(i=>`<li>${i.quantity}x ${i.name} <small>R$ ${(i.price||0).toFixed(2).replace('.',',')}</small></li>`).join(''); const histHTML=(order.history||[]).map(h=>`<li>${this.getOrderStatusLabel(h.status)} - <small>${this.formatDate(h.at)}</small> ${h.note?`<em>${h.note}</em>`:''}</li>`).join(''); body.innerHTML=`<p><strong>Status:</strong> ${this.getOrderStatusLabel(order.status)}</p>
+      <p><strong>Cliente:</strong> ${order.user||'-'}</p>
+      <p><strong>Data:</strong> ${this.formatDate(order.createdAt)}</p>
+      <p><strong>Total:</strong> R$ ${(order.totals?.total||0).toFixed(2).replace('.',',')}</p>
+      <p><strong>Pagamento:</strong> ${order.paymentMethod}${order.installments?` (${order.installments.count}x)`:''}</p>
+      <p><strong>Endereço:</strong> ${order.address?.street||''}, ${order.address?.number||''} - ${order.address?.city||''}/${order.address?.state||''}</p>
+      <div style="margin:.5rem 0;"><strong>Itens:</strong><ul style="margin:.25rem 0 .5rem 1.1rem;">${itemsHTML}</ul></div>
+      <div style="margin:.5rem 0;"><strong>Histórico:</strong><ul style="margin:.25rem 0 .5rem 1.1rem;">${histHTML}</ul></div>
+      ${this.nextStatus(order.status)?`<button id="od-advance" class="btn btn--primary">Avançar para ${this.getOrderStatusLabel(this.nextStatus(order.status))}</button>`:''}`;
+    if(this.nextStatus(order.status)) body.querySelector('#od-advance').addEventListener('click',()=>{ this.advanceOrderStatus(order); modal.remove(); }); }
 
-  hideNotification(notification) {
-    notification.classList.remove('show');
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notification.remove();
-      }
-    }, 300);
-  }
+  // Sample data fallback
+  loadSampleData(){ this.products=[{id:'1',name:'Dipirona 500mg',category:'medicamentos',price:8.90,stock:50,description:'20 comprimidos',status:'active'},{id:'2',name:'Protetor Solar FPS 60',category:'dermocosmeticos',price:45.90,stock:25,description:'FPS 60',status:'active'}]; this.clients=[{id:'c1',name:'Maria',email:'maria@example.com'}]; }
+  handleLogout(){ if(!confirm('Sair do painel?')) return; this.showNotification('Logout efetuado','success'); setTimeout(()=>{ window.location='modern-index.html'; },800); }
 
-  getNotificationIcon(type) {
-    switch (type) {
-      case 'success': return '✅';
-      case 'error': return '❌';
-      case 'warning': return '⚠️';
-      default: return 'ℹ️';
-    }
-  }
-
-  addNotificationStyles() {
-    if (document.getElementById('admin-notification-styles')) return;
-
-    const style = document.createElement('style');
-    style.id = 'admin-notification-styles';
-    style.textContent = `
-      .notification {
-        position: fixed;
-        top: var(--spacing-4);
-        right: var(--spacing-4);
-        background-color: var(--white);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-lg);
-        padding: var(--spacing-4);
-        z-index: 10000;
-        transform: translateX(100%);
-        transition: transform var(--transition);
-        min-width: 300px;
-        max-width: 400px;
-      }
-
-      .notification.show {
-        transform: translateX(0);
-      }
-
-      .notification--success {
-        border-left: 4px solid var(--success-color);
-      }
-
-      .notification--error {
-        border-left: 4px solid var(--error-color);
-      }
-
-      .notification--warning {
-        border-left: 4px solid var(--warning-color);
-      }
-
-      .notification--info {
-        border-left: 4px solid var(--primary-color);
-      }
-
-      .notification__content {
-        display: flex;
-        align-items: center;
-        gap: var(--spacing-3);
-      }
-
-      .notification__content span:nth-child(2) {
-        flex: 1;
-      }
-
-      .notification__close {
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: var(--spacing-1);
-      }
-    `;
-    document.head.appendChild(style);
-  }
+  // Notifications
+  showNotification(msg,type='info'){ const n=document.createElement('div'); n.className=`notification notification--${type}`; n.innerHTML=`<div class="notification__content"><span>${this.getNotificationIcon(type)}</span><span>${msg}</span><button class="notification__close">❌</button></div>`; this.addNotificationStyles(); document.body.appendChild(n); setTimeout(()=> n.classList.add('show'),30); n.querySelector('.notification__close')?.addEventListener('click',()=> this.hideNotification(n)); setTimeout(()=> this.hideNotification(n),4500); return n; }
+  hideNotification(n){ n.classList.remove('show'); setTimeout(()=> n.remove(),300); }
+  getNotificationIcon(t){ return ({success:'✅',error:'❌',warning:'⚠️'})[t]||'ℹ️'; }
+  addNotificationStyles(){ if(document.getElementById('admin-notification-styles')) return; const s=document.createElement('style'); s.id='admin-notification-styles'; s.textContent=`.notification{position:fixed;top:1rem;right:1rem;background:var(--white);padding:.75rem 1rem;border-radius:10px;box-shadow:var(--shadow-lg);transform:translateX(120%);transition:transform .3s;display:flex;gap:.5rem;z-index:10000;min-width:280px;} .notification.show{transform:translateX(0);} .notification--success{border-left:4px solid var(--success-color);} .notification--error{border-left:4px solid var(--error-color);} .notification--warning{border-left:4px solid var(--warning-color);} .notification--info{border-left:4px solid var(--primary-color);} .notification__content{display:flex;align-items:center;gap:.5rem;width:100%;} .notification__content span:nth-child(2){flex:1;} .notification__close{background:none;border:none;cursor:pointer;font-size:.9rem;}`; document.head.appendChild(s); }
 }
 
-// Initialize admin app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  window.adminApp = new AdminApp();
-});
+document.addEventListener('DOMContentLoaded', ()=> { window.adminApp=new AdminApp(); });
 
 export default AdminApp;

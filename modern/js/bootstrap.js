@@ -5,6 +5,7 @@ import { CartService } from './services/cart-service.js';
 import { ModalsManager } from './services/modals-service.js';
 import { eventBus } from './services/event-bus.js';
 import { analytics } from './services/analytics-service.js';
+import './services/toast-service.js'; // initializes toast global
 
 class Bootstrap {
   constructor() {
