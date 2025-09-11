@@ -70,7 +70,25 @@ class AdminApp {
   resetProductForm(){ document.getElementById('product-form')?.reset(); this.editingProduct=null; }
 
   // Data
-  async loadFirestoreData(){ if(!this.firebase.isInitialized) return; this.products=await this.firebase.getProducts(); this.clients=await this.firebase.getClients(); }
+  async loadFirestoreData(){
+    if(!this.firebase.isInitialized) return;
+    const rawProducts = await this.firebase.getProducts();
+    this.products = this.mapAdminProducts(rawProducts);
+    this.clients = await this.firebase.getClients();
+  }
+
+  mapAdminProducts(list){
+    return (Array.isArray(list)? list: []).map(p=>{
+      const price = p.price ?? p.precoComDesconto ?? p.valorComDesconto ?? p.preco ?? p.precoMaximo ?? 0;
+      const stock = p.stock ?? p.quantidade ?? 0;
+      const name = p.name || p.nome || 'Produto';
+      const description = p.description || p.descricao || '';
+      const category = p.category || p.categoria || 'outros';
+      const status = p.status || ((p.ativo === false)? 'inactive' : 'active');
+      const featured = p.featured ?? p.destaque ?? false;
+      return { id:p.id, name, description, category, price:Number(price)||0, stock:Number(stock)||0, status, featured };
+    });
+  }
 
   // Dashboard
   updateDashboard(){
@@ -113,10 +131,10 @@ class AdminApp {
     if(!data.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum produto</td></tr>'; return; }
     tbody.innerHTML=data.map(p=>`<tr>
       <td><div class="product-image">${this.getCategoryIcon(p.category)}</div></td>
-      <td><strong>${p.name}</strong><br><small style="color:var(--gray-500);">${p.description||'—'}</small></td>
+      <td><strong>${p.name||'Produto'}</strong><br><small style="color:var(--gray-500);">${p.description||'—'}</small></td>
       <td>${this.getCategoryName(p.category)}</td>
-      <td>R$ ${p.price.toFixed(2).replace('.',',')}</td>
-      <td>${p.stock}</td>
+      <td>R$ ${(Number(p.price)||0).toFixed(2).replace('.',',')}</td>
+      <td>${Number(p.stock)||0}</td>
       <td><span class="status status--${p.status}">${p.status==='active'?'Ativo':'Inativo'}</span></td>
       <td style="white-space:nowrap;">
         <button class="btn-icon" onclick="adminApp.editProduct('${p.id}')">✏️</button>

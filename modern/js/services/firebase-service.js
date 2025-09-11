@@ -5,6 +5,10 @@ export class FirebaseService {
     this.auth = null;
     this.firestore = null;
     this.isInitialized = false;
+  // Lightweight client cache (localStorage)
+  this._productsCacheKey = 'products_cache_v2';
+  // TTL in ms (default 60 min)
+  this._productsCacheTTL = 60 * 60 * 1000;
   }
 
   async init() {
@@ -120,25 +124,69 @@ export class FirebaseService {
 
   // Firestore methods
   async getProducts() {
-    if (!this.isInitialized) throw new Error('Firebase not initialized');
-    
+    // Return cached data if fresh, minimizing reads
+    const cached = this._getLocalCache(this._productsCacheKey);
+    const now = Date.now();
+
+    // If not initialized, try to serve cache; otherwise throw for caller fallback
+    if (!this.isInitialized) {
+      if (cached?.items && cached.items.length) return cached.items;
+      throw new Error('Firebase not initialized');
+    }
+
     try {
-      const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      const { collection, getDocs, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+
+      // If cache is still fresh by TTL, use it without any read
+      if (cached && (now - (cached.ts || 0) < this._productsCacheTTL) && Array.isArray(cached.items)) {
+        return cached.items;
+      }
+
+      // Otherwise, do a cheap single-doc read to check version
+      let remoteVersion = null;
+      try {
+        const metaRef = doc(this.firestore, 'meta', 'counters');
+        const metaSnap = await getDoc(metaRef);
+        if (metaSnap.exists()) {
+          const data = metaSnap.data();
+          remoteVersion = typeof data.productsVersion === 'number' ? data.productsVersion : null;
+        }
+      } catch (e) {
+        // If meta read fails but we have a not-too-old cache, use it
+        if (cached?.items && (now - (cached.ts || 0) < this._productsCacheTTL * 6)) {
+          console.info('[FirebaseService] Using cached products (meta check failed)');
+          return cached.items;
+        }
+      }
+
+      // If versions match, return cache
+      if (cached && remoteVersion !== null && cached.version === remoteVersion && Array.isArray(cached.items)) {
+        return cached.items;
+      }
+
+      // Fetch from Firestore only when necessary
       const querySnapshot = await getDocs(collection(this.firestore, 'produtos'));
-      
       const products = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        // Transform Firebase timestamp to JavaScript Date if it exists
+      querySnapshot.forEach((d) => {
+        const data = d.data();
         if (data.criadoEm && data.criadoEm.toDate) {
           data.criadoEm = data.criadoEm.toDate();
         }
-        products.push(Object.assign({ id: doc.id }, data));
+        products.push(Object.assign({ id: d.id }, data));
       });
-      
+
+      // Save/update local cache
+      const newCache = {
+        items: products,
+        version: remoteVersion ?? (cached?.version ?? 0),
+        ts: now
+      };
+      this._setLocalCache(this._productsCacheKey, newCache);
       return products;
     } catch (error) {
       console.error('Error getting products:', error);
+      // On error, prefer cached if available
+      if (cached?.items && cached.items.length) return cached.items;
       return [];
     }
   }
@@ -166,8 +214,10 @@ export class FirebaseService {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
     
     try {
-      const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
-      const docRef = await addDoc(collection(this.firestore, 'produtos'), product);
+  const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+  const docRef = await addDoc(collection(this.firestore, 'produtos'), product);
+  // Bump products version for cache invalidation
+  this._bumpProductsVersion().catch(() => {});
       return docRef.id;
     } catch (error) {
       console.error('Error adding product:', error);
@@ -182,6 +232,8 @@ export class FirebaseService {
       const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
       const docRef = doc(this.firestore, 'produtos', id);
       await updateDoc(docRef, product);
+  // Bump products version for cache invalidation
+  this._bumpProductsVersion().catch(() => {});
     } catch (error) {
       console.error('Error updating product:', error);
       throw error;
@@ -195,6 +247,8 @@ export class FirebaseService {
       const { doc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
       const docRef = doc(this.firestore, 'produtos', id);
       await deleteDoc(docRef);
+  // Bump products version for cache invalidation
+  this._bumpProductsVersion().catch(() => {});
     } catch (error) {
       console.error('Error deleting product:', error);
       throw error;
@@ -517,5 +571,35 @@ export class FirebaseService {
   getCurrentUser() {
     if (!this.isInitialized) return null;
     return this.auth.currentUser;
+  }
+
+  // ===== Client-side cache helpers =====
+  _getLocalCache(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  _setLocalCache(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // ignore quota errors
+    }
+  }
+
+  async _bumpProductsVersion() {
+    if (!this.isInitialized) return;
+    try {
+      const { doc, setDoc, serverTimestamp, increment } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      const metaRef = doc(this.firestore, 'meta', 'counters');
+      await setDoc(metaRef, { productsVersion: increment(1), productsUpdatedAt: serverTimestamp() }, { merge: true });
+    } catch (e) {
+      console.warn('[FirebaseService] Failed to bump products version', e);
+    }
   }
 }
