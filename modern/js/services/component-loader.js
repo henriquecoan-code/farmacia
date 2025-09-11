@@ -7,7 +7,7 @@ class ComponentLoader {
         this.components = new Map();
         this.cache = new Map();
     this.cacheTTLms = 1000 * 60 * 60 * 6; // 6h
-    this.version = 'v1';
+    this.version = 'v2';
     }
 
     /**
@@ -39,7 +39,7 @@ class ComponentLoader {
             }
             // Network fetch if still missing
             if (!html) {
-                const response = await fetch(`modern/components/${componentName}.html`, { cache: 'no-cache' });
+                const response = await fetch(`modern/components/${componentName}.html?v=${this.version}` , { cache: 'no-cache' });
                 if (!response.ok) throw new Error(`Failed to load component: ${componentName}`);
                 html = await response.text();
                 this.cache.set(componentName, html);

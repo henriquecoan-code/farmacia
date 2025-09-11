@@ -296,9 +296,22 @@ a:hover {
   font-size: var(--font-size-2xl);
 }
 
+/* Custom: logo image size moved from inline to CSS */
+.logo__img {
+  height: 56px !important; /* 56px * 1.5 = 84px */
+  max-height: 56px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+}
+/* Extra specificity to override other rules */
+.header__logo img.logo__img { height: 84px !important; }
+
 .header__search {
   max-width: 500px;
   width: 100%;
+  margin-left: auto;
+  margin-right: auto; /* center search bar */
 }
 
 .search-box {
