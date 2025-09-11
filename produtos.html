@@ -67,9 +67,11 @@
         <!-- Products Grid -->
         <section class="products-grid">
             <div class="container">
+                <div id="products-results-info" class="products-results-info" aria-live="polite" style="margin-bottom:1rem;font-size:.9rem;color:#555"></div>
                 <div class="products-grid__container" id="products-container">
                     <!-- Products will be dynamically loaded here -->
                 </div>
+                <div id="pagination-container" class="pagination" aria-label="Paginação de produtos" style="margin-top:2rem"></div>
             </div>
         </section>
     </main>
@@ -91,6 +93,5 @@
 
     <!-- Scripts -->
     <script type="module" src="modern/js/produtos-firebase.js"></script>
-    <script type="module" src="modern/js/app.js"></script>    
 </body>
 </html>

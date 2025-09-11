@@ -6,6 +6,7 @@ export class ModalsManager {
     this.loadingOverlay = null;
     this.isInitialized = false;
     this.currentAuthMode = 'login'; // 'login' or 'register'
+  this.lastFocusedElement = null; // for focus return
   }
 
   async init() {
@@ -85,12 +86,24 @@ export class ModalsManager {
   // Cart Modal Methods
   openCartModal() {
     if (!this.cartModal) return;
-    
+    // accessibility attributes
+    this.cartModal.setAttribute('role', 'dialog');
+    this.cartModal.setAttribute('aria-modal', 'true');
+    this.cartModal.setAttribute('aria-label', 'Carrinho de compras');
+    this.lastFocusedElement = document.activeElement;
     this.cartModal.classList.add('modal--active');
     document.body.classList.add('modal-open');
     
     // Load cart items
     this.updateCartDisplay();
+
+    // focus first focusable element
+    const focusTarget = this.cartModal.querySelector('.modal__close, button, [href], input');
+    if (focusTarget) {
+      setTimeout(() => focusTarget.focus(), 50);
+    }
+
+    this.trapFocus(this.cartModal);
   }
 
   closeCartModal() {
@@ -98,6 +111,10 @@ export class ModalsManager {
     
     this.cartModal.classList.remove('modal--active');
     document.body.classList.remove('modal-open');
+    if (this.lastFocusedElement) {
+      this.lastFocusedElement.focus();
+      this.lastFocusedElement = null;
+    }
   }
 
   updateCartDisplay() {
@@ -145,8 +162,20 @@ export class ModalsManager {
     this.currentAuthMode = mode;
     this.updateAuthModalContent();
     
+    // accessibility attributes
+    this.authModal.setAttribute('role', 'dialog');
+    this.authModal.setAttribute('aria-modal', 'true');
+    this.authModal.setAttribute('aria-labelledby', 'auth-modal-title');
+    this.lastFocusedElement = document.activeElement;
     this.authModal.classList.add('modal--active');
     document.body.classList.add('modal-open');
+
+    // focus first input
+    const firstInput = this.authModal.querySelector('input');
+    if (firstInput) {
+      setTimeout(() => firstInput.focus(), 50);
+    }
+    this.trapFocus(this.authModal);
   }
 
   closeAuthModal() {
@@ -159,6 +188,10 @@ export class ModalsManager {
     const authForm = document.getElementById('auth-form');
     if (authForm) {
       authForm.reset();
+    }
+    if (this.lastFocusedElement) {
+      this.lastFocusedElement.focus();
+      this.lastFocusedElement = null;
     }
   }
 
@@ -242,64 +275,62 @@ export class ModalsManager {
 
   // Cart Management Methods
   getCartItems() {
+    // Prefer CartService se existir
+    if (window.cartService) return window.cartService.getItems();
     try {
-      const cart = localStorage.getItem('cart');
+      const cart = localStorage.getItem('modern_pharmacy_cart') || localStorage.getItem('cart');
       return cart ? JSON.parse(cart) : [];
-    } catch (error) {
-      console.error('Error getting cart items:', error);
-      return [];
-    }
+    } catch (error) { console.error('Error getting cart items:', error); return []; }
   }
 
   saveCartItems(items) {
-    try {
-      localStorage.setItem('cart', JSON.stringify(items));
+    if (window.cartService) {
+      // CartService já persiste e notifica
+      window.cartService.items = items;
+      window.cartService.saveToStorage();
+      window.cartService.updateCartCounter();
+      window.cartService.notifyListeners?.();
       this.updateCartDisplay();
-    } catch (error) {
-      console.error('Error saving cart items:', error);
+      return;
     }
+    try { localStorage.setItem('modern_pharmacy_cart', JSON.stringify(items)); this.updateCartDisplay(); } catch (e) { console.error('Error saving cart items:', e); }
   }
 
   addToCart(product) {
-    const cart = this.getCartItems();
-    const existingItem = cart.find(item => item.id === product.id);
-    
-    if (existingItem) {
-      existingItem.quantity += 1;
-    } else {
-      cart.push({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        quantity: 1
-      });
+    if (window.cartService) {
+      // Adapt product shape
+      window.cartService.addItem({ id: product.id, name: product.name, price: product.price });
+      if (product.quantity && product.quantity > 1) {
+        // adjust quantity if >1 (addItem adds 1 by default)
+        window.cartService.updateQuantity(product.id, product.quantity);
+      }
+      const qty = product.quantity || 1;
+      this.showToast(`${qty}x ${product.name} adicionad${qty > 1 ? 'os' : 'o'} ao carrinho!`);
+      return;
     }
-    
+    const cart = this.getCartItems();
+    const existingItem = cart.find(i => i.id === product.id);
+    if (existingItem) existingItem.quantity += product.quantity || 1; else cart.push({ id: product.id, name: product.name, price: product.price, quantity: product.quantity || 1 });
     this.saveCartItems(cart);
-    
-    // Show feedback
-    this.showToast(`${product.name} adicionado ao carrinho!`);
+    const qty = product.quantity || 1;
+    this.showToast(`${qty}x ${product.name} adicionad${qty > 1 ? 'os' : 'o'} ao carrinho!`);
+  }
+
+  addToCartWithQuantity(id, name, price, quantity) {
+    this.addToCart({ id, name, price, quantity });
   }
 
   updateCartItemQuantity(productId, newQuantity) {
-    if (newQuantity <= 0) {
-      this.removeCartItem(productId);
-      return;
-    }
-    
-    const cart = this.getCartItems();
-    const item = cart.find(item => item.id === productId);
-    
-    if (item) {
-      item.quantity = newQuantity;
-      this.saveCartItems(cart);
-    }
+  if (window.cartService) { window.cartService.updateQuantity(productId, newQuantity); this.updateCartDisplay(); return; }
+  if (newQuantity <= 0) { this.removeCartItem(productId); return; }
+  const cart = this.getCartItems();
+  const item = cart.find(i => i.id === productId);
+  if (item) { item.quantity = newQuantity; this.saveCartItems(cart); }
   }
 
   removeCartItem(productId) {
-    const cart = this.getCartItems();
-    const filteredCart = cart.filter(item => item.id !== productId);
-    this.saveCartItems(filteredCart);
+  if (window.cartService) { window.cartService.removeItem(productId); this.updateCartDisplay(); return; }
+  const cart = this.getCartItems().filter(i => i.id !== productId); this.saveCartItems(cart);
   }
 
   // Utility Methods
@@ -324,6 +355,33 @@ export class ModalsManager {
       toast.classList.remove('toast--show');
       setTimeout(() => document.body.removeChild(toast), 300);
     }, 3000);
+  }
+
+  // Focus trap implementation
+  trapFocus(modalEl) {
+    function getFocusable(container) {
+      return [...container.querySelectorAll('a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])')]
+        .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
+    }
+    const focusable = getFocusable(modalEl);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const keyHandler = (e) => {
+      if (e.key === 'Tab') {
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+      if (e.key === 'Escape') {
+        this.closeAllModals();
+      }
+    };
+    modalEl.addEventListener('keydown', keyHandler, { once: true });
   }
 }
 

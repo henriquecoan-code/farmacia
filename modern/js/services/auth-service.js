@@ -1,4 +1,6 @@
 // Authentication Service - Handles user authentication
+import { eventBus } from './event-bus.js';
+
 export class AuthService {
   constructor() {
     this.user = null;
@@ -20,11 +22,13 @@ export class AuthService {
       this.firebaseService.onAuthStateChanged((user) => {
         this.user = user;
         this.updateUserUI();
+        eventBus.emit('auth:stateChanged', { user });
       });
     } else {
       // Update UI immediately with no user when Firebase is not available
       this.user = null;
       this.updateUserUI();
+      eventBus.emit('auth:stateChanged', { user: null });
     }
   }
 
@@ -42,7 +46,9 @@ export class AuthService {
   hideAuthModal() {
     const modal = document.getElementById('auth-modal');
     if (modal) {
-      modal.classList.remove('active');
+  // Remove both possible class patterns used by different implementations
+  modal.classList.remove('active');
+  modal.classList.remove('modal--active');
       document.body.style.overflow = '';
       this.clearAuthForm();
     }
@@ -103,9 +109,11 @@ export class AuthService {
       if (this.isLoginMode) {
         await this.firebaseService.signIn(email, password);
         this.showSuccess('Login realizado com sucesso!');
+  eventBus.emit('auth:login', { user: this.firebaseService.getCurrentUser?.() || null });
       } else {
         await this.firebaseService.signUp(email, password);
         this.showSuccess('Conta criada com sucesso!');
+  eventBus.emit('auth:login', { user: this.firebaseService.getCurrentUser?.() || null, newUser: true });
       }
 
       this.hideAuthModal();
@@ -126,7 +134,14 @@ export class AuthService {
 
     try {
       await this.firebaseService.signOut();
+  // Fecha qualquer modal de auth aberto (defensivo)
+  this.hideAuthModal();
+  // Remove dropdown imediatamente para feedback visual instantâneo
+  this.removeUserDropdown();
+  // Atualiza UI (listener também fará, mas garante rapidez)
+  this.updateUserUI();
       this.showSuccess('Logout realizado com sucesso!');
+  eventBus.emit('auth:logout', {});
     } catch (error) {
       console.error('Sign out error:', error);
       this.showError('Erro ao fazer logout');
@@ -147,6 +162,28 @@ export class AuthService {
       
       // Add dropdown menu
       this.addUserDropdown();
+
+      // Fecha modal caso ainda esteja aberto (classes diferentes suportadas)
+      const modal = document.getElementById('auth-modal');
+      if (modal && (modal.classList.contains('active') || modal.classList.contains('modal--active'))) {
+        this.hideAuthModal();
+      }
+
+      // Abre o dropdown ao passar o mouse e fecha ao sair
+      userBtn.onmouseenter = () => {
+        const dropdown = userBtn.querySelector('.user-dropdown');
+        if (dropdown) dropdown.classList.add('active');
+      };
+      userBtn.onmouseleave = () => {
+        const dropdown = userBtn.querySelector('.user-dropdown');
+        if (dropdown) dropdown.classList.remove('active');
+      };
+
+      // Remove o evento de click para não abrir o modal de login
+      userBtn.onclick = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      };
     } else {
       // User is not logged in
       userBtn.innerHTML = `

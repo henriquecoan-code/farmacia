@@ -1,4 +1,6 @@
 // Cart Service - Handles shopping cart functionality
+import { eventBus } from './event-bus.js';
+
 export class CartService {
   constructor() {
     this.items = [];
@@ -28,6 +30,7 @@ export class CartService {
     this.saveToStorage();
     this.updateCartCounter();
     this.notifyListeners();
+  eventBus.emit('cart:added', { productId: product.id, items: this.getItems(), total: this.getTotal() });
   }
 
   // Remove item from cart
@@ -36,6 +39,7 @@ export class CartService {
     this.saveToStorage();
     this.updateCartCounter();
     this.notifyListeners();
+  eventBus.emit('cart:removed', { productId, items: this.getItems(), total: this.getTotal() });
   }
 
   // Update item quantity
@@ -50,6 +54,7 @@ export class CartService {
         this.saveToStorage();
         this.updateCartCounter();
         this.notifyListeners();
+  eventBus.emit('cart:updated', { productId, quantity, items: this.getItems(), total: this.getTotal() });
       }
     }
   }
@@ -75,6 +80,7 @@ export class CartService {
     this.saveToStorage();
     this.updateCartCounter();
     this.notifyListeners();
+  eventBus.emit('cart:cleared', {});
   }
 
   // Save to localStorage

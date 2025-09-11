@@ -1,20 +1,17 @@
-// Modern Pharmacy App
-import { FirebaseService } from './services/firebase-service.js';
-import { CartService } from './services/cart-service.js';
-import { AuthService } from './services/auth-service.js';
+// Modern Pharmacy App (refatorado para usar bootstrap compartilhado)
 import { UIService } from './services/ui-service.js';
-import { ModalsManager } from './services/modals-service.js';
 import ComponentLoader from './services/component-loader.js';
+import { bootstrap } from './bootstrap.js';
+import { eventBus } from './services/event-bus.js';
 
 class PharmacyApp {
   constructor() {
-    this.firebase = new FirebaseService();
-    this.cart = new CartService();
-    this.auth = new AuthService();
     this.ui = new UIService();
-    this.modals = new ModalsManager();
     this.componentLoader = new ComponentLoader();
-    
+    this.firebase = null;
+    this.auth = null;
+    this.cart = null;
+    this.modals = null;
     this.init();
   }
 
@@ -26,24 +23,12 @@ class PharmacyApp {
       // Load components first
       await this.loadComponents();
       
-      // Initialize Firebase (but don't fail if it doesn't work)
-      try {
-        await this.firebase.init();
-        console.log('Firebase initialized successfully');
-      } catch (firebaseError) {
-        console.warn('Firebase initialization failed, continuing without it:', firebaseError);
-      }
-      
-      // Initialize services (always continue even if Firebase failed)
-      this.cart.init();
-      this.auth.init();
-      this.auth.setFirebaseService(this.firebase);
-      
-      // Initialize modals
-      await this.modals.init();
-      
-      // Make modals globally available
-      window.modalsManager = this.modals;
+  // Aguarda bootstrap compartilhado
+  await bootstrap.init();
+  this.firebase = bootstrap.firebase;
+  this.auth = bootstrap.auth;
+  this.cart = bootstrap.cart;
+  this.modals = bootstrap.modals;
       
       // Setup event listeners (this must work regardless of Firebase)
       this.setupEventListeners();
@@ -54,15 +39,15 @@ class PharmacyApp {
       // Hide loading
       this.ui.hideLoading();
       
-      console.log('Pharmacy App initialized successfully');
+  console.log('Pharmacy App initialized successfully (bootstrap)');
     } catch (error) {
       console.error('Error initializing app:', error);
       this.ui.hideLoading();
       
       // Still try to setup basic functionality even if initialization failed
       try {
-        await this.loadComponents();
-        this.setupEventListeners();
+  await this.loadComponents();
+  this.setupEventListeners();
         console.log('Basic functionality loaded without full initialization');
       } catch (fallbackError) {
         console.error('Complete initialization failure:', fallbackError);
