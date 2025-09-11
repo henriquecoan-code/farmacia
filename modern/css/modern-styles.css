@@ -1,8 +1,9 @@
 /* Modern CSS Variables and Reset */
 :root {
   /* Colors */
-  --primary-color: #2563eb;
-  --primary-dark: #1d4ed8;
+  /* Updated primary to Tailwind blue-800 and hover to blue-900 */
+  --primary-color: #1e40af; /* blue-800 */
+  --primary-dark: #1e3a8a; /* blue-900 */
   --primary-light: #3b82f6;
   --secondary-color: #059669;
   --accent-color: #dc2626;
