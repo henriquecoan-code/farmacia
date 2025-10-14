@@ -1,0 +1,24 @@
+[
+  {
+    "id": "dipirona-500",
+    "name": "Dipirona 500mg",
+    "description": "Analgésico e antitérmico - 20 comprimidos",
+    "category": "medicamentos",
+    "price": 8.9,
+    "stock": 50,
+    "status": "active",
+    "featured": true,
+    "image": "img/produtos/default-product.svg"
+  },
+  {
+    "id": "protetor-solar-60",
+    "name": "Protetor Solar FPS 60",
+    "description": "Proteção solar para todos os tipos de pele",
+    "category": "dermocosmeticos",
+    "price": 45.9,
+    "stock": 25,
+    "status": "active",
+    "featured": true,
+    "image": "img/produtos/default-product.svg"
+  }
+]

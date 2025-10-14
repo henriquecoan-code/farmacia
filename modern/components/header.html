@@ -9,6 +9,16 @@
                 </a>
             </div>
 
+            <script>
+                try {
+                    const params = new URLSearchParams(location.search);
+                    const showcase = (typeof window !== 'undefined' && window.SHOWCASE_MODE) || params.get('vitrine') === '1';
+                    const badge = document.getElementById('showcase-badge');
+                    if (badge && showcase) {
+                        badge.style.display = 'inline-flex';
+                    }
+                } catch {}
+                </script>
             <!-- Search -->
             <div class="header__search">
                 <div class="search-box">
@@ -21,6 +31,9 @@
 
             <!-- Actions -->
             <div class="header__actions">
+                <span id="showcase-badge" style="display:none;align-items:center;gap:.35rem;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;padding:.25rem .5rem;border-radius:.375rem;font-size:.75rem;font-weight:600;margin-right:.5rem">
+                    <i class="fas fa-eye"></i> Modo vitrine
+                </span>
                 <button class="action-btn" id="user-btn">
                     <i class="fas fa-user"></i>
                     <span>Entrar</span>

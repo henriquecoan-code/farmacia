@@ -91,7 +91,44 @@
         <button class="btn btn--primary" onclick="location.reload()">Recarregar</button>
     </div>
 
-    <!-- Scripts -->
-    <script type="module" src="modern/js/produtos-firebase.js"></script>
+        <!-- Scripts -->
+        <!-- Showcase PoC: ativa modo vitrine via ?vitrine=1 (lê /data/products.json e bloqueia escritas) -->
+        <script type="module">
+            const params = new URLSearchParams(location.search);
+            const showcase = params.get('vitrine') === '1';
+            if (showcase) {
+                window.SHOWCASE_MODE = true;
+                import('./modern/js/bootstrap.js').then(async ({ bootstrap }) => {
+                    try { await bootstrap.init(); } catch {}
+                    const cacheKey = 'products_cache_vitrine';
+                    const ttl = 60 * 60 * 1000; // 60 min
+                    bootstrap.firebase.getProducts = async () => {
+                        const now = Date.now();
+                        try {
+                            const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+                            if (cached?.items && now - (cached.ts || 0) < ttl) {
+                                return cached.items;
+                            }
+                        } catch {}
+                        try {
+                            const resp = await fetch('/data/products.json', { cache: 'no-store' });
+                            const items = await resp.json();
+                            try { localStorage.setItem(cacheKey, JSON.stringify({ items, ts: now })); } catch {}
+                            return Array.isArray(items) ? items : [];
+                        } catch (e) {
+                            console.error('[Showcase] Falha ao carregar /data/products.json', e);
+                            return [];
+                        }
+                    };
+                    ['addProduct','updateProduct','deleteProduct','createOrder','addClient','updateClient','deleteClient']
+                        .forEach(m => {
+                            if (typeof bootstrap.firebase[m] === 'function') {
+                                bootstrap.firebase[m] = async () => { throw new Error('Modo vitrine: operação não permitida'); };
+                            }
+                        });
+                });
+            }
+        </script>
+        <script type="module" src="modern/js/produtos-firebase.js"></script>
 </body>
 </html>
