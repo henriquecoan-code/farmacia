@@ -7,9 +7,17 @@
 import pg from 'pg';
 import admin from 'firebase-admin';
 
+process.on('unhandledRejection', (e) => {
+  console.error('[sync] UnhandledRejection:', e && e.stack ? e.stack : e);
+});
+process.on('uncaughtException', (e) => {
+  console.error('[sync] UncaughtException:', e && e.stack ? e.stack : e);
+});
+
 const {
   PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD,
-  GOOGLE_APPLICATION_CREDENTIALS, PGSSL
+  GOOGLE_APPLICATION_CREDENTIALS, PGSSL,
+  PG_CONNECT_TIMEOUT, PG_STATEMENT_TIMEOUT
 } = process.env;
 
 if (!PGHOST || !PGDATABASE || !PGUSER) {
@@ -30,7 +38,11 @@ const pool = new pg.Pool({
   database: PGDATABASE,
   user: PGUSER,
   password: PGPASSWORD,
-  ssl: PGSSL === '1' ? { rejectUnauthorized: false } : undefined
+  ssl: PGSSL === '1' ? { rejectUnauthorized: false } : undefined,
+  // Fail fast if connection can't be established
+  connectionTimeoutMillis: Number(PG_CONNECT_TIMEOUT || 10000),
+  idleTimeoutMillis: 10000,
+  max: 3
 });
 
 // Mapeie códigos de grupo do ERP para categorias usadas no site
@@ -64,9 +76,42 @@ async function bumpProductsVersion(){
 }
 
 async function main(){
+  const sslEnabled = PGSSL === '1';
+  console.log(`[sync] Connecting to PG host=${PGHOST} port=${PGPORT||5432} db=${PGDATABASE} user=${PGUSER} ssl=${sslEnabled}`);
   const client = await pool.connect();
   try {
-    const { rows } = await client.query(`
+    console.log('[sync] Connected to PG.');
+    await client.query('SELECT 1');
+    console.log('[sync] Heartbeat OK');
+    const stmtTimeoutMs = Number(PG_STATEMENT_TIMEOUT || 15000);
+    if (Number.isFinite(stmtTimeoutMs) && stmtTimeoutMs > 0) {
+      await client.query(`SET statement_timeout = ${stmtTimeoutMs}`);
+      console.log(`[sync] statement_timeout set to ${stmtTimeoutMs} ms`);
+    }
+    const schema = process.env.PGSCHEMA;
+    if (schema) {
+      await client.query(`SET search_path TO ${schema}`);
+      console.log(`[sync] search_path set to ${schema}`);
+    }
+    // Optional sampling for testing: SYNC_LIMIT (number) and/or SYNC_SAMPLE_IDS (comma-separated cod_reduzido)
+    const limitN = Number(process.env.SYNC_LIMIT || 0);
+    const sampleIds = (process.env.SYNC_SAMPLE_IDS || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(s => Number(s))
+      .filter(n => Number.isFinite(n));
+
+  const sampleClause = sampleIds.length ? ` AND p.cod_reduzido IN (${sampleIds.join(',')})` : '';
+  const limitClause = Number.isFinite(limitN) && limitN > 0 ? ` LIMIT ${limitN}` : '';
+  const orderByClause = (sampleIds.length || limitClause) ? '' : ' ORDER BY p.cod_reduzido ASC';
+
+  console.log(`[sync] Executando SELECT com${sampleClause ? ' filtro de IDs' : ''}${limitClause ? ' e limite '+limitN : ''}${orderByClause ? ' (com ORDER BY)' : ' (sem ORDER BY)'}...`);
+
+    console.time('[sync] SELECT');
+    let rows = [];
+    try {
+      const res = await client.query(`
       SELECT p.cod_reduzido AS cod_red, p.nom_produto AS nome, p.cod_grupo, p.vlr_venda, p.prc_desconto,
              d.nom_dcb AS dcb, l.nom_laborat AS laboratorio, e.qtd_estoque AS quantidade
       FROM cadprodu p
@@ -74,9 +119,18 @@ async function main(){
       LEFT JOIN cadcddcb d ON d.cod_dcb = p.cod_dcb
       LEFT JOIN cadlabor l ON l.cod_laborat = p.cod_laborat
       WHERE p.flg_ativo = 'A'
-        AND (p.tip_classeterapeutica IS NULL OR p.tip_classeterapeutica = '')
+        AND (p.tip_classeterapeutica IS NULL OR NULLIF(TRIM(p.tip_classeterapeutica::text), '') IS NULL)
         AND e.qtd_estoque > 0
-    `);
+        ${sampleClause}
+      ${orderByClause}
+      ${limitClause}
+      `);
+      rows = res.rows;
+    } catch (err) {
+      console.log('[sync] SELECT error:', err && err.message ? err.message : String(err));
+      throw err;
+    }
+    console.timeEnd('[sync] SELECT');
 
     if (!rows.length) {
       console.warn('[sync] Nenhum produto retornado pelo SELECT.');
