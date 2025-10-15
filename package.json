@@ -1,0 +1,24 @@
+{
+  "name": "farmacia",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/henriquecoan-code/farmacia.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/henriquecoan-code/farmacia/issues"
+  },
+  "homepage": "https://github.com/henriquecoan-code/farmacia#readme",
+  "description": "",
+  "dependencies": {
+    "firebase-admin": "^13.5.0",
+    "pg": "^8.16.3"
+  }
+}

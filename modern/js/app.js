@@ -2,6 +2,7 @@
 import { UIService } from './services/ui-service.js';
 import ComponentLoader from './services/component-loader.js';
 import { bootstrap } from './bootstrap.js';
+import { normalizeProduct, formatPrice } from './services/product-utils.js';
 import { eventBus } from './services/event-bus.js';
 
 class PharmacyApp {
@@ -304,9 +305,10 @@ class PharmacyApp {
     if (!productsGrid) return;
 
     try {
-      // Load products from Firebase
-      const products = await this.firebase.getProducts();
-      const featuredProducts = products.filter(product => product.featured || products.length <= 4);
+      // Load products from Firebase and normalize to unified shape
+      const raw = await this.firebase.getProducts();
+      const products = raw.map(normalizeProduct);
+      const featuredProducts = products.filter(p => p.destaque) ;
       
       // If no featured products, show first 4
       const productsToShow = featuredProducts.length > 0 ? featuredProducts.slice(0, 4) : products.slice(0, 4);
@@ -321,29 +323,33 @@ class PharmacyApp {
         return;
       }
 
-      productsGrid.innerHTML = productsToShow.map(product => `
-        <div class="card product-card" data-product-id="${product.id}">
+      productsGrid.innerHTML = productsToShow.map(p => {
+        const price = p.precoDesconto ?? p.precoCheio ?? 0;
+        const cartPayload = { id: p.id, name: p.nome, price };
+        const original = p.precoCheio && p.precoCheio > price ? ` <span style="text-decoration: line-through; color: var(--gray-400); font-size: var(--font-size-sm); margin-left: var(--spacing-2);">${formatPrice(p.precoCheio)}</span>` : '';
+        return `
+        <div class="card product-card" data-product-id="${p.id}">
           <div class="card__image">
             <i class="fas fa-prescription-bottle-alt"></i>
           </div>
           <div class="card__content">
-            <h3 class="card__title">${product.name}</h3>
-            <p class="card__text">${product.description}</p>
+            <h3 class="card__title">${p.nome}</h3>
+            <p class="card__text">${p.descricao || ''}</p>
             <div class="card__price">
-              R$ ${product.price.toFixed(2).replace('.', ',')}
+              ${formatPrice(price)}${original}
             </div>
             <div class="card__actions">
-              <button class="btn btn--primary add-to-cart-btn" data-product='${JSON.stringify(product)}'>
+              <button class="btn btn--primary add-to-cart-btn" data-product='${JSON.stringify(cartPayload)}'>
                 <i class="fas fa-cart-plus"></i>
                 Adicionar
               </button>
-              <button class="btn btn--secondary view-product-btn" data-product-id="${product.id}">
+              <button class="btn btn--secondary view-product-btn" data-product-id="${p.id}">
                 Ver Detalhes
               </button>
             </div>
           </div>
-        </div>
-      `).join('');
+        </div>`;
+      }).join('');
 
       // Add event listeners to product buttons
       productsGrid.querySelectorAll('.add-to-cart-btn').forEach(btn => {
