@@ -30,6 +30,7 @@ export function normalizeProduct(raw) {
     precoDesconto,
     desconto: descontoCalc,
     quantidade: raw.quantidade ?? raw.stock ?? 0,
+    ativo: (raw.ativo !== false),
     codRed: raw.codRed || raw.codigo || null,
     destaque: !!(raw.destaque || raw.featured),
     laboratorio: raw.laboratorio || raw.marca || '',

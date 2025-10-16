@@ -60,8 +60,9 @@ class ProdutosFirebaseApp {
 
     async loadProducts() {
         try {
-            const raw = await this.firebaseService.getProducts();
-            this.products = raw.map(normalizeProduct);
+                        const raw = await this.firebaseService.getProducts();
+                        this.products = raw.map(normalizeProduct)
+                            .filter(p => p.ativo !== false && (Number(p.quantidade) || 0) > 0);
             this.renderProducts();
         } catch (e) {
             console.warn('Falha ao carregar Firebase, usando amostras.', e);
