@@ -124,7 +124,7 @@ export class FirebaseService {
 
   // Firestore methods
   async getProducts() {
-    // Return cached data if fresh, minimizing reads
+    // Local cache
     const cached = this._getLocalCache(this._productsCacheKey);
     const now = Date.now();
 
@@ -137,12 +137,10 @@ export class FirebaseService {
     try {
       const { collection, getDocs, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
 
-      // If cache is still fresh by TTL, use it without any read
-      if (cached && (now - (cached.ts || 0) < this._productsCacheTTL) && Array.isArray(cached.items)) {
-        return cached.items;
-      }
+      // Allow manual bypass via query param (?nocache=1)
+      const nocache = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache');
 
-      // Otherwise, do a cheap single-doc read to check version
+      // First, get remote productsVersion (cheap single-doc read)
       let remoteVersion = null;
       try {
         const metaRef = doc(this.firestore, 'meta', 'counters');
@@ -152,19 +150,26 @@ export class FirebaseService {
           remoteVersion = typeof data.productsVersion === 'number' ? data.productsVersion : null;
         }
       } catch (e) {
-        // If meta read fails but we have a not-too-old cache, use it
-        if (cached?.items && (now - (cached.ts || 0) < this._productsCacheTTL * 6)) {
-          console.info('[FirebaseService] Using cached products (meta check failed)');
-          return cached.items;
+        // ignore; we may still use TTL cache below
+      }
+
+      // Decide if we can return cache
+      if (!nocache && cached?.items && Array.isArray(cached.items)) {
+        const ageOk = (now - (cached.ts || 0) < this._productsCacheTTL);
+        if (remoteVersion !== null) {
+          if (cached.version === remoteVersion && ageOk) {
+            return cached.items;
+          }
+        } else {
+          // If meta/counters not readable, fallback to TTL-based cache
+          if (ageOk) {
+            console.info('[FirebaseService] Using cached products (meta unavailable)');
+            return cached.items;
+          }
         }
       }
 
-      // If versions match, return cache
-      if (cached && remoteVersion !== null && cached.version === remoteVersion && Array.isArray(cached.items)) {
-        return cached.items;
-      }
-
-      // Fetch from Firestore only when necessary
+      // Fetch from Firestore when no valid cache
       const querySnapshot = await getDocs(collection(this.firestore, 'produtos'));
       const products = [];
       querySnapshot.forEach((d) => {
@@ -185,7 +190,6 @@ export class FirebaseService {
       return products;
     } catch (error) {
       console.error('Error getting products:', error);
-      // On error, prefer cached if available
       if (cached?.items && cached.items.length) return cached.items;
       return [];
     }
