@@ -4,9 +4,9 @@
 $env:PGHOST = "192.168.1.220"
 $env:PGPORT = "5432"
 $env:PGDATABASE = "sgfpod1"
-$env:PGUSER = "pharmacy_ro"
+$env:PGUSER = "postgres"
 # Habilitar SSL (recomendado em acesso externo)
-$env:PGPASSWORD = "Guiderick35-"
+$env:PGPASSWORD = "postgres"
 # Sete para "1" se precisar SSL (ex.: Cloud PG):
 # $env:PGSSL = "1"
 
@@ -15,7 +15,7 @@ $env:PGPASSWORD = "Guiderick35-"
 # $env:PG_STATEMENT_TIMEOUT = "15000"
 
 # Caminho do service account (JSON) do Firebase Admin
-$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Users\henri\OneDrive\Documentos\GitHub\farmacia\serviceAccount.json"
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Keys\farmacia-service-account.json"
 
 # Timeouts (ativado): conexão e statement, em ms
 $env:PG_CONNECT_TIMEOUT = "10000"

@@ -4,16 +4,19 @@
 $env:PGHOST = "192.168.1.220"
 $env:PGPORT = "5432"
 $env:PGDATABASE = "sgfpod1"
-$env:PGUSER = "pharmacy_ro"
-$env:PGPASSWORD = "Guiderick35-"
+$env:PGUSER = "postgres"
+$env:PGPASSWORD = "postgres"
 # $env:PGSSL = "1"  # opcional
 
-# Timeouts (opcional)
-# $env:PG_CONNECT_TIMEOUT = "10000"
-# $env:PG_STATEMENT_TIMEOUT = "15000"
+## Timeouts (ativado)
+$env:PG_CONNECT_TIMEOUT = "10000"
+$env:PG_STATEMENT_TIMEOUT = "15000"
 
-# Amostragem (opcional)
-# $env:SYNC_LIMIT = "3"
-# $env:SYNC_SAMPLE_IDS = "123,456"
+## Schema opcional (se não for 'public')
+# $env:PGSCHEMA = "public"
+
+## Amostragem (ativada)
+$env:SYNC_LIMIT = "3"
+# $env:SYNC_SAMPLE_IDS = "41609,41597,41591"
 
 node .\scripts\export-pg-to-json.mjs

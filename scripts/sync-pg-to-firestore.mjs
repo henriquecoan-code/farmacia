@@ -6,6 +6,7 @@
 
 import pg from 'pg';
 import admin from 'firebase-admin';
+import fs from 'fs/promises';
 
 process.on('unhandledRejection', (e) => {
   console.error('[sync] UnhandledRejection:', e && e.stack ? e.stack : e);
@@ -28,6 +29,22 @@ if (!GOOGLE_APPLICATION_CREDENTIALS) {
   console.error('[sync] Defina GOOGLE_APPLICATION_CREDENTIALS com o caminho do service account do Firebase.');
   process.exit(1);
 }
+
+// Validate service account file exists
+try {
+  await fs.access(GOOGLE_APPLICATION_CREDENTIALS);
+} catch {
+  console.error(`[sync] Arquivo de credenciais não encontrado: ${GOOGLE_APPLICATION_CREDENTIALS}`);
+  process.exit(1);
+}
+
+// Try to read project_id for logging (non-sensitive)
+try {
+  const sa = JSON.parse(await fs.readFile(GOOGLE_APPLICATION_CREDENTIALS, 'utf8'));
+  if (sa && sa.project_id) {
+    console.log(`[sync] Using Firebase project_id=${sa.project_id}`);
+  }
+} catch {}
 
 admin.initializeApp({ credential: admin.credential.applicationDefault() });
 const db = admin.firestore();
@@ -164,11 +181,37 @@ async function main(){
       ops++;
 
       // Commit em lotes de 400 para não estourar limites
-      if (ops % 400 === 0) { await batch.commit(); batch = db.batch(); }
+      if (ops % 400 === 0) {
+        console.log(`[sync] Committing batch at ${ops} ops...`);
+        try {
+          await batch.commit();
+          console.log('[sync] Batch committed.');
+        } catch (e) {
+          console.error('[sync] Batch commit error:', e && e.message ? e.message : e);
+          throw e;
+        }
+        batch = db.batch();
+      }
     }
 
-    if (ops % 400 !== 0) { await batch.commit(); }
-    await bumpProductsVersion();
+    if (ops % 400 !== 0) {
+      console.log(`[sync] Committing final batch (${ops % 400} ops)...`);
+      try {
+        await batch.commit();
+        console.log('[sync] Final batch committed.');
+      } catch (e) {
+        console.error('[sync] Final batch commit error:', e && e.message ? e.message : e);
+        throw e;
+      }
+    }
+    console.log('[sync] Bumping productsVersion...');
+    try {
+      await bumpProductsVersion();
+      console.log('[sync] productsVersion bumped.');
+    } catch (e) {
+      console.error('[sync] bumpProductsVersion error:', e && e.message ? e.message : e);
+      throw e;
+    }
 
     console.log(`[sync] Sincronizados ${ops} produtos.`);
   } finally {
