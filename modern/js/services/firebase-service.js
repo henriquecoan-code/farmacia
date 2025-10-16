@@ -171,7 +171,7 @@ export class FirebaseService {
 
       // Fetch from Firestore when no valid cache
       const querySnapshot = await getDocs(collection(this.firestore, 'produtos'));
-      const products = [];
+      let products = [];
       querySnapshot.forEach((d) => {
         const data = d.data();
         if (data.criadoEm && data.criadoEm.toDate) {
@@ -179,6 +179,18 @@ export class FirebaseService {
         }
         products.push(Object.assign({ id: d.id }, data));
       });
+
+      // If Firestore returned empty (e.g., rules blocked or collection empty), fallback to local JSON if available
+      if (!products.length && typeof window !== 'undefined' && !window.SHOWCASE_MODE) {
+        try {
+          const resp = await fetch('/data/products.json', { cache: 'no-store' });
+          const items = await resp.json();
+          if (Array.isArray(items) && items.length) {
+            console.info('[FirebaseService] Fallback to /data/products.json');
+            products = items;
+          }
+        } catch {}
+      }
 
       // Save/update local cache
       const newCache = {

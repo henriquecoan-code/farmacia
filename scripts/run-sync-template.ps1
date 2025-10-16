@@ -24,7 +24,7 @@ $env:PG_STATEMENT_TIMEOUT = "15000"
 # $env:PGSCHEMA = "public"
 
 # Amostragem (ativada) — testar com poucos itens
-$env:SYNC_LIMIT = "3"            # limite de itens
+$env:SYNC_LIMIT = "20"            # limite de itens
 # $env:SYNC_SAMPLE_IDS = "41609,41597,41591" # ids específicos (cod_reduzido)
 
 node .\scripts\sync-pg-to-firestore.mjs
