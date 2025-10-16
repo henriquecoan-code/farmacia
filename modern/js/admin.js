@@ -35,6 +35,9 @@ class AdminApp {
     document.getElementById('orders-status-filter')?.addEventListener('change',()=> this.renderOrders());
     document.getElementById('admin-logout')?.addEventListener('click', ()=> this.handleLogout());
     this.setupProductModalEvents();
+    // Moderation
+    document.getElementById('moderation-refresh')?.addEventListener('click', ()=> this.loadAndRenderModeration());
+    document.getElementById('moderation-search')?.addEventListener('input', ()=> this.renderModeration());
   }
   showSection(id){
     document.querySelectorAll('.admin-nav__link').forEach(a=>a.classList.remove('admin-nav__link--active'));
@@ -75,6 +78,7 @@ class AdminApp {
     const rawProducts = await this.firebase.getProducts();
     this.products = this.mapAdminProducts(rawProducts);
     this.clients = await this.firebase.getClients();
+    await this.loadAndRenderModeration();
   }
 
   mapAdminProducts(list){
@@ -86,7 +90,11 @@ class AdminApp {
       const category = p.category || p.categoria || 'outros';
       const status = p.status || ((p.ativo === false)? 'inactive' : 'active');
       const featured = p.featured ?? p.destaque ?? false;
-      return { id:p.id, name, description, category, price:Number(price)||0, stock:Number(stock)||0, status, featured };
+      const publicado = (p.publicado !== false);
+      const pendente = (p.pendente === true);
+      const motivos = Array.isArray(p.motivosBloqueio)? p.motivosBloqueio: [];
+      const codRed = p.codRed || p.codigo || p.id;
+      return { id:p.id, codRed, name, description, category, price:Number(price)||0, stock:Number(stock)||0, status, featured, publicado, pendente, motivos };
     });
   }
 
@@ -142,6 +150,54 @@ class AdminApp {
         <button class="btn-icon" onclick="adminApp.deleteProduct('${p.id}')">🗑️</button>
       </td>
     </tr>`).join('');
+  }
+
+  // Moderation (validation)
+  async loadAndRenderModeration(){
+    // Reuse loaded products; optionally refetch if needed
+    this.renderModeration();
+  }
+  getModerationItems(){
+    const term=(document.getElementById('moderation-search')?.value||'').toLowerCase();
+    let items = this.products.filter(p=> p.pendente===true || p.publicado===false);
+    if (term) items = items.filter(p=> (p.name||'').toLowerCase().includes(term) || String(p.codRed||'').includes(term));
+    return items;
+  }
+  renderModeration(){
+    const tbody=document.getElementById('moderation-table-body'); if(!tbody) return;
+    const data=this.getModerationItems();
+    if(!data.length){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum item pendente</td></tr>'; return; }
+    tbody.innerHTML = data.map(p=>`<tr>
+      <td>${p.codRed||p.id}</td>
+      <td><strong>${p.name||'-'}</strong>${p.pendente? ' <span class="status status--inactive">pendente</span>':''}${p.publicado===false? ' <span class="status status--inactive">não publicado</span>':''}</td>
+      <td>R$ ${(Number(p.price)||0).toFixed(2).replace('.',',')}</td>
+      <td>${Number(p.stock)||0}</td>
+      <td>${(p.motivos||[]).join(', ')||'—'}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn--primary" data-action="approve" data-id="${p.id}">Publicar</button>
+        <button class="btn btn--secondary" data-action="keepblocked" data-id="${p.id}">Manter bloqueado</button>
+      </td>
+    </tr>`).join('');
+    tbody.querySelectorAll('button[data-action]')
+      .forEach(btn=> btn.addEventListener('click', ()=> this.handleModerationAction(btn.getAttribute('data-action'), btn.getAttribute('data-id'))));
+  }
+  async handleModerationAction(action, id){
+    const p = this.products.find(x=>x.id===id); if(!p) return;
+    try{
+      if(action==='approve'){
+        await this.firebase.updateProduct(id, { publicado:true, pendente:false, updatedAt:new Date().toISOString() });
+        p.publicado=true; p.pendente=false; p.motivos=[];
+        this.showNotification('Produto publicado','success');
+      } else if(action==='keepblocked'){
+        await this.firebase.updateProduct(id, { publicado:false, pendente:true, updatedAt:new Date().toISOString() });
+        p.publicado=false; p.pendente=true;
+        this.showNotification('Mantido como bloqueado','info');
+      }
+      this.renderModeration();
+      this.renderProducts();
+    }catch(e){
+      console.error(e); this.showNotification('Falha na validação','error');
+    }
   }
   getCategoryIcon(c){ return ({medicamentos:'💊',dermocosmeticos:'💄',suplementos:'💪',higiene:'🧼',bebes:'👶',equipamentos:'🩺'})[c]||'📦'; }
   getCategoryName(c){ const names={medicamentos:'Medicamentos',dermocosmeticos:'Dermocosméticos',suplementos:'Suplementos',higiene:'Higiene',bebes:'Bebês',equipamentos:'Equipamentos'}; return names[c]||c; }

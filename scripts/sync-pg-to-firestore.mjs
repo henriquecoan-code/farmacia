@@ -80,6 +80,48 @@ function calcularPreco(vlr_venda, prc_desconto){
   return { precoMaximo: v, precoComDesconto: +preco.toFixed(2) };
 }
 
+// ============ Blocking filters (keywords, groups, price) ============
+// Load optional config from config/product-filters.json
+let FILTERS = {
+  disallowedKeywords: [
+    'entrega', 'resto de compras', 'resto compras', 'aplicação', 'aplica', 'f2'
+  ],
+  disallowedGroups: [], // e.g., [ 9900, 9950 ]
+  minPrice: 0.01
+};
+try {
+  const rawCfg = await fs.readFile('config/product-filters.json','utf8');
+  const cfg = JSON.parse(rawCfg);
+  if (cfg && typeof cfg === 'object') FILTERS = Object.assign(FILTERS, cfg);
+  console.log('[sync] product-filters loaded');
+} catch {}
+
+function removeAccents(str){
+  try { return (str||'').normalize('NFD').replace(/[\u0300-\u036f]/g,''); } catch { return (str||''); }
+}
+function shouldBlockProduct({ nome, cod_grupo, precoMaximo, precoComDesconto }){
+  const reasons = [];
+  const txt = removeAccents(String(nome||'').toLowerCase());
+  const kws = Array.isArray(FILTERS.disallowedKeywords) ? FILTERS.disallowedKeywords : [];
+  for (const kw of kws) {
+    const normKw = removeAccents(String(kw||'').toLowerCase());
+    if (normKw && txt.includes(normKw)) {
+      reasons.push(`palavra:${kw}`);
+    }
+  }
+  if (Array.isArray(FILTERS.disallowedGroups) && FILTERS.disallowedGroups.includes(Number(cod_grupo))) {
+    reasons.push(`grupo:${cod_grupo}`);
+  }
+  const minP = Number(FILTERS.minPrice||0);
+  if (!Number.isFinite(precoComDesconto) || precoComDesconto < minP) {
+    reasons.push('sem_valor');
+  }
+  if (!Number.isFinite(precoMaximo) || precoMaximo < minP) {
+    reasons.push('preco_max_zero');
+  }
+  return reasons;
+}
+
 async function bumpProductsVersion(){
   const ref = db.collection('meta').doc('counters');
   await db.runTransaction(async tx => {
@@ -160,7 +202,7 @@ async function main(){
     for (const r of rows) {
       const { precoMaximo, precoComDesconto } = calcularPreco(r.vlr_venda, r.prc_desconto);
       const id = String(r.cod_red);
-      const payload = {
+      const basePayload = {
         id,
         nome: r.nome,
         descricao: '',
@@ -177,6 +219,15 @@ async function main(){
         imagens: [],
         atualizadoEm: new Date().toISOString()
       };
+      // Compute blocking reasons and moderation flags
+      const reasons = shouldBlockProduct({ nome: r.nome, cod_grupo: r.cod_grupo, precoMaximo, precoComDesconto });
+      const isBlocked = reasons.length > 0;
+      const payload = Object.assign({}, basePayload, {
+        pendente: isBlocked,
+        motivosBloqueio: reasons
+      });
+      // Only set publicado=false when blocked to avoid overriding manual approvals
+      if (isBlocked) payload.publicado = false;
       batch.set(col.doc(id), payload, { merge: true });
       ops++;
 

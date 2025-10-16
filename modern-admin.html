@@ -43,6 +43,11 @@
                         💊 Produtos
                     </a>
                 </li>
+                    <li class="admin-nav__item">
+                        <a href="#moderation" class="admin-nav__link" data-section="moderation">
+                            ✅ Validação
+                        </a>
+                    </li>
                 <li class="admin-nav__item">
                     <a href="#orders" class="admin-nav__link" data-section="orders">
                         📦 Pedidos
@@ -156,6 +161,33 @@
                     </table>
                 </div>
             </section>
+
+                <!-- Moderation Section -->
+                <section id="moderation-section" class="admin-section">
+                    <div class="section-header">
+                        <h2>Validação de Produtos</h2>
+                        <p>Revise itens pendentes/bloqueados antes de publicar no site.</p>
+                    </div>
+                    <div class="products-filters">
+                        <input type="text" class="search-input" placeholder="Buscar pendentes..." id="moderation-search">
+                        <button class="btn btn--secondary" id="moderation-refresh">Atualizar</button>
+                    </div>
+                    <div class="products-table-container">
+                        <table class="products-table" id="moderation-table">
+                            <thead>
+                                <tr>
+                                    <th>Cód</th>
+                                    <th>Nome</th>
+                                    <th>Preço</th>
+                                    <th>Estoque</th>
+                                    <th>Motivos</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="moderation-table-body"></tbody>
+                        </table>
+                    </div>
+                </section>
 
             <!-- Orders Section -->
             <section id="orders-section" class="admin-section">

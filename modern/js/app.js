@@ -307,7 +307,8 @@ class PharmacyApp {
     try {
       // Load products from Firebase and normalize to unified shape
       const raw = await this.firebase.getProducts();
-  const products = raw.map(normalizeProduct).filter(p => p.ativo !== false && (Number(p.quantidade)||0) > 0);
+  const products = raw.map(normalizeProduct)
+        .filter(p => p.ativo !== false && (p.publicado !== false) && (p.pendente !== true) && (Number(p.quantidade)||0) > 0);
       const featuredProducts = products.filter(p => p.destaque) ;
       
       // If no featured products, show first 4
