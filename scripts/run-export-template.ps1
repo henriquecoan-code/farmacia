@@ -4,8 +4,8 @@
 $env:PGHOST = "192.168.1.220"
 $env:PGPORT = "5432"
 $env:PGDATABASE = "sgfpod1"
-$env:PGUSER = "postgres"
-$env:PGPASSWORD = "postgres"
+$env:PGUSER = "consulta"
+$env:PGPASSWORD = "farmacia"
 # $env:PGSSL = "1"  # opcional
 
 ## Timeouts (ativado)

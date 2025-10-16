@@ -4,9 +4,9 @@
 $env:PGHOST = "192.168.1.220"
 $env:PGPORT = "5432"
 $env:PGDATABASE = "sgfpod1"
-$env:PGUSER = "postgres"
+$env:PGUSER = "consulta"
 # Habilitar SSL (recomendado em acesso externo)
-$env:PGPASSWORD = "postgres"
+$env:PGPASSWORD = "farmacia"
 # Sete para "1" se precisar SSL (ex.: Cloud PG):
 # $env:PGSSL = "1"
 
