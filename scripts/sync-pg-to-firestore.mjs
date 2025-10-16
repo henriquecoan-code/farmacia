@@ -74,9 +74,19 @@ const GRUPO_TO_CATEGORIA = {
 const mapCategoria = g => GRUPO_TO_CATEGORIA[g] || 'medicamentos';
 
 function calcularPreco(vlr_venda, prc_desconto){
-  const v = Number(vlr_venda)||0, d = Number(prc_desconto)||0;
-  const isPercent = d > 0 && d <= 1;
-  const preco = isPercent ? v * (1 - d) : Math.max(0, v - d);
+  const v = Number(vlr_venda)||0; let d = Number(prc_desconto)||0;
+  let preco = v;
+  if (d > 0) {
+    if (d > 1) {
+      // d vem como pontos percentuais (ex.: 10 = 10%)
+      const p = Math.min(Math.max(d/100, 0), 1);
+      preco = v * (1 - p);
+    } else {
+      // d fracionário (0<d<=1)
+      preco = v * (1 - d);
+    }
+  }
+  preco = Math.max(0, preco);
   return { precoMaximo: v, precoComDesconto: +preco.toFixed(2) };
 }
 

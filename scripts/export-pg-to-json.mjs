@@ -30,8 +30,16 @@ const mapCategoria = g => GRUPO_TO_CATEGORIA[g] || 'medicamentos';
 
 function calcularPreco(v, d){
   v = Number(v)||0; d = Number(d)||0;
-  const isPercent = d > 0 && d <= 1;
-  const preco = isPercent ? v * (1 - d) : Math.max(0, v - d);
+  let preco = v;
+  if (d > 0) {
+    if (d > 1) {
+      const p = Math.min(Math.max(d/100, 0), 1);
+      preco = v * (1 - p);
+    } else {
+      preco = v * (1 - d);
+    }
+  }
+  preco = Math.max(0, preco);
   return { precoMaximo: v, precoComDesconto: +preco.toFixed(2) };
 }
 
