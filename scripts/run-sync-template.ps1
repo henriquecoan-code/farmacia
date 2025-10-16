@@ -23,8 +23,8 @@ $env:PG_STATEMENT_TIMEOUT = "15000"
 # Schema opcional (se suas tabelas não estão no 'public')
 # $env:PGSCHEMA = "public"
 
-# Amostragem (ativada) — testar com poucos itens
-$env:SYNC_LIMIT = "20"            # limite de itens
+# Amostragem (ativada) — ajustar quantidade de itens
+$env:SYNC_LIMIT = "100"            # limite de itens
 # $env:SYNC_SAMPLE_IDS = "41609,41597,41591" # ids específicos (cod_reduzido)
 
 node .\scripts\sync-pg-to-firestore.mjs
