@@ -19,12 +19,12 @@ $env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Keys\farmacia-service-account.json"
 
 # Timeouts (ativado): conexão e statement, em ms
 $env:PG_CONNECT_TIMEOUT = "10000"
-$env:PG_STATEMENT_TIMEOUT = "15000"
+$env:PG_STATEMENT_TIMEOUT = "60000"
 # Schema opcional (se suas tabelas não estão no 'public')
 # $env:PGSCHEMA = "public"
 
 # Amostragem (ativada) — ajustar quantidade de itens
-$env:SYNC_LIMIT = "100"            # limite de itens
+$env:SYNC_LIMIT = "2000"            # limite de itens
 # $env:SYNC_SAMPLE_IDS = "41609,41597,41591" # ids específicos (cod_reduzido)
 
 node .\scripts\sync-pg-to-firestore.mjs
