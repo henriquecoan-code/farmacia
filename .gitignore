@@ -1,1 +1,16 @@
 test-firebase-products.html
+
+# === Secrets / Credenciais (nunca versionar) ===
+.env
+.env.*
+*.env
+*.pem
+*.p12
+*.key
+*service-account*.json
+*firebase-adminsdk*.json
+*credentials*.json
+keys/
+
+# (OBS) Não ignore arquivos de config legítimos do projeto
+!config/product-filters.json
