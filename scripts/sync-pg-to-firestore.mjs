@@ -97,7 +97,15 @@ let FILTERS = {
     'entrega', 'resto de compras', 'resto compras', 'aplicação', 'aplica', 'f2'
   ],
   disallowedGroups: [], // e.g., [ 9900, 9950 ]
-  minPrice: 0.01
+  minPrice: 0.01,
+  minPriceByCategory: {},
+  minPriceByGroup: {},
+  requireDcb: false,
+  requireLaboratorio: false,
+  minNameLength: 0,
+  maxDiscountPercent: 95,
+  blockIfRegex: [],
+  allowListIds: []
 };
 try {
   const rawCfg = await fs.readFile('config/product-filters.json','utf8');
@@ -109,8 +117,12 @@ try {
 function removeAccents(str){
   try { return (str||'').normalize('NFD').replace(/[\u0300-\u036f]/g,''); } catch { return (str||''); }
 }
-function shouldBlockProduct({ nome, cod_grupo, precoMaximo, precoComDesconto }){
+function shouldBlockProduct({ id, nome, cod_grupo, categoria, precoMaximo, precoComDesconto, dcb, laboratorio, descontoPercent }){
   const reasons = [];
+  // Allowlist de ids ignora bloqueios
+  if (Array.isArray(FILTERS.allowListIds) && FILTERS.allowListIds.map(String).includes(String(id))) {
+    return reasons; // vazio = não bloquear
+  }
   const txt = removeAccents(String(nome||'').toLowerCase());
   const kws = Array.isArray(FILTERS.disallowedKeywords) ? FILTERS.disallowedKeywords : [];
   for (const kw of kws) {
@@ -122,12 +134,37 @@ function shouldBlockProduct({ nome, cod_grupo, precoMaximo, precoComDesconto }){
   if (Array.isArray(FILTERS.disallowedGroups) && FILTERS.disallowedGroups.includes(Number(cod_grupo))) {
     reasons.push(`grupo:${cod_grupo}`);
   }
-  const minP = Number(FILTERS.minPrice||0);
-  if (!Number.isFinite(precoComDesconto) || precoComDesconto < minP) {
-    reasons.push('sem_valor');
+  // Regex list
+  if (Array.isArray(FILTERS.blockIfRegex)) {
+    for (const pattern of FILTERS.blockIfRegex) {
+      try {
+        const re = new RegExp(pattern, 'i');
+        if (re.test(String(nome||''))) reasons.push(`regex:${pattern}`);
+      } catch {}
+    }
   }
-  if (!Number.isFinite(precoMaximo) || precoMaximo < minP) {
+  // Mínimo de preço base
+  const minP = Number(FILTERS.minPrice||0);
+  // Overrides por categoria
+  const catMin = FILTERS.minPriceByCategory && Number(FILTERS.minPriceByCategory[categoria]);
+  const grpMin = FILTERS.minPriceByGroup && Number(FILTERS.minPriceByGroup[String(cod_grupo)]);
+  const effMin = [minP, catMin, grpMin].filter(x => Number.isFinite(x)).reduce((a,b)=> Math.max(a,b), 0);
+  if (!Number.isFinite(precoComDesconto) || precoComDesconto < effMin) {
+    reasons.push(`sem_valor_min=${effMin}`);
+  }
+  if (!Number.isFinite(precoMaximo) || precoMaximo < effMin) {
     reasons.push('preco_max_zero');
+  }
+  // Requisitos de DCB / laboratório
+  if (FILTERS.requireDcb && !dcb) reasons.push('sem_dcb');
+  if (FILTERS.requireLaboratorio && !laboratorio) reasons.push('sem_laboratorio');
+  // Nome mínimo
+  const minNameLen = Number(FILTERS.minNameLength||0);
+  if (minNameLen > 0 && String(nome||'').trim().length < minNameLen) reasons.push('nome_curto');
+  // Desconto máximo (em %)
+  if (Number.isFinite(descontoPercent) && FILTERS.maxDiscountPercent >= 0) {
+    const maxDisc = Number(FILTERS.maxDiscountPercent);
+    if (descontoPercent > maxDisc) reasons.push(`desconto_acima_${maxDisc}%`);
   }
   return reasons;
 }
@@ -230,7 +267,17 @@ async function main(){
         atualizadoEm: new Date().toISOString()
       };
       // Compute blocking reasons and moderation flags
-      const reasons = shouldBlockProduct({ nome: r.nome, cod_grupo: r.cod_grupo, precoMaximo, precoComDesconto });
+      const reasons = shouldBlockProduct({
+        id,
+        nome: r.nome,
+        cod_grupo: r.cod_grupo,
+        categoria: basePayload.categoria,
+        precoMaximo,
+        precoComDesconto,
+        dcb: basePayload.dcb,
+        laboratorio: basePayload.laboratorio,
+        descontoPercent: basePayload.desconto
+      });
       const isBlocked = reasons.length > 0;
       const payload = Object.assign({}, basePayload, {
         pendente: isBlocked,

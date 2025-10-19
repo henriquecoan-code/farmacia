@@ -98,6 +98,7 @@ async function main(){
 
     const items = rows.map(r => {
       const { precoMaximo, precoComDesconto } = calcularPreco(r.vlr_venda, r.prc_desconto);
+      const desconto = (precoMaximo>0) ? Math.round((1 - (precoComDesconto / precoMaximo)) * 100) : 0;
       return {
         id: String(r.cod_red),
         nome: r.nome,
@@ -105,7 +106,7 @@ async function main(){
         categoria: mapCategoria(r.cod_grupo),
         precoMaximo,
         precoComDesconto,
-        desconto: (precoMaximo>0) ? Math.round((1 - (precoComDesconto / precoMaximo)) * 100) : 0,
+        desconto,
         quantidade: Number(r.quantidade)||0,
         codRed: String(r.cod_red),
         dcb: r.dcb || null,

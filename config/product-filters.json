@@ -1,0 +1,34 @@
+{
+  "disallowedKeywords": [
+    "entrega",
+    "resto de compras",
+    "resto compras",
+    "aplicação",
+    "aplica",
+    "f2"
+  ],
+  "disallowedGroups": [],
+  "minPrice": 0.01,
+  "minPriceByCategory": {
+    "perfumaria": 0.01,
+    "conveniencia": 0.01,
+    "genericos": 0.01,
+    "referencia": 0.01,
+    "similares": 0.01,
+    "correlatos": 0.01,
+    "medicamentos": 0.01
+  },
+  "minPriceByGroup": {
+    "": 0
+  },
+  "requireDcb": false,
+  "requireLaboratorio": false,
+  "minNameLength": 0,
+  "maxDiscountPercent": 95,
+  "blockIfRegex": [
+    
+  ],
+  "allowListIds": [
+    
+  ]
+}
