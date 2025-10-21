@@ -1,60 +1,42 @@
 # Scripts de Integração (PG → Firestore / JSON)
 
-Este diretório contém scripts para sincronizar o banco PostgreSQL da farmácia com o site.
+Este diretório reúne os utilitários para integrar o PostgreSQL da farmácia ao site (Firestore) e para exportar um fallback em JSON.
 
-## Opção A — Sincronizar para Firestore
+## O que já está implementado
+- Sincronização completa PG → Firestore com moderação por regras configuráveis.
+- Atualização de estoque (apenas quantidade) sem afetar outros campos.
+- Exportação para `data/products.json` (modo vitrine, somente leitura no front).
+- Invalidação de cache no front via `meta/counters.productsVersion`.
+- Regras de negócio: nomes especiais para perfumaria, filtro por filial do estoque, COALESCE de estoque ausente para 0.
 
-Requisitos:
-- Node 18+
-- `npm i pg firebase-admin`
-- Credencial do Firebase Admin (Service Account JSON)
+---
 
-Variáveis de ambiente (PowerShell no Windows):
+## Filtros de produtos e moderação (config/product-filters.json)
+As regras de publicação/pendência são declarativas neste arquivo. Campos suportados:
+- disallowedKeywords: palavras bloqueadas no nome (case-insensitive, com acentos ignorados).
+- disallowedGroups: lista de `cod_grupo` bloqueados.
+- minPrice: preço mínimo global (após desconto) para publicar.
+- minPriceByCategory: preço mínimo por categoria do site (chaves como: perfumaria, correlatos, etc.).
+- minPriceByGroup: preço mínimo por `cod_grupo` (chaves string do número do grupo).
+- requireDcb: se true, bloqueia itens sem DCB.
+- requireLaboratorio: se true, bloqueia itens sem laboratório.
+- minNameLength: comprimento mínimo do nome.
+- maxDiscountPercent: teto de desconto permitido (0–100).
+- blockIfRegex: expressões regulares (string) aplicadas ao nome; se casar, bloqueia.
+- allowListIds: lista de ids (cod_reduzido) sempre permitidos, ignorando bloqueios.
 
-```powershell
-# Postgres
-$env:PGHOST = "seu-host";
-$env:PGPORT = "5432";
-$env:PGDATABASE = "seu-db";
-$env:PGUSER = "seu-user";
-$env:PGPASSWORD = "sua-senha";
-# SSL opcional
-# $env:PGSSL = "1";
+Onde é aplicado:
+- `scripts/sync-pg-to-firestore.mjs` lê esse JSON e calcula `pendente`, `motivosBloqueio` e, quando bloqueado, força `publicado=false` (sem sobrescrever liberações manuais quando não bloqueado).
 
-# Firebase Admin
-$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\\caminho\\serviceAccount.json";
-```
+Observações de domínio:
+- Perfumaria (grupo 8000) usa `nom_prodcomp` como nome de exibição quando existir.
+- Estoque é filtrado por filial (`cadestoq.cod_filial` via env `ESTOQUE_COD_FILIAL`, default 3) e, quando não há linha, trata como 0 (LEFT JOIN + COALESCE).
 
-Rodar:
+---
 
-```powershell
-node .\scripts\sync-pg-to-firestore.mjs
-```
+## Mapeamento de grupos → categorias do site
+Definido em `scripts/sync-pg-to-firestore.mjs` (constante `GRUPO_TO_CATEGORIA`). Ajuste conforme sua taxonomia:
 
-O script irá:
-- Ler produtos do PG com as regras: `flg_ativo = 'A'`, `tip_classeterapeutica` nula/vazia, `qtd_estoque > 0`.
-- Upsert na coleção `produtos` do Firestore usando `cod_reduzido` como `id`.
-- Incrementar `meta/counters.productsVersion` para o front invalidar o cache e recarregar produtos.
-
-Mapeamento de categorias:
-- Edite a constante `GRUPO_TO_CATEGORIA` nos scripts para refletir como cada `cod_grupo` se encaixa nas categorias do site.
-
-## Opção B — Exportar JSON para modo vitrine
-
-Requisitos:
-- Node 18+
-- `npm i pg`
-
-Variáveis (mesmo bloco PG acima), depois:
-
-```powershell
-node .\scripts\export-pg-to-json.mjs
-```
-
-Isso gera `data/products.json`. Para usar no site, abra as páginas com `?vitrine=1` (ex.: `modern-index.html?vitrine=1` ou `produtos.html?vitrine=1`). O código já está preparado para ler esse JSON e bloquear operações de escrita.
-
-## Mapeamento de grupos (exemplo do cliente)
-Atualize nos dois scripts:
 ```
 10000: 'conveniencia'
 9000:  'correlatos'
@@ -64,20 +46,113 @@ Atualize nos dois scripts:
 2000:  'similares'
 ```
 
+---
+
+## Sincronismo — execução (PowerShell)
+Requisitos gerais:
+- Node 18+
+- Dependências: `pg`, `firebase-admin` (já presentes em `package.json`)
+- Service Account do Firebase Admin: mantenha o JSON fora do repositório e aponte por caminho absoluto.
+
+Variáveis comuns (exemplos — prefira rodar via os scripts .ps1 prontos):
+
+```powershell
+# Postgres (usuário somente leitura recomendado)
+$env:PGHOST = "192.168.1.220"; $env:PGPORT = "5432";
+$env:PGDATABASE = "sgfpod1";   $env:PGUSER = "consulta"; $env:PGPASSWORD = "***";
+# Timeouts (ms)
+$env:PG_CONNECT_TIMEOUT = "10000"; $env:PG_STATEMENT_TIMEOUT = "60000";
+# Firestore
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\\Keys\\farmacia-service-account.json";
+# Filial do estoque (default 3)
+$env:ESTOQUE_COD_FILIAL = "3";
+```
+
+### A) Sync completo PG → Firestore
+- Script pronto: `scripts\run-sync-template.ps1`
+- Comportamento: cria/atualiza produtos em `produtos/{id}`, aplica filtros/moderação e faz bump de `productsVersion`.
+- Amostra opcional: `SYNC_LIMIT` (ex.: 20) ou `SYNC_SAMPLE_IDS` (lista de ids) para testes rápidos.
+
+Rodar manualmente:
+
+```powershell
+.\u005cscripts
+un-sync-template.ps1
+```
+
+### B) Atualizar apenas estoque (quantidade)
+- Script pronto: `scripts\run-sync-stock.ps1`
+- Comportamento: só atualiza `quantidade` + `atualizadoEm`. Opções principais:
+  - `ONLY_EXISTING=1`: não cria novos docs, só atualiza existentes.
+  - `SKIP_UNCHANGED=1`: evita gravar quando a quantidade não mudou.
+  - `BUMP_VERSION=1`: após alterações, atualiza `productsVersion`.
+  - `PROGRESS_EVERY`: imprime progresso a cada N itens.
+  - `VERBOSE=1`/`DRY_RUN=1`: diagnóstico sem escrever (útil para auditoria).
+
+Rodar manualmente:
+
+```powershell
+.\u005cscripts
+un-sync-stock.ps1
+```
+
+### C) Verificar divergências PG × Firestore (amostra)
+- Script pronto: `scripts\run-verify-stock.ps1`
+- Comportamento: consulta uma amostra no PG e compara com Firestore, listando OK/DIFF/FS_NOT_FOUND.
+
+```powershell
+.\u005cscripts
+un-verify-stock.ps1
+```
+
+### D) Exportar JSON (modo vitrine)
+- Script pronto: `scripts\run-export-template.ps1`
+- Resultado: `data\products.json`. No front, adicione `?vitrine=1` nas páginas.
+
+```powershell
+.\u005cscripts
+un-export-template.ps1
+```
+
+---
+
 ## Agendar no Windows (Task Scheduler)
-1. Abra o Agendador de Tarefas.
-2. Criar Tarefa Básica → nome "Sync PG Firestore" → periodicidade (ex.: a cada 1 hora).
-3. Ação: Iniciar um programa.
+Sugestões:
+- Sync completo: 1× por madrugada.
+- Estoque: a cada 10–30 minutos, com `ONLY_EXISTING=1` e `SKIP_UNCHANGED=1` para minimizar escritas.
+
+Passos:
+1) Agendador de Tarefas → Criar Tarefa (não básica) → Aba Geral: marcar "Executar com privilégios mais altos".
+2) Disparadores: defina a periodicidade.
+3) Ações: Iniciar um programa.
    - Programa/script: `powershell.exe`
-   - Adicionar argumentos: `-ExecutionPolicy Bypass -File "C:\caminho\repo\scripts\run-sync-template.ps1"`
-   - Iniciar em: `C:\caminho\repo` (pasta do projeto, onde está node_modules).
-4. Marque "Executar com privilégios mais altos" se necessário.
-5. Teste executando a tarefa manualmente e veja o histórico/saída.
+   - Argumentos: `-ExecutionPolicy Bypass -File "C:\\caminho\\repo\\scripts\\run-sync-stock.ps1"`
+   - Iniciar em: `C:\\caminho\\repo`
+4) Teste executando manualmente e revise o histórico.
 
-> Se preferir o export para JSON, agende `scripts\run-export-template.ps1`.
+---
 
-## Dicas
-- Execute via Agendador de Tarefas do Windows a cada 30–60 minutos.
-- Use um usuário read-only no Postgres.
-- Não versione o JSON de credenciais do Firebase Admin.
-- Se `prc_desconto` for percentual inteiro (ex.: 15), adapte a lógica `calcularPreco()` (dividindo por 100).
+## Boas práticas e limites
+- Não deprecie estoque pelo site; o estoque é autoridade do PG.
+- Guarde o JSON do Service Account fora do repositório e proteja o caminho.
+- Evite exceder limites diários do Firestore; o sync de estoque escreve apenas quando muda.
+- Mantenha `PG_STATEMENT_TIMEOUT` e limites de amostra em testes para evitar consultas longas.
+- Usuário de banco com permissão de leitura apenas.
+
+---
+
+## Solução de problemas rápidos
+- Exit code 1 ao rodar: confira o caminho em `GOOGLE_APPLICATION_CREDENTIALS` (o script valida a existência do arquivo) e variáveis PG.
+- Sem produtos retornados: verifique filtros (ativo, classe terapêutica vazia) e amostra (`SYNC_LIMIT`/`SYNC_SAMPLE_IDS`).
+- Estoque não aparece: revise `ESTOQUE_COD_FILIAL` e lembre que ausência de linha vira `0` (COALESCE).
+- Muitos itens pendentes: ajuste `config/product-filters.json` (minPrice, keywords, regex, etc.) ou use `allowListIds` para exceções.
+- Front não atualiza de imediato: confirme o bump de `productsVersion` nos logs e aguarde cache/refresh do app.
+
+---
+
+## Referências de arquivos
+- `scripts/sync-pg-to-firestore.mjs`: sync completo com regras de moderação e bump de versão.
+- `scripts/sync-stock-only.mjs`: atualização de quantidade com opções de otimização.
+- `scripts/verify-stock.mjs`: verificação de amostra PG × Firestore.
+- `config/product-filters.json`: regras de bloqueio/publicação.
+- Runners PowerShell: `run-sync-template.ps1`, `run-sync-stock.ps1`, `run-verify-stock.ps1`, `run-export-template.ps1`.
