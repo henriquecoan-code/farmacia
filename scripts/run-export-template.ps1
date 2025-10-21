@@ -19,4 +19,8 @@ $env:PG_STATEMENT_TIMEOUT = "15000"
 $env:SYNC_LIMIT = "3"
 # $env:SYNC_SAMPLE_IDS = "41609,41597,41591"
 
+# Filial/rede do estoque (cadestoq.cod_filial). Default será 3 se não definido.
+# Exemplo para outra rede: $env:ESTOQUE_COD_FILIAL = "5"
+# $env:ESTOQUE_COD_FILIAL = "3"
+
 node .\scripts\export-pg-to-json.mjs

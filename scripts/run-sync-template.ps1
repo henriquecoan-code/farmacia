@@ -25,7 +25,11 @@ $env:PG_STATEMENT_TIMEOUT = "60000"
 
 # Amostragem (ativada) — ajustar quantidade de itens
 # Dica: você pode sobrescrever SYNC_LIMIT antes de chamar este script
-$env:SYNC_LIMIT = "20"            # limite de itens
+$env:SYNC_LIMIT = "3000"            # limite de itens
+
+# Filial/rede do estoque (cadestoq.cod_filial). Default será 3 se não definido.
+# Exemplo para outra rede: $env:ESTOQUE_COD_FILIAL = "5"
+# $env:ESTOQUE_COD_FILIAL = "3"
 # $env:SYNC_SAMPLE_IDS = "41609,41597,41591" # ids específicos (cod_reduzido)
 
 node .\scripts\sync-pg-to-firestore.mjs

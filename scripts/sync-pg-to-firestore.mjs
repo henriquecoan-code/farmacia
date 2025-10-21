@@ -215,18 +215,22 @@ async function main(){
   console.log(`[sync] Executando SELECT com${sampleClause ? ' filtro de IDs' : ''}${limitClause ? ' e limite '+limitN : ''}${orderByClause ? ' (com ORDER BY)' : ' (sem ORDER BY)'}...`);
 
     console.time('[sync] SELECT');
+    const filialCod = Number(process.env.ESTOQUE_COD_FILIAL || 3);
+    if (!Number.isFinite(filialCod)) {
+      throw new Error(`[sync] ESTOQUE_COD_FILIAL inválido: ${process.env.ESTOQUE_COD_FILIAL}`);
+    }
     let rows = [];
     try {
       const res = await client.query(`
-      SELECT p.cod_reduzido AS cod_red, p.nom_produto AS nome, p.cod_grupo, p.vlr_venda, p.prc_desconto,
-             d.nom_dcb AS dcb, l.nom_laborat AS laboratorio, e.qtd_estoque AS quantidade
+      SELECT p.cod_reduzido AS cod_red, p.nom_produto AS nome, p.nom_prodcomp AS nome_comp, p.cod_grupo, p.vlr_venda, p.prc_desconto,
+        d.nom_dcb AS dcb, l.nom_laborat AS laboratorio, COALESCE(e.qtd_estoque, 0) AS quantidade
       FROM cadprodu p
-      JOIN cadestoq e USING (cod_reduzido)
+      LEFT JOIN cadestoq e ON e.cod_reduzido = p.cod_reduzido AND e.cod_filial = ${filialCod}
       LEFT JOIN cadcddcb d ON d.cod_dcb = p.cod_dcb
       LEFT JOIN cadlabor l ON l.cod_laborat = p.cod_laborat
       WHERE p.flg_ativo = 'A'
         AND (p.tip_classeterapeutica IS NULL OR NULLIF(TRIM(p.tip_classeterapeutica::text), '') IS NULL)
-        AND e.qtd_estoque > 0
+  AND COALESCE(e.qtd_estoque, 0) >= 0
         ${sampleClause}
       ${orderByClause}
       ${limitClause}
@@ -249,9 +253,11 @@ async function main(){
     for (const r of rows) {
       const { precoMaximo, precoComDesconto } = calcularPreco(r.vlr_venda, r.prc_desconto);
       const id = String(r.cod_red);
+      const isPerfumaria = Number(r.cod_grupo) === 8000;
+      const displayName = (isPerfumaria && String(r.nome_comp||'').trim()) ? String(r.nome_comp).trim() : r.nome;
       const basePayload = {
         id,
-        nome: r.nome,
+        nome: displayName,
         descricao: '',
         categoria: mapCategoria(r.cod_grupo),
         precoMaximo,
@@ -269,7 +275,7 @@ async function main(){
       // Compute blocking reasons and moderation flags
       const reasons = shouldBlockProduct({
         id,
-        nome: r.nome,
+        nome: displayName,
         cod_grupo: r.cod_grupo,
         categoria: basePayload.categoria,
         precoMaximo,
