@@ -70,15 +70,19 @@ $env:ESTOQUE_COD_FILIAL = "3";
 
 ### A) Sync completo PG → Firestore
 - Script pronto: `scripts\run-sync-template.ps1`
-- Comportamento: cria/atualiza produtos em `produtos/{id}`, aplica filtros/moderação e faz bump de `productsVersion`.
+- Comportamento: cria/atualiza produtos em `produtos/{id}`, aplica filtros/moderação e faz bump de `productsVersion` quando há alterações.
 - Amostra opcional: `SYNC_LIMIT` (ex.: 20) ou `SYNC_SAMPLE_IDS` (lista de ids) para testes rápidos.
 
-Rodar manualmente:
+Flags suportadas (via variáveis de ambiente):
+- `VERBOSE=1`: logs detalhados de leitura/escrita
+- `DRY_RUN=1`: simula sem gravar no Firestore (útil para auditoria)
+- `SKIP_UNCHANGED=1`: evita escrita quando os campos principais não mudaram
+- `ONLY_EXISTING=1`: não cria novos documentos; só atualiza existentes
+- `BATCH_SIZE=400`: tamanho do batch de writes (1–500; padrão 400)
+- `PROGRESS_EVERY=50`: imprime progresso a cada N itens (0 = desliga)
+- `BUMP_VERSION=1`: após alterações, incrementa `meta/counters.productsVersion`
 
-```powershell
-.\u005cscripts
-un-sync-template.ps1
-```
+Para execução manual, prefira o runner `run-sync-template.ps1` e ajuste as variáveis no próprio script.
 
 ### B) Atualizar apenas estoque (quantidade)
 - Script pronto: `scripts\run-sync-stock.ps1`
@@ -89,30 +93,19 @@ un-sync-template.ps1
   - `PROGRESS_EVERY`: imprime progresso a cada N itens.
   - `VERBOSE=1`/`DRY_RUN=1`: diagnóstico sem escrever (útil para auditoria).
 
-Rodar manualmente:
-
-```powershell
-.\u005cscripts
-un-sync-stock.ps1
-```
+Para execução manual, prefira o runner `run-sync-stock.ps1` e ajuste as variáveis no próprio script.
 
 ### C) Verificar divergências PG × Firestore (amostra)
 - Script pronto: `scripts\run-verify-stock.ps1`
 - Comportamento: consulta uma amostra no PG e compara com Firestore, listando OK/DIFF/FS_NOT_FOUND.
 
-```powershell
-.\u005cscripts
-un-verify-stock.ps1
-```
+Use o runner `run-verify-stock.ps1` para executar.
 
 ### D) Exportar JSON (modo vitrine)
 - Script pronto: `scripts\run-export-template.ps1`
 - Resultado: `data\products.json`. No front, adicione `?vitrine=1` nas páginas.
 
-```powershell
-.\u005cscripts
-un-export-template.ps1
-```
+Use o runner `run-export-template.ps1` para executar.
 
 ---
 
