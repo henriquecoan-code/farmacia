@@ -179,8 +179,12 @@ export class AuthService {
         if (dropdown) dropdown.classList.remove('active');
       };
 
-      // Remove o evento de click para não abrir o modal de login
+      // Permite cliques nos links do dropdown; evita abrir modal quando clicar no botão em si
       userBtn.onclick = (e) => {
+        // Se o clique veio de um link do dropdown, não impedir navegação
+        const link = e.target?.closest('a.user-dropdown__item');
+        if (link) return; // deixa propagar/navegar
+        // Caso contrário, apenas evita o comportamento padrão do botão
         e.stopPropagation();
         e.preventDefault();
       };
@@ -205,11 +209,11 @@ export class AuthService {
     dropdown.className = 'user-dropdown';
     dropdown.innerHTML = `
       <div class="user-dropdown__content">
-        <a href="#" class="user-dropdown__item">
+        <a href="conta.html" class="user-dropdown__item" id="account-link">
           <i class="fas fa-user-circle"></i>
           Minha Conta
         </a>
-        <a href="#" class="user-dropdown__item">
+        <a href="pedidos.html" class="user-dropdown__item" id="orders-link">
           <i class="fas fa-box"></i>
           Meus Pedidos
         </a>
@@ -238,6 +242,26 @@ export class AuthService {
         e.preventDefault();
         e.stopPropagation();
         this.signOut();
+      });
+    }
+
+    // Navegação: Minha Conta / Meus Pedidos
+    const accountLink = dropdown.querySelector('#account-link');
+    if (accountLink) {
+      accountLink.addEventListener('click', (e) => {
+        // Evita que o clique suba até o botão (que poderia abrir modal)
+        e.stopPropagation();
+        // Permitir navegação padrão, apenas fechar o dropdown rapidamente
+        const dd = userBtn.querySelector('.user-dropdown');
+        if (dd) dd.classList.remove('active');
+      });
+    }
+    const ordersLink = dropdown.querySelector('#orders-link');
+    if (ordersLink) {
+      ordersLink.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const dd = userBtn.querySelector('.user-dropdown');
+        if (dd) dd.classList.remove('active');
       });
     }
 

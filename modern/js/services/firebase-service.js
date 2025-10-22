@@ -90,6 +90,51 @@ export class FirebaseService {
     }
   }
 
+  /**
+   * List orders for a specific user (by uid first, fallback to email)
+   * Options: { uid?: string, email?: string, limit?: number, status?: string }
+   */
+  async listOrdersByUser({ uid=null, email=null, status=null, limit:lim=100 } = {}) {
+    if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const { collection, getDocs, query, where, orderBy, limit } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+    const ordersCol = collection(this.firestore, 'orders');
+    const results = [];
+    let snap = null;
+    try {
+      if (uid) {
+        try {
+          // Try with orderBy for better UX; if index missing, fallback below
+          let q = query(ordersCol, where('user.uid','==', uid), orderBy('createdAt','desc'), limit(lim));
+          if (status) q = query(ordersCol, where('user.uid','==', uid), where('status','==', status), orderBy('createdAt','desc'), limit(lim));
+          snap = await getDocs(q);
+        } catch (err) {
+          // Fallback without orderBy to avoid composite index requirement
+          let q = query(ordersCol, where('user.uid','==', uid), limit(lim));
+          if (status) q = query(ordersCol, where('user.uid','==', uid), where('status','==', status), limit(lim));
+          snap = await getDocs(q);
+        }
+      }
+      if ((!snap || snap.empty) && email) {
+        try {
+          let q = query(ordersCol, where('user.email','==', email), orderBy('createdAt','desc'), limit(lim));
+          if (status) q = query(ordersCol, where('user.email','==', email), where('status','==', status), orderBy('createdAt','desc'), limit(lim));
+          snap = await getDocs(q);
+        } catch (err) {
+          let q = query(ordersCol, where('user.email','==', email), limit(lim));
+          if (status) q = query(ordersCol, where('user.email','==', email), where('status','==', status), limit(lim));
+          snap = await getDocs(q);
+        }
+      }
+      if (snap) {
+        snap.forEach(doc => results.push(Object.assign({ _docId: doc.id }, doc.data())));
+      }
+      return results;
+    } catch (e) {
+      console.error('Error listing orders by user', e);
+      return [];
+    }
+  }
+
   async updateOrderStatus(docId, newStatus, note='') {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
     try {
