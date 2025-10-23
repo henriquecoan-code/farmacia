@@ -255,24 +255,39 @@ class CheckoutPage {
     const user = window.authService?.user;
     if (!user?.email) return;
     try {
-      const client = await bootstrap.firebase.getClientByEmail(user.email);
-      if (client && client.address) {
-        const map = {
-          'addr-name': client.name,
-          'addr-phone': client.phone,
-          'addr-cep': client.address.zipCode,
-          'addr-street': client.address.street,
-          'addr-city': client.address.city,
-          'addr-state': client.address.state
-        };
-        Object.entries(map).forEach(([id,val]) => {
-          const el = document.getElementById(id);
-          if (el && !el.value) el.value = val || '';
-        });
-        const status = document.getElementById('address-status');
-        if (status) { status.textContent = 'Endereço carregado do cadastro.'; status.style.color = 'var(--success-color)'; }
-        analytics.track('checkout_address_prefill',{ source:'client_record'});
-        this.updateAll();
+      const client = await (bootstrap.firebase.getCurrentUserProfile?.() || bootstrap.firebase.getClientByEmail(user.email));
+      if (client) {
+        const addr = client.address || client.endereco || null;
+        if (addr) {
+          const map = {
+            'addr-name': client.name || client.nome,
+            'addr-phone': client.phone || client.telefone,
+            'addr-cep': addr.zipCode || addr.cep || '',
+            'addr-street': addr.street || addr.rua || '',
+            'addr-city': addr.city || addr.cidade || '',
+            'addr-state': (addr.state || addr.estado || '').toString().toUpperCase(),
+            'addr-number': addr.number || addr.numero || '',
+            'addr-district': addr.district || addr.bairro || '',
+            'addr-comp': addr.comp || addr.complemento || ''
+          };
+          Object.entries(map).forEach(([id,val]) => {
+            const el = document.getElementById(id);
+            if (el && !el.value) el.value = val || '';
+          });
+          // Auto-format phone if digits only (10-11)
+          const phoneEl = document.getElementById('addr-phone');
+          const rawPhone = (phoneEl?.value || '').replace(/\D/g,'');
+          if (phoneEl && /^\d{10,11}$/.test(rawPhone)) {
+            const ddd = rawPhone.slice(0,2);
+            const middle = rawPhone.length === 11 ? rawPhone.slice(2,7) : rawPhone.slice(2,6);
+            const end = rawPhone.length === 11 ? rawPhone.slice(7) : rawPhone.slice(6);
+            phoneEl.value = `(${ddd}) ${middle}-${end}`;
+          }
+          const status = document.getElementById('address-status');
+          if (status) { status.textContent = 'Endereço carregado do cadastro.'; status.style.color = 'var(--success-color)'; }
+          analytics.track('checkout_address_prefill',{ source:'client_record'});
+          this.updateAll();
+        }
       }
     } catch (e){ console.warn('Prefill address failed', e); }
     this.prefillAttempted = true;
@@ -285,7 +300,7 @@ class CheckoutPage {
     const user = window.authService?.user;
     if (!user?.email) return;
     try {
-      this.clientRecord = await bootstrap.firebase.getClientByEmail(user.email);
+  this.clientRecord = await (bootstrap.firebase.getCurrentUserProfile?.() || bootstrap.firebase.getClientByEmail(user.email));
       const container = document.getElementById('saved-addresses-box');
       const list = document.getElementById('saved-addresses-list');
       if (!container || !list) return;
@@ -485,7 +500,7 @@ class CheckoutPage {
     let valid = true;
     const val = (el.value || '').trim();
     switch(id){
-      case 'addr-phone': valid = /\(\d{2}\) \d{4,5}-\d{4}$/.test(val); break;
+      case 'addr-phone': valid = /\(\d{2}\) \d{4,5}-\d{4}$/.test(val) || /^\d{10,11}$/.test(val.replace(/\D/g,'')); break;
       case 'addr-cep': valid = /^\d{5}-\d{3}$/.test(val); break;
       case 'addr-state': valid = /^[A-Za-z]{2}$/.test(val); break;
       default: valid = !!val; break;
@@ -594,6 +609,7 @@ class CheckoutPage {
   installments: this.payment === 'card' ? this.selectedInstallment : null,
       address: this.readAddress(),
       user: window.authService?.user?.email || null,
+      userId: window.authService?.user?.uid || null,
   coupon: this.coupon || null,
   status: 'pending'
     };

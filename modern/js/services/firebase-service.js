@@ -60,11 +60,14 @@ export class FirebaseService {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
     try {
       const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      const uid = this.auth?.currentUser?.uid || order.userId || null;
       const payload = Object.assign({}, order, {
         status: order.status || 'pending',
-        history: order.history || [ { status: order.status || 'pending', at: new Date().toISOString(), note: 'Pedido criado' } ]
+        history: order.history || [ { status: order.status || 'pending', at: new Date().toISOString(), note: 'Pedido criado' } ],
+        userId: uid
       });
-      const docRef = await addDoc(collection(this.firestore, 'orders'), payload);
+      // Conforme regras, coleção é 'pedidos'
+      const docRef = await addDoc(collection(this.firestore, 'pedidos'), payload);
       return docRef.id; // Firestore id (string) returned; keep numeric id inside payload.id
     } catch (e) {
       console.error('Error creating order', e);
@@ -76,9 +79,9 @@ export class FirebaseService {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
     try {
       const { collection, getDocs, query, where, orderBy, limit } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
-      let q = query(collection(this.firestore, 'orders'), orderBy('createdAt','desc'), limit(lim));
+      let q = query(collection(this.firestore, 'pedidos'), orderBy('createdAt','desc'), limit(lim));
       if (status) {
-        q = query(collection(this.firestore, 'orders'), where('status','==', status), orderBy('createdAt','desc'), limit(lim));
+        q = query(collection(this.firestore, 'pedidos'), where('status','==', status), orderBy('createdAt','desc'), limit(lim));
       }
       const snap = await getDocs(q);
       const orders = [];
@@ -97,29 +100,31 @@ export class FirebaseService {
   async listOrdersByUser({ uid=null, email=null, status=null, limit:lim=100 } = {}) {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
     const { collection, getDocs, query, where, orderBy, limit } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
-    const ordersCol = collection(this.firestore, 'orders');
+    // Primeiro tenta na coleção 'pedidos' com campo userId (alinhado às regras)
+    const pedidosCol = collection(this.firestore, 'pedidos');
     const results = [];
     let snap = null;
     try {
       if (uid) {
         try {
-          // Try with orderBy for better UX; if index missing, fallback below
-          let q = query(ordersCol, where('user.uid','==', uid), orderBy('createdAt','desc'), limit(lim));
-          if (status) q = query(ordersCol, where('user.uid','==', uid), where('status','==', status), orderBy('createdAt','desc'), limit(lim));
+          let q = query(pedidosCol, where('userId','==', uid), orderBy('createdAt','desc'), limit(lim));
+          if (status) q = query(pedidosCol, where('userId','==', uid), where('status','==', status), orderBy('createdAt','desc'), limit(lim));
           snap = await getDocs(q);
         } catch (err) {
-          // Fallback without orderBy to avoid composite index requirement
-          let q = query(ordersCol, where('user.uid','==', uid), limit(lim));
-          if (status) q = query(ordersCol, where('user.uid','==', uid), where('status','==', status), limit(lim));
+          let q = query(pedidosCol, where('userId','==', uid), limit(lim));
+          if (status) q = query(pedidosCol, where('userId','==', uid), where('status','==', status), limit(lim));
           snap = await getDocs(q);
         }
       }
+      // Fallbacks para esquemas antigos (coleção 'orders' com user.uid ou user.email)
       if ((!snap || snap.empty) && email) {
         try {
+          const ordersCol = collection(this.firestore, 'orders');
           let q = query(ordersCol, where('user.email','==', email), orderBy('createdAt','desc'), limit(lim));
           if (status) q = query(ordersCol, where('user.email','==', email), where('status','==', status), orderBy('createdAt','desc'), limit(lim));
           snap = await getDocs(q);
         } catch (err) {
+          const ordersCol = collection(this.firestore, 'orders');
           let q = query(ordersCol, where('user.email','==', email), limit(lim));
           if (status) q = query(ordersCol, where('user.email','==', email), where('status','==', status), limit(lim));
           snap = await getDocs(q);
@@ -133,6 +138,48 @@ export class FirebaseService {
       console.error('Error listing orders by user', e);
       return [];
     }
+  }
+
+  // ===== Usuários (perfil) e endereços (novo esquema) =====
+  async getUserByEmail(email) {
+    if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const { collection, getDocs, query, where, limit } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+    const q = query(collection(this.firestore, 'usuarios'), where('email','==', email), limit(1));
+    const snap = await getDocs(q);
+    let user = null;
+    snap.forEach(doc => { if (!user) user = Object.assign({ id: doc.id }, doc.data()); });
+    return user;
+  }
+
+  async getCurrentUserProfile() {
+    if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const uid = this.auth?.currentUser?.uid;
+    if (!uid) return null;
+    const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+    try {
+      const ref = doc(this.firestore, 'usuarios', uid);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return null;
+      const profile = Object.assign({ id: uid }, snap.data());
+      try {
+        const addrs = await this.getUserAddresses(uid);
+        if (Array.isArray(addrs) && addrs.length) profile.addresses = addrs;
+      } catch {}
+      return profile;
+    } catch (e) {
+      console.error('Error getting current user profile', e);
+      return null;
+    }
+  }
+
+  async getUserAddresses(uid) {
+    if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+    const col = collection(this.firestore, 'usuarios', uid, 'enderecos');
+    const snap = await getDocs(col);
+    const addrs = [];
+    snap.forEach(doc => addrs.push(Object.assign({ id: doc.id }, doc.data())));
+    return addrs;
   }
 
   async updateOrderStatus(docId, newStatus, note='') {
@@ -358,11 +405,22 @@ export class FirebaseService {
   async getClientByEmail(email) {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
     try {
-      const { collection, getDocs, query, where, limit } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      const { collection, getDocs, query, where, limit, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      // 1) Tenta buscar em 'usuarios' (novo esquema)
+      let user = await this.getUserByEmail(email).catch(() => null);
+      if (user) {
+        // Tenta carregar subcoleção 'enderecos'
+        try {
+          const addrs = await this.getUserAddresses(user.id);
+          if (addrs?.length) user.addresses = addrs;
+        } catch {}
+        return user; // { id: uid, ...campos }
+      }
+      // 2) Fallback para 'clientes' (legado)
       const q = query(collection(this.firestore, 'clientes'), where('email','==', email), limit(1));
       const snap = await getDocs(q);
       let found = null;
-      snap.forEach(doc => { if (!found) found = Object.assign({ id: doc.id }, doc.data()); });
+      snap.forEach(docSnap => { if (!found) found = Object.assign({ id: docSnap.id }, docSnap.data()); });
       return found;
     } catch (error) {
       console.error('Error getting client by email:', error);
@@ -372,18 +430,32 @@ export class FirebaseService {
 
   async addAddressToClient(clientId, address, { favorite = false } = {}) {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const { doc, getDoc, updateDoc, collection, addDoc, getDocs, writeBatch } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
     try {
-      const { doc, getDoc, updateDoc, arrayUnion } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      // Prefer esquema 'usuarios/{uid}/enderecos'
+      const userRef = doc(this.firestore, 'usuarios', clientId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const col = collection(this.firestore, 'usuarios', clientId, 'enderecos');
+        const payload = Object.assign({ favorite: !!favorite, createdAt: new Date().toISOString() }, address);
+        const added = await addDoc(col, payload);
+        // Se favorite, desmarca os demais
+        if (favorite) {
+          const listSnap = await getDocs(col);
+          const batch = writeBatch(this.firestore);
+          listSnap.forEach(d => { if (d.id !== added.id && d.data().favorite) batch.update(d.ref, { favorite: false }); });
+          await batch.commit();
+        }
+        return Object.assign({ id: added.id }, payload);
+      }
+      // Fallback: coleção 'clientes' com campo addresses (array)
       const docRef = doc(this.firestore, 'clientes', clientId);
       const snap = await getDoc(docRef);
       if (!snap.exists()) throw new Error('Client not found');
       const data = snap.data();
       const addresses = Array.isArray(data.addresses) ? data.addresses.slice() : [];
-      // Normalize
       const newAddress = Object.assign({ id: 'addr_' + Date.now().toString(36), favorite: !!favorite, createdAt: new Date().toISOString() }, address);
-      if (favorite) {
-        addresses.forEach(a => a.favorite = false);
-      }
+      if (favorite) addresses.forEach(a => a.favorite = false);
       addresses.push(newAddress);
       await updateDoc(docRef, { addresses });
       return newAddress;
@@ -395,8 +467,25 @@ export class FirebaseService {
 
   async updateClientAddress(clientId, addressId, patch) {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const { doc, getDoc, updateDoc, collection, getDocs, writeBatch } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
     try {
-      const { doc, getDoc, updateDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      // Tenta esquema 'usuarios/{uid}/enderecos/{addressId}'
+      const userRef = doc(this.firestore, 'usuarios', clientId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const addrRef = doc(this.firestore, 'usuarios', clientId, 'enderecos', addressId);
+        const payload = Object.assign({}, patch, { updatedAt: new Date().toISOString() });
+        await updateDoc(addrRef, payload);
+        if (patch.favorite) {
+          const col = collection(this.firestore, 'usuarios', clientId, 'enderecos');
+          const listSnap = await getDocs(col);
+          const batch = writeBatch(this.firestore);
+          listSnap.forEach(d => { if (d.id !== addressId && d.data().favorite) batch.update(d.ref, { favorite: false }); });
+          await batch.commit();
+        }
+        return true;
+      }
+      // Fallback: addresses array em 'clientes/{id}'
       const docRef = doc(this.firestore, 'clientes', clientId);
       const snap = await getDoc(docRef);
       if (!snap.exists()) throw new Error('Client not found');
@@ -408,7 +497,6 @@ export class FirebaseService {
         return a;
       });
       if (!updated) throw new Error('Address not found');
-      // If patch.favorite true set others false
       if (patch.favorite) addresses.forEach(a => { if (a.id !== addressId) a.favorite = false; });
       await updateDoc(docRef, { addresses });
       return true;
@@ -424,8 +512,17 @@ export class FirebaseService {
 
   async deleteClientAddress(clientId, addressId) {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const { doc, getDoc, updateDoc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
     try {
-      const { doc, getDoc, updateDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      // Tenta esquema 'usuarios/{uid}/enderecos/{addressId}'
+      const userRef = doc(this.firestore, 'usuarios', clientId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const addrRef = doc(this.firestore, 'usuarios', clientId, 'enderecos', addressId);
+        await deleteDoc(addrRef);
+        return true;
+      }
+      // Fallback addresses array em 'clientes'
       const docRef = doc(this.firestore, 'clientes', clientId);
       const snap = await getDoc(docRef);
       if (!snap.exists()) throw new Error('Client not found');

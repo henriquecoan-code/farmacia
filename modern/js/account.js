@@ -21,8 +21,28 @@ function renderLoggedOut(root){
   });
 }
 
+function normalizeEndereco(e){
+  if (!e) return null;
+  return {
+    id: 'endereco_cadastro',
+    label: 'Endereço do cadastro',
+    zipCode: e.cep || e.zipCode || '',
+    street: e.rua || e.street || '',
+    number: e.numero || e.number || '',
+    district: e.bairro || e.district || '',
+    comp: e.complemento || e.comp || '',
+    complement: e.complemento || e.complement || '',
+    city: e.cidade || e.city || '',
+    state: e.estado || e.state || '',
+    favorite: true
+  };
+}
+
 function renderAddressSection(container, client){
-  const addresses = Array.isArray(client?.addresses) ? client.addresses : [];
+  const listFromArray = Array.isArray(client?.addresses) ? client.addresses.slice() : [];
+  const cadastroAddr = normalizeEndereco(client?.endereco);
+  const addresses = listFromArray.length ? listFromArray : (cadastroAddr ? [cadastroAddr] : []);
+  const isCadastroOnly = !listFromArray.length && !!cadastroAddr;
   container.innerHTML = `
     <div class="card">
       <div class="card__content">
@@ -30,7 +50,8 @@ function renderAddressSection(container, client){
           <h3 class="card__title" style="margin:0"><i class="fas fa-map-marker-alt"></i> Endereços</h3>
           <button id="addr-add-toggle" class="btn btn--secondary"><i class="fas fa-plus"></i> Novo endereço</button>
         </div>
-        <div id="addr-list" style="margin-top:1rem"></div>
+  <div id="addr-list" style="margin-top:1rem"></div>
+  ${isCadastroOnly ? `<div class="alert-inline" style="margin-top:.5rem">Este é o seu endereço do cadastro. <button id="btn-save-cadastro" class="btn btn--secondary" style="margin-left:.5rem">Salvar nos meus endereços</button></div>` : ''}
         <form id="addr-form" class="form" style="display:none;margin-top:1rem">
           <div class="grid" style="grid-template-columns:1fr 1fr; gap: var(--spacing-3)">
             <div class="form__group"><label>CEP</label><input id="addr-zip" type="text" placeholder="00000-000"></div>
@@ -67,15 +88,15 @@ function renderAddressSection(container, client){
         <div class="card__content" style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start">
           <div>
             <div style="display:flex;align-items:center;gap:.5rem">
-              <strong>${a.street || a.logradouro || 'Endereço'}</strong>
+              <strong>${a.label || a.street || a.logradouro || 'Endereço'}</strong>
               ${a.favorite ? '<span style="background:#e0f2fe;color:#075985;padding:.125rem .375rem;border-radius:.375rem;font-size:.75rem">Favorito</span>' : ''}
             </div>
             <div class="card__text" style="margin:.25rem 0 0">${a.district || ''} ${a.city ? '• ' + a.city : ''} ${a.state ? '• ' + a.state : ''} ${a.zipCode ? '• ' + a.zipCode : ''}</div>
-            ${a.complement ? `<div class="card__text" style="margin:.25rem 0 0">${a.complement}</div>`: ''}
+              ${(a.complement || a.comp) ? `<div class="card__text" style="margin:.25rem 0 0">${a.complement || a.comp}</div>`: ''}
           </div>
           <div class="card__actions" style="flex-shrink:0;display:flex;gap:.5rem">
-            ${!a.favorite ? `<button class="btn" data-fav="${a.id}"><i class="fas fa-star"></i> Favoritar</button>`:''}
-            <button class="btn btn--secondary" data-del="${a.id}"><i class="fas fa-trash"></i> Remover</button>
+            ${a.id === 'endereco_cadastro' ? '' : (!a.favorite ? `<button class="btn" data-fav="${a.id}"><i class="fas fa-star"></i> Favoritar</button>`:'')}
+            ${a.id === 'endereco_cadastro' ? '' : `<button class="btn btn--secondary" data-del="${a.id}"><i class="fas fa-trash"></i> Remover</button>`}
           </div>
         </div>
       </div>`).join('');
@@ -108,6 +129,31 @@ function renderAddressSection(container, client){
   }
 
   renderList();
+  // Quando existe apenas o endereço do cadastro, permitir salvar na subcoleção 'enderecos'
+  if (isCadastroOnly) {
+    const saveBtn = container.querySelector('#btn-save-cadastro');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async ()=>{
+        try {
+          const payload = {
+            zipCode: cadastroAddr.zipCode,
+            street: cadastroAddr.street,
+            number: cadastroAddr.number,
+            district: cadastroAddr.district,
+            comp: cadastroAddr.comp || cadastroAddr.complement || '',
+            city: cadastroAddr.city,
+            state: cadastroAddr.state
+          };
+          const saved = await bootstrap.firebase.addAddressToClient(client.id, payload, { favorite: true });
+          addresses.push(saved);
+          // Agora existem endereços salvos; remove banner e re-renderiza
+          renderList();
+          const alert = container.querySelector('.alert-inline'); if (alert) alert.remove();
+          window.toast?.success('Endereço salvo nos seus endereços.');
+        } catch(e){ console.error(e); window.toast?.error('Não foi possível salvar endereço.'); }
+      });
+    }
+  }
 
   toggleBtn.addEventListener('click', ()=>{
     formEl.style.display = formEl.style.display === 'none' ? 'block' : 'none';
@@ -177,36 +223,30 @@ async function main(){
   const user = bootstrap.auth?.user || bootstrap.firebase?.getCurrentUser?.();
   if (!user) { renderLoggedOut(root); }
   else {
-    // Buscar/garantir cliente por e-mail
+    // Buscar perfil por UID (regras exigem request.auth.uid == userId)
     let client = null;
     try {
-      if (bootstrap.firebase?.getClientByEmail) {
+      if (bootstrap.firebase?.getCurrentUserProfile) {
+        client = await bootstrap.firebase.getCurrentUserProfile();
+      }
+      // Fallback por email se necessário (menos recomendado)
+      if (!client && bootstrap.firebase?.getClientByEmail) {
         client = await bootstrap.firebase.getClientByEmail(user.email);
       }
-      if (!client && bootstrap.firebase?.addClient) {
-        const payload = {
-          name: user.displayName || (user.email?.split('@')[0] || 'Usuário'),
-          email: user.email,
-          addresses: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        const id = await bootstrap.firebase.addClient(payload);
-        client = Object.assign({ id }, payload);
-      }
     } catch (e) {
-      console.error('Erro ao obter/criar cliente', e);
+      console.error('Erro ao obter cliente', e);
     }
-    renderAccount(root, user, client || { id: 'unknown', addresses: [] });
+    renderAccount(root, user, client || { id: user.uid, endereco: null, addresses: [] });
   }
   // Re-render on auth changes
   eventBus.on('auth:stateChanged', async ({ user }) => {
     if (!user) { renderLoggedOut(root); return; }
     let client = null;
     try {
-      client = await bootstrap.firebase.getClientByEmail(user.email);
+      client = await bootstrap.firebase.getCurrentUserProfile?.();
+      if (!client) client = await bootstrap.firebase.getClientByEmail?.(user.email);
     } catch {}
-    renderAccount(root, user, client || { id: 'unknown', addresses: [] });
+    renderAccount(root, user, client || { id: user.uid, addresses: [] });
   });
 }
 
