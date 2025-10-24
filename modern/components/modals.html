@@ -48,48 +48,86 @@
                 </div>
                 <button type="submit" class="btn btn--primary btn--full">Entrar</button>
             </form>
-            <p class="auth-switch">
-                Não tem conta? <a href="#" id="auth-toggle">Cadastre-se</a>
-            </p>
+            <div class="auth-switch">
+                <span>Não tem conta?</span>
+                <a href="#" id="auth-toggle" class="auth-switch__link">Cadastre-se</a>
+            </div>
         </div>
     </div>
 </div>
-
 <!-- Address Modal -->
-<div class="modal" id="address-modal">
+<div class="modal modern-modal" id="address-modal">
     <div class="modal__backdrop" id="address-modal-backdrop"></div>
-    <div class="modal__content" style="max-width:680px">
-        <div class="modal__header">
-            <h3>Novo Endereço</h3>
-            <button class="modal__close" id="address-modal-close">
+    <div class="modal__content modal__content--wide modern-card" style="box-shadow:0 8px 32px rgba(0,0,0,0.18); border-radius: 18px; background: var(--surface, #fff);">
+        <div class="modal__header" style="border-bottom:1px solid var(--gray-200); padding-bottom:1rem;">
+            <h3 style="font-size:1.4rem; font-weight:600; color:var(--primary-color, #1a73e8); letter-spacing:-.5px;">Novo Endereço</h3>
+            <button class="modal__close" id="address-modal-close" style="background:transparent; border:none; font-size:1.3rem; color:var(--gray-500); transition:color .2s;">
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <div class="modal__body">
-            <form id="address-form-modal" class="checkout-form">
+        <div class="modal__body" style="padding:2rem 1.5rem 1.5rem 1.5rem;">
+            <form id="address-form-modal" class="checkout-form" autocomplete="off" style="display:flex; flex-direction:column; gap:1.2rem;">
                 <div class="grid" style="grid-template-columns:1fr 1fr; gap: var(--spacing-3)">
-                    <div class="field-wrapper" data-field="addrm-cep"><label>CEP</label><input required id="addrm-cep" maxlength="9" placeholder="00000-000" /><div class="field-error">CEP inválido</div></div>
-                    <div class="field-wrapper" data-field="addrm-city"><label>Cidade</label><input required id="addrm-city" /><div class="field-error">Informe a cidade</div></div>
+                            <div class="field-wrapper" data-field="addrm-cep">
+                              <label for="addrm-cep">CEP</label>
+                              <input required id="addrm-cep" name="zipCode" maxlength="9" placeholder="00000-000" inputmode="numeric" autocomplete="postal-code" pattern="\d{5}-?\d{3}" aria-describedby="error-addrm-cep" />
+                              <div class="field-error" id="error-addrm-cep" role="alert" aria-live="polite">CEP inválido</div>
+                    </div>
+                    <div class="field-wrapper" data-field="addrm-city">
+                              <label for="addrm-city">Cidade</label>
+                              <input required id="addrm-city" name="city" autocomplete="address-level2" aria-describedby="error-addrm-city" />
+                              <div class="field-error" id="error-addrm-city" role="alert" aria-live="polite">Informe a cidade</div>
+                    </div>
                 </div>
                 <div class="grid" style="grid-template-columns:1fr 1fr; gap: var(--spacing-3)">
-                    <div class="field-wrapper" data-field="addrm-street"><label>Rua</label><input required id="addrm-street" /><div class="field-error">Informe a rua</div></div>
-                    <div class="field-wrapper" data-field="addrm-number"><label>Número</label><input required id="addrm-number" /><div class="field-error">Informe o número</div></div>
+                    <div class="field-wrapper" data-field="addrm-street">
+                  <label for="addrm-street">Rua</label>
+                  <input required id="addrm-street" name="street" autocomplete="address-line1" aria-describedby="error-addrm-street" />
+                  <div class="field-error" id="error-addrm-street" role="alert" aria-live="polite">Informe a rua</div>
+                    </div>
+                    <div class="field-wrapper" data-field="addrm-number">
+                  <label for="addrm-number">Número</label>
+                  <input required id="addrm-number" name="number" inputmode="numeric" aria-describedby="error-addrm-number" />
+                  <div class="field-error" id="error-addrm-number" role="alert" aria-live="polite">Informe o número</div>
+                    </div>
                 </div>
                 <div class="grid" style="grid-template-columns:1fr 1fr; gap: var(--spacing-3)">
-                    <div class="field-wrapper" data-field="addrm-district"><label>Bairro</label><input required id="addrm-district" /><div class="field-error">Informe o bairro</div></div>
-                    <div class="field-wrapper" data-field="addrm-comp"><label>Complemento</label><input id="addrm-comp" /></div>
+                    <div class="field-wrapper" data-field="addrm-district">
+                              <label for="addrm-district">Bairro</label>
+                              <input required id="addrm-district" name="district" aria-describedby="error-addrm-district" />
+                              <div class="field-error" id="error-addrm-district" role="alert" aria-live="polite">Informe o bairro</div>
+                    </div>
+                    <div class="field-wrapper" data-field="addrm-comp">
+                              <label for="addrm-comp">Complemento</label>
+                              <input id="addrm-comp" name="comp" autocomplete="address-line2" />
+                    </div>
                 </div>
-                <div class="field-wrapper" data-field="addrm-state"><label>Estado</label><input required id="addrm-state" maxlength="2" style="text-transform:uppercase;" /><div class="field-error">UF inválida</div></div>
+                <div class="field-wrapper" data-field="addrm-state">
+                              <label for="addrm-state">Estado</label>
+                              <input required id="addrm-state" name="state" maxlength="2" style="text-transform:uppercase;" autocomplete="address-level1" pattern="[A-Za-z]{2}" list="states-br" aria-describedby="error-addrm-state" />
+                              <div class="field-error" id="error-addrm-state" role="alert" aria-live="polite">UF inválida</div>
+                              <datalist id="states-br">
+                                <option value="AC"><option value="AL"><option value="AP"><option value="AM">
+                                <option value="BA"><option value="CE"><option value="DF"><option value="ES">
+                                <option value="GO"><option value="MA"><option value="MT"><option value="MS">
+                                <option value="MG"><option value="PA"><option value="PB"><option value="PR">
+                                <option value="PE"><option value="PI"><option value="RJ"><option value="RN">
+                                <option value="RS"><option value="RO"><option value="RR"><option value="SC">
+                                <option value="SP"><option value="SE"><option value="TO">
+                              </datalist>
+                </div>
                 <div style="display:flex; align-items:center; gap:.5rem; margin-top:.25rem;">
-                    <input type="checkbox" id="addrm-favorite" /> <label for="addrm-favorite" style="margin:0; font-size:.85rem;">Definir como favorito</label>
+                    <input type="checkbox" id="addrm-favorite" style="accent-color:var(--primary-color, #1a73e8);" />
+                    <label for="addrm-favorite" style="margin:0; font-size:.95rem; color:var(--gray-700);">Definir como favorito</label>
                 </div>
-                <div class="modal__footer" style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
-                    <button type="button" class="btn" id="address-cancel-btn">Cancelar</button>
-                    <button type="submit" class="btn btn--primary">Salvar</button>
+                <div class="modal__footer" style="display:flex; gap:.7rem; justify-content:flex-end; margin-top:1.2rem;">
+                    <button type="button" class="btn" id="address-cancel-btn" style="background:var(--gray-100); color:var(--gray-700); border-radius:7px; font-weight:500;">Cancelar</button>
+                    <button type="submit" class="btn btn--primary" style="border-radius:7px; font-weight:600; background:var(--primary-color, #1a73e8); box-shadow:0 2px 8px rgba(26,115,232,0.08);">Salvar</button>
                 </div>
             </form>
         </div>
     </div>
+</div>
     <style>
       /* Reusa estilos do checkout form */
       #address-modal .field-error { font-size:.65rem; color: var(--error-color); margin-top:.15rem; display:none; }
@@ -104,4 +142,7 @@
 .cart-skeleton .sk-line.short { width:60%; }
 .cart-skeleton .sk-line:before { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(255,255,255,0)0%,rgba(255,255,255,.6)50%,rgba(255,255,255,0)100%); animation: sk-sh 1.1s linear infinite; }
 @keyframes sk-sh { 0%{transform:translateX(-100%);}100%{transform:translateX(100%);} }
+
+/* Modal wide content */
+.modal__content--wide { max-width: 680px; }
 </style>

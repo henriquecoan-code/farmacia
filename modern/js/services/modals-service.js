@@ -10,6 +10,9 @@ export class ModalsManager {
   this.lastFocusedElement = null; // for focus return
   this._addressSaveHandler = null;
   this._addressInFlight = false;
+  // CEP lookup helpers
+  this._cepTimer = null;
+  this._lastCepLookup = '';
   }
 
   async init() {
@@ -91,10 +94,17 @@ export class ModalsManager {
     const addressBackdrop = document.getElementById('address-modal-backdrop');
     const addressCancelBtn = document.getElementById('address-cancel-btn');
     const addressForm = document.getElementById('address-form-modal');
+  const cepInput = document.getElementById('addrm-cep');
+  const ufInput = document.getElementById('addrm-state');
     if (addressCloseBtn) addressCloseBtn.addEventListener('click', () => this.closeAddressModal());
     if (addressBackdrop) addressBackdrop.addEventListener('click', () => this.closeAddressModal());
     if (addressCancelBtn) addressCancelBtn.addEventListener('click', () => this.closeAddressModal());
     if (addressForm) addressForm.addEventListener('submit', (e) => this.handleAddressSubmit(e));
+    if (cepInput) {
+      cepInput.addEventListener('input', (e) => { this._maskCep(e); this._scheduleCepLookup(); });
+      cepInput.addEventListener('blur', () => this._maybeLookupCep(true));
+    }
+  if (ufInput) ufInput.addEventListener('input', (e) => { e.target.value = (e.target.value || '').toUpperCase().slice(0,2); });
 
     // ESC key to close modals
     document.addEventListener('keydown', (e) => {
@@ -300,6 +310,11 @@ export class ModalsManager {
     required.forEach(([id, valid]) => {
       const wrap = this.addressModal.querySelector(`[data-field="${id}"]`);
       if (wrap) wrap.classList.toggle('invalid', !valid);
+      const input = this.addressModal.querySelector(`#${id}`);
+      if (input) {
+        if (!valid) input.setAttribute('aria-invalid', 'true');
+        else input.removeAttribute('aria-invalid');
+      }
       ok = ok && !!valid;
     });
     if (!ok) { this.showToast('Corrija os campos destacados.', 'warn'); return; }
@@ -335,6 +350,77 @@ export class ModalsManager {
       console.error('Erro no handler de salvar endereço:', err);
       this.showToast('Erro ao salvar endereço.', 'error');
       this._addressInFlight = false; const submitBtn = this.addressModal.querySelector('#address-form-modal button[type="submit"]'); if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+
+  _maskCep(e) {
+    try {
+      const el = e.target;
+      let v = (el.value || '').replace(/\D/g, '').slice(0, 8);
+      if (v.length > 5) v = `${v.slice(0,5)}-${v.slice(5)}`;
+      el.value = v;
+    } catch (err) { /* noop */ }
+  }
+
+  _getCepDigits() {
+    const el = this.addressModal?.querySelector('#addrm-cep');
+    return (el?.value || '').replace(/\D/g, '').slice(0, 8);
+  }
+
+  _scheduleCepLookup() {
+    if (!this.addressModal) return;
+    clearTimeout(this._cepTimer);
+    this._cepTimer = setTimeout(() => this._maybeLookupCep(false), 450);
+  }
+
+  async _maybeLookupCep(force = false) {
+    try {
+      const cep = this._getCepDigits();
+      if (cep.length !== 8) return;
+      if (!force && this._lastCepLookup === cep) return; // prevent duplicate lookups
+      this._lastCepLookup = cep;
+      await this._lookupCep(cep);
+    } catch (_) { /* noop */ }
+  }
+
+  async _lookupCep(cep) {
+    if (!this.addressModal) return;
+    this.showLoading?.();
+    try {
+      const resp = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      if (!resp.ok) throw new Error('CEP request failed');
+      const data = await resp.json();
+      if (data.erro) {
+        this.showToast('CEP não encontrado.', 'warn');
+        return;
+      }
+      this._fillAddressFromCep(data);
+    } catch (err) {
+      console.error('Erro ao consultar CEP:', err);
+      this.showToast('Não foi possível consultar o CEP.', 'error');
+    } finally {
+      this.hideLoading?.();
+    }
+  }
+
+  _fillAddressFromCep(viaCep) {
+    const setVal = (id, val) => {
+      const el = this.addressModal.querySelector('#' + id);
+      if (el && !el.value) el.value = val || '';
+      const wrap = this.addressModal.querySelector(`[data-field="${id}"]`);
+      if (wrap && val) wrap.classList.remove('invalid');
+      if (el && val) el.removeAttribute('aria-invalid');
+    };
+    setVal('addrm-street', viaCep.logradouro);
+    setVal('addrm-district', viaCep.bairro);
+    setVal('addrm-city', viaCep.localidade);
+    const uf = (viaCep.uf || '').toString().toUpperCase();
+    const ufInput = this.addressModal.querySelector('#addrm-state');
+    if (ufInput && !ufInput.value && uf) {
+      ufInput.value = uf;
+      const wrap = this.addressModal.querySelector('[data-field="addrm-state"]');
+      if (wrap) wrap.classList.remove('invalid');
+      ufInput.removeAttribute('aria-invalid');
     }
   }
 
