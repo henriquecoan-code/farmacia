@@ -52,54 +52,46 @@ function renderAddressSection(container, client){
         </div>
   <div id="addr-list" style="margin-top:1rem"></div>
   ${isCadastroOnly ? `<div class="alert-inline" style="margin-top:.5rem">Este é o seu endereço do cadastro. <button id="btn-save-cadastro" class="btn btn--secondary" style="margin-left:.5rem">Salvar nos meus endereços</button></div>` : ''}
-        <form id="addr-form" class="form" style="display:none;margin-top:1rem">
-          <div class="grid" style="grid-template-columns:1fr 1fr; gap: var(--spacing-3)">
-            <div class="form__group"><label>CEP</label><input id="addr-zip" type="text" placeholder="00000-000"></div>
-            <div class="form__group"><label>Cidade</label><input id="addr-city" type="text" placeholder="São Paulo"></div>
-            <div class="form__group"><label>Estado</label><input id="addr-state" type="text" placeholder="SP"></div>
-            <div class="form__group" style="grid-column:1 / -1"><label>Rua</label><input id="addr-street" type="text" placeholder="Rua Exemplo, 123"></div>
-            <div class="form__group"><label>Bairro</label><input id="addr-district" type="text" placeholder="Centro"></div>
-            <div class="form__group"><label>Complemento</label><input id="addr-complement" type="text" placeholder="Apto / Bloco"></div>
-            <div class="form__group" style="grid-column:1 / -1"><label>Referência</label><input id="addr-reference" type="text" placeholder="Ponto de referência"></div>
-            <div class="form__group" style="grid-column:1 / -1;display:flex;align-items:center;gap:.5rem">
-              <input id="addr-favorite" type="checkbox"> <label for="addr-favorite">Definir como favorito</label>
-            </div>
-          </div>
-          <div class="card__actions" style="margin-top: .75rem">
-            <button type="submit" class="btn btn--primary"><i class="fas fa-save"></i> Salvar</button>
-            <button type="button" id="addr-cancel" class="btn"><i class="fas fa-times"></i> Cancelar</button>
-          </div>
-        </form>
       </div>
     </div>`;
 
   const listEl = container.querySelector('#addr-list');
   const toggleBtn = container.querySelector('#addr-add-toggle');
-  const formEl = container.querySelector('#addr-form');
-  const cancelBtn = container.querySelector('#addr-cancel');
 
   function renderList(){
     if (!addresses.length){
       listEl.innerHTML = '<p class="card__text">Nenhum endereço cadastrado.</p>';
       return;
     }
-    listEl.innerHTML = addresses.map(a=>`
+    listEl.innerHTML = addresses.map(a=>{
+      const street = a.street || a.rua || a.logradouro || '';
+      const number = a.number || a.numero || '';
+      const mainLine = [street, number].filter(Boolean).join(', ');
+      const compVal = a.complement || a.comp || a.complemento || '';
+      const showComp = compVal && !mainLine.toLowerCase().includes(compVal.toLowerCase());
+      const labelText = a.label || mainLine || 'Endereço';
+      const details = [a.district || a.bairro || '', a.city || a.cidade || '', a.state || a.estado || '', a.zipCode || a.cep || '']
+        .filter(Boolean)
+        .map((v, i) => i === 0 ? v : `• ${v}`)
+        .join(' ');
+      return `
       <div class="card" style="margin-bottom:.5rem">
         <div class="card__content" style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start">
           <div>
             <div style="display:flex;align-items:center;gap:.5rem">
-              <strong>${a.label || a.street || a.logradouro || 'Endereço'}</strong>
+              <strong>${labelText}</strong>
               ${a.favorite ? '<span style="background:#e0f2fe;color:#075985;padding:.125rem .375rem;border-radius:.375rem;font-size:.75rem">Favorito</span>' : ''}
             </div>
-            <div class="card__text" style="margin:.25rem 0 0">${a.district || ''} ${a.city ? '• ' + a.city : ''} ${a.state ? '• ' + a.state : ''} ${a.zipCode ? '• ' + a.zipCode : ''}</div>
-              ${(a.complement || a.comp) ? `<div class="card__text" style="margin:.25rem 0 0">${a.complement || a.comp}</div>`: ''}
+            ${details ? `<div class="card__text" style="margin:.25rem 0 0">${details}</div>` : ''}
+            ${showComp ? `<div class="card__text" style="margin:.25rem 0 0">${compVal}</div>`: ''}
           </div>
           <div class="card__actions" style="flex-shrink:0;display:flex;gap:.5rem">
             ${a.id === 'endereco_cadastro' ? '' : (!a.favorite ? `<button class="btn" data-fav="${a.id}"><i class="fas fa-star"></i> Favoritar</button>`:'')}
             ${a.id === 'endereco_cadastro' ? '' : `<button class="btn btn--secondary" data-del="${a.id}"><i class="fas fa-trash"></i> Remover</button>`}
           </div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
     // bind actions
     listEl.querySelectorAll('[data-fav]')?.forEach(btn=>{
@@ -134,7 +126,9 @@ function renderAddressSection(container, client){
     const saveBtn = container.querySelector('#btn-save-cadastro');
     if (saveBtn) {
       saveBtn.addEventListener('click', async ()=>{
+        if (saveBtn.disabled) return;
         try {
+          saveBtn.disabled = true;
           const payload = {
             zipCode: cadastroAddr.zipCode,
             street: cadastroAddr.street,
@@ -144,44 +138,39 @@ function renderAddressSection(container, client){
             city: cadastroAddr.city,
             state: cadastroAddr.state
           };
-          const saved = await bootstrap.firebase.addAddressToClient(client.id, payload, { favorite: true });
-          addresses.push(saved);
+          // Usa um ID determinístico para evitar duplicatas do endereço do cadastro
+          const saved = await bootstrap.firebase.addAddressToClient(client.id, payload, { favorite: true, docId: 'cadastro' });
+          if (!addresses.find(x => x.id === saved.id)) addresses.push(saved);
           // Agora existem endereços salvos; remove banner e re-renderiza
           renderList();
           const alert = container.querySelector('.alert-inline'); if (alert) alert.remove();
           window.toast?.success('Endereço salvo nos seus endereços.');
         } catch(e){ console.error(e); window.toast?.error('Não foi possível salvar endereço.'); }
+        finally { saveBtn.disabled = false; }
       });
     }
   }
 
-  toggleBtn.addEventListener('click', ()=>{
-    formEl.style.display = formEl.style.display === 'none' ? 'block' : 'none';
-  });
-  cancelBtn.addEventListener('click', ()=>{ formEl.reset?.(); formEl.style.display='none'; });
-
-  formEl.addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const payload = {
-      zipCode: container.querySelector('#addr-zip')?.value?.trim()||'',
-      city: container.querySelector('#addr-city')?.value?.trim()||'',
-      state: container.querySelector('#addr-state')?.value?.trim()||'',
-      street: container.querySelector('#addr-street')?.value?.trim()||'',
-      district: container.querySelector('#addr-district')?.value?.trim()||'',
-      complement: container.querySelector('#addr-complement')?.value?.trim()||'',
-      reference: container.querySelector('#addr-reference')?.value?.trim()||''
-    };
-    const favorite = !!container.querySelector('#addr-favorite')?.checked;
-    if (!payload.street || !payload.city || !payload.state) { window.toast?.warn('Informe pelo menos Rua, Cidade e Estado.'); return; }
-    try {
-      const newAddr = await bootstrap.firebase.addAddressToClient(client.id, payload, { favorite });
-      addresses.push(newAddr);
-      if (favorite) addresses.forEach(a=>{ if (a.id !== newAddr.id) a.favorite = false; });
-      renderList();
-      formEl.reset();
-      formEl.style.display = 'none';
-      window.toast?.success('Endereço adicionado');
-    } catch(e){ console.error(e); window.toast?.error('Falha ao adicionar endereço'); }
+  // Botão "Novo endereço" abre modal moderno
+  toggleBtn.addEventListener('click', () => {
+    window.modalsManager?.openAddressModal({
+      onSave: async (payload) => {
+        const favorite = !!payload.favorite;
+        const addrPayload = {
+          zipCode: payload.zipCode,
+          street: payload.street,
+          number: payload.number,
+          district: payload.district,
+          comp: payload.comp || '',
+          city: payload.city,
+          state: payload.state,
+        };
+        const newAddr = await bootstrap.firebase.addAddressToClient(client.id, addrPayload, { favorite });
+        if (!addresses.find(x => x.id === newAddr.id)) addresses.push(newAddr);
+        if (favorite) addresses.forEach(a => { if (a.id !== newAddr.id) a.favorite = false; });
+        renderList();
+      }
+    });
   });
 }
 
@@ -189,7 +178,7 @@ function renderAccount(root, user, client){
   const email = user?.email || '—';
   const uid = user?.uid || '—';
   root.innerHTML = `
-    <div class="grid" style="grid-template-columns:1fr;gap: var(--spacing-6);max-width:960px">
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap: var(--spacing-6);max-width:1200px;margin-inline:auto;">
       <div class="card">
         <div class="card__content">
           <h2 class="card__title"><i class="fas fa-user-circle"></i> Informações do usuário</h2>

@@ -3,10 +3,13 @@ export class ModalsManager {
   constructor() {
     this.cartModal = null;
     this.authModal = null;
+    this.addressModal = null;
     this.loadingOverlay = null;
     this.isInitialized = false;
     this.currentAuthMode = 'login'; // 'login' or 'register'
   this.lastFocusedElement = null; // for focus return
+  this._addressSaveHandler = null;
+  this._addressInFlight = false;
   }
 
   async init() {
@@ -30,6 +33,7 @@ export class ModalsManager {
       // Get modal references
       this.cartModal = document.getElementById('cart-modal');
       this.authModal = document.getElementById('auth-modal');
+      this.addressModal = document.getElementById('address-modal');
       this.loadingOverlay = document.getElementById('loading-overlay');
       
     } catch (error) {
@@ -81,6 +85,16 @@ export class ModalsManager {
     if (authForm) {
       authForm.addEventListener('submit', (e) => this.handleAuthSubmit(e));
     }
+
+    // Address Modal Events
+    const addressCloseBtn = document.getElementById('address-modal-close');
+    const addressBackdrop = document.getElementById('address-modal-backdrop');
+    const addressCancelBtn = document.getElementById('address-cancel-btn');
+    const addressForm = document.getElementById('address-form-modal');
+    if (addressCloseBtn) addressCloseBtn.addEventListener('click', () => this.closeAddressModal());
+    if (addressBackdrop) addressBackdrop.addEventListener('click', () => this.closeAddressModal());
+    if (addressCancelBtn) addressCancelBtn.addEventListener('click', () => this.closeAddressModal());
+    if (addressForm) addressForm.addEventListener('submit', (e) => this.handleAddressSubmit(e));
 
     // ESC key to close modals
     document.addEventListener('keydown', (e) => {
@@ -203,6 +217,124 @@ export class ModalsManager {
     if (this.lastFocusedElement) {
       this.lastFocusedElement.focus();
       this.lastFocusedElement = null;
+    }
+  }
+
+  // Address Modal Methods
+  openAddressModal(options = {}) {
+    if (!this.addressModal) return;
+    const { onSave = null, initial = null } = options;
+    this._addressSaveHandler = onSave;
+
+    // Prefill if provided
+    const byId = (id) => this.addressModal.querySelector('#' + id);
+    const setVal = (id, v) => { const el = byId(id); if (el) el.value = v || ''; };
+    if (initial) {
+      setVal('addrm-cep', initial.zipCode || initial.cep || '');
+      setVal('addrm-street', initial.street || initial.rua || '');
+      setVal('addrm-number', initial.number || initial.numero || '');
+      setVal('addrm-district', initial.district || initial.bairro || '');
+      setVal('addrm-comp', initial.comp || initial.complemento || '');
+      setVal('addrm-city', initial.city || initial.cidade || '');
+      setVal('addrm-state', (initial.state || initial.estado || '').toString().toUpperCase());
+      const fav = this.addressModal.querySelector('#addrm-favorite');
+      if (fav) fav.checked = !!initial.favorite;
+    } else {
+      // reset
+      const form = this.addressModal.querySelector('#address-form-modal');
+      if (form) form.reset();
+    }
+
+    // accessibility
+    this.addressModal.setAttribute('role', 'dialog');
+    this.addressModal.setAttribute('aria-modal', 'true');
+    this.addressModal.setAttribute('aria-label', 'Novo endereço');
+    this.lastFocusedElement = document.activeElement;
+    this.addressModal.classList.add('modal--active');
+    document.body.classList.add('modal-open');
+
+    const firstInput = this.addressModal.querySelector('input');
+    if (firstInput) setTimeout(() => firstInput.focus(), 50);
+    this.trapFocus(this.addressModal);
+  }
+
+  closeAddressModal() {
+    if (!this.addressModal) return;
+    this.addressModal.classList.remove('modal--active');
+    document.body.classList.remove('modal-open');
+    // reset invalid states
+    this.addressModal.querySelectorAll('.field-wrapper.invalid').forEach(el => el.classList.remove('invalid'));
+    const form = this.addressModal.querySelector('#address-form-modal');
+    if (form) form.reset();
+    this._addressSaveHandler = null;
+    this._addressInFlight = false;
+    const submitBtn = this.addressModal.querySelector('#address-form-modal button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = false;
+    if (this.lastFocusedElement) { this.lastFocusedElement.focus(); this.lastFocusedElement = null; }
+  }
+
+  handleAddressSubmit(e) {
+    e.preventDefault();
+    if (this._addressInFlight) return;
+    const q = (id) => this.addressModal.querySelector('#' + id);
+    const payload = {
+      zipCode: q('addrm-cep')?.value?.trim() || '',
+      street: q('addrm-street')?.value?.trim() || '',
+      number: q('addrm-number')?.value?.trim() || '',
+      district: q('addrm-district')?.value?.trim() || '',
+      comp: q('addrm-comp')?.value?.trim() || '',
+      city: q('addrm-city')?.value?.trim() || '',
+      state: (q('addrm-state')?.value || '').trim().toUpperCase(),
+      favorite: !!q('addrm-favorite')?.checked,
+    };
+    // Basic validation
+    const required = [
+      ['addrm-cep', payload.zipCode && payload.zipCode.replace(/\D/g, '').length === 8],
+      ['addrm-street', !!payload.street],
+      ['addrm-number', !!payload.number],
+      ['addrm-district', !!payload.district],
+      ['addrm-city', !!payload.city],
+      ['addrm-state', !!payload.state && payload.state.length === 2],
+    ];
+    let ok = true;
+    required.forEach(([id, valid]) => {
+      const wrap = this.addressModal.querySelector(`[data-field="${id}"]`);
+      if (wrap) wrap.classList.toggle('invalid', !valid);
+      ok = ok && !!valid;
+    });
+    if (!ok) { this.showToast('Corrija os campos destacados.', 'warn'); return; }
+
+    try {
+      this._addressInFlight = true;
+      const submitBtn = this.addressModal.querySelector('#address-form-modal button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+      if (typeof this._addressSaveHandler === 'function') {
+        const res = this._addressSaveHandler(payload);
+        if (res && typeof res.then === 'function') {
+          // promise
+          this.showLoading();
+          res.then(() => {
+            this.hideLoading();
+            this.showToast('Endereço salvo.');
+            this.closeAddressModal();
+          }).catch((err) => {
+            console.error('Erro ao salvar endereço:', err);
+            this.hideLoading();
+            this.showToast('Erro ao salvar endereço.', 'error');
+          }).finally(() => { this._addressInFlight = false; if (submitBtn) submitBtn.disabled = false; });
+        } else {
+          this.showToast('Endereço salvo.');
+          this.closeAddressModal();
+          this._addressInFlight = false; if (submitBtn) submitBtn.disabled = false;
+        }
+      } else {
+        this.closeAddressModal();
+        this._addressInFlight = false; if (submitBtn) submitBtn.disabled = false;
+      }
+    } catch (err) {
+      console.error('Erro no handler de salvar endereço:', err);
+      this.showToast('Erro ao salvar endereço.', 'error');
+      this._addressInFlight = false; const submitBtn = this.addressModal.querySelector('#address-form-modal button[type="submit"]'); if (submitBtn) submitBtn.disabled = false;
     }
   }
 
@@ -361,6 +493,7 @@ export class ModalsManager {
   closeAllModals() {
     this.closeCartModal();
     this.closeAuthModal();
+    this.closeAddressModal();
   }
 
   showToast(message, type = 'success') {

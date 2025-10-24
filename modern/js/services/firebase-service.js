@@ -428,9 +428,9 @@ export class FirebaseService {
     }
   }
 
-  async addAddressToClient(clientId, address, { favorite = false } = {}) {
+  async addAddressToClient(clientId, address, { favorite = false, docId = null } = {}) {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
-    const { doc, getDoc, updateDoc, collection, addDoc, getDocs, writeBatch } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+    const { doc, getDoc, updateDoc, collection, addDoc, getDocs, writeBatch, setDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
     try {
       // Prefer esquema 'usuarios/{uid}/enderecos'
       const userRef = doc(this.firestore, 'usuarios', clientId);
@@ -438,15 +438,23 @@ export class FirebaseService {
       if (userSnap.exists()) {
         const col = collection(this.firestore, 'usuarios', clientId, 'enderecos');
         const payload = Object.assign({ favorite: !!favorite, createdAt: new Date().toISOString() }, address);
-        const added = await addDoc(col, payload);
+        let addedId = null;
+        if (docId) {
+          const addrRef = doc(this.firestore, 'usuarios', clientId, 'enderecos', docId);
+          await setDoc(addrRef, payload, { merge: true });
+          addedId = docId;
+        } else {
+          const added = await addDoc(col, payload);
+          addedId = added.id;
+        }
         // Se favorite, desmarca os demais
         if (favorite) {
           const listSnap = await getDocs(col);
           const batch = writeBatch(this.firestore);
-          listSnap.forEach(d => { if (d.id !== added.id && d.data().favorite) batch.update(d.ref, { favorite: false }); });
+          listSnap.forEach(d => { if (d.id !== addedId && d.data().favorite) batch.update(d.ref, { favorite: false }); });
           await batch.commit();
         }
-        return Object.assign({ id: added.id }, payload);
+        return Object.assign({ id: addedId }, payload);
       }
       // Fallback: coleção 'clientes' com campo addresses (array)
       const docRef = doc(this.firestore, 'clientes', clientId);

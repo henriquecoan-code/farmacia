@@ -55,6 +55,48 @@
     </div>
 </div>
 
+<!-- Address Modal -->
+<div class="modal" id="address-modal">
+    <div class="modal__backdrop" id="address-modal-backdrop"></div>
+    <div class="modal__content" style="max-width:680px">
+        <div class="modal__header">
+            <h3>Novo Endereço</h3>
+            <button class="modal__close" id="address-modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal__body">
+            <form id="address-form-modal" class="checkout-form">
+                <div class="grid" style="grid-template-columns:1fr 1fr; gap: var(--spacing-3)">
+                    <div class="field-wrapper" data-field="addrm-cep"><label>CEP</label><input required id="addrm-cep" maxlength="9" placeholder="00000-000" /><div class="field-error">CEP inválido</div></div>
+                    <div class="field-wrapper" data-field="addrm-city"><label>Cidade</label><input required id="addrm-city" /><div class="field-error">Informe a cidade</div></div>
+                </div>
+                <div class="grid" style="grid-template-columns:1fr 1fr; gap: var(--spacing-3)">
+                    <div class="field-wrapper" data-field="addrm-street"><label>Rua</label><input required id="addrm-street" /><div class="field-error">Informe a rua</div></div>
+                    <div class="field-wrapper" data-field="addrm-number"><label>Número</label><input required id="addrm-number" /><div class="field-error">Informe o número</div></div>
+                </div>
+                <div class="grid" style="grid-template-columns:1fr 1fr; gap: var(--spacing-3)">
+                    <div class="field-wrapper" data-field="addrm-district"><label>Bairro</label><input required id="addrm-district" /><div class="field-error">Informe o bairro</div></div>
+                    <div class="field-wrapper" data-field="addrm-comp"><label>Complemento</label><input id="addrm-comp" /></div>
+                </div>
+                <div class="field-wrapper" data-field="addrm-state"><label>Estado</label><input required id="addrm-state" maxlength="2" style="text-transform:uppercase;" /><div class="field-error">UF inválida</div></div>
+                <div style="display:flex; align-items:center; gap:.5rem; margin-top:.25rem;">
+                    <input type="checkbox" id="addrm-favorite" /> <label for="addrm-favorite" style="margin:0; font-size:.85rem;">Definir como favorito</label>
+                </div>
+                <div class="modal__footer" style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
+                    <button type="button" class="btn" id="address-cancel-btn">Cancelar</button>
+                    <button type="submit" class="btn btn--primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <style>
+      /* Reusa estilos do checkout form */
+      #address-modal .field-error { font-size:.65rem; color: var(--error-color); margin-top:.15rem; display:none; }
+      #address-modal .field-wrapper.invalid .field-error { display:block; }
+    </style>
+</div>
+
 <style>
 /* Skeleton styles for modals */
 #cart-skeleton { display:grid; gap:.5rem; }
