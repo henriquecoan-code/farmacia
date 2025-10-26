@@ -1,0 +1,93 @@
+/* Modal components - extracted from components/modals.html */
+
+/* Skeleton styles for modals */
+#cart-skeleton { display:grid; gap:.5rem; }
+.cart-skeleton .sk-line { height:14px; background: var(--gray-200); border-radius: var(--radius); position:relative; overflow:hidden; }
+.cart-skeleton .sk-line.short { width:60%; }
+.cart-skeleton .sk-line:before { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(255,255,255,0)0%,rgba(255,255,255,.6)50%,rgba(255,255,255,0)100%); animation: sk-sh 1.1s linear infinite; }
+@keyframes sk-sh { 0%{transform:translateX(-100%);}100%{transform:translateX(100%);} }
+
+/* Modal wide content */
+.modal__content--wide { max-width: 680px; }
+
+/* Auth modal modern fields */
+#auth-modal .field-wrapper { display:flex; flex-direction:column; gap:.35rem; margin-bottom:.9rem; }
+#auth-modal label { font-weight:500; color:var(--gray-700); }
+#auth-modal .field-error { font-size:.75rem; color: var(--error-color, #cc2d2d); display:none; }
+#auth-modal .field-wrapper.invalid .field-error { display:block; }
+#auth-modal .input-with-action { position:relative; display:flex; align-items:center; }
+#auth-modal .input-with-action input { width:100%; padding-right:2.25rem; }
+#auth-modal .input-with-action .input-action { position:absolute; right:.5rem; background:transparent; border:none; color:var(--gray-500); cursor:pointer; padding:.25rem; }
+#auth-modal .password-strength { display:flex; align-items:center; gap:.5rem; margin-top:.4rem; }
+#auth-modal .password-strength .bar { height:6px; width:100%; max-width:180px; background:var(--gray-200); border-radius:999px; position:relative; overflow:hidden; }
+#auth-modal .password-strength .bar::after { content:""; position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--error-color, #cc2d2d); transition:width .25s ease, background .25s ease; }
+#auth-modal .password-strength.level-1 .bar::after { width:33%; background:#e57373; }
+#auth-modal .password-strength.level-2 .bar::after { width:66%; background:#f9a825; }
+#auth-modal .password-strength.level-3 .bar::after { width:100%; background:#43a047; }
+
+/* Address modal styles */
+#address-modal .field-error { font-size:.65rem; color: var(--error-color); margin-top:.15rem; display:none; text-align:center; }
+#address-modal .field-wrapper.invalid .field-error { display:block; }
+/* Address form vertical layout */
+#address-modal .checkout-form { display:flex; flex-direction:column; gap:1.2rem; }
+
+/* Address modal content card and header */
+#address-modal .modal__content.modern-card { box-shadow:0 8px 32px rgba(0,0,0,0.18); border-radius: 18px; background: var(--surface, #fff); }
+#address-modal .modal__header { border-bottom:1px solid var(--gray-200); padding-bottom:1rem; }
+#address-modal .modal__header h3 { font-size:1.4rem; font-weight:600; color:var(--primary-color, #1a73e8); letter-spacing:-.5px; }
+#address-modal .modal__subtitle { margin:.25rem 0 0; font-size:.9rem; color:var(--gray-600); text-align:center; }
+#address-modal .modal__close { background:transparent; border:none; font-size:1.3rem; color:var(--gray-500); transition:color .2s; }
+#address-modal .modal__close:hover { color: var(--gray-700); }
+
+/* Body padding to match design */
+#address-modal .modal__body { padding:2rem 1.5rem 1.5rem 1.5rem; }
+
+/* Centralização e dimensões */
+#address-modal .checkout-form { width: 65%; margin: 0 auto; }
+#address-modal .grid { justify-items: center; }
+#address-modal .favorite-row { display:flex; align-items:center; gap:.5rem; margin-top:.25rem; justify-content: center; }
+#address-modal .modal__footer { display:flex; gap:.7rem; justify-content: center !important; margin-top:1.2rem; }
+#address-modal #addrm-favorite { accent-color:var(--primary-color, #1a73e8); }
+
+/* Grid rows in address modal */
+#address-modal .addr-grid { display:grid; grid-template-columns:1fr 1fr; gap: var(--spacing-3); }
+#address-modal .modal__subtitle { text-align:center; }
+
+/* Modern input styles with icons */
+#address-modal .field-wrapper { position: relative; width:100%; }
+#address-modal .field-wrapper.has-icon .input-icon { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); color:var(--gray-400); pointer-events:none; }
+#address-modal .field-wrapper.has-icon input { padding-left: 2.25rem; }
+#address-modal input { width:100%; border-radius:10px; border:1px solid var(--gray-300); padding:.7rem .9rem; background:var(--gray-50); transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+#address-modal #addrm-state { text-transform: uppercase; }
+#address-modal input:focus { outline:none; border-color: var(--primary-color, #1a73e8); box-shadow: 0 0 0 3px rgba(26,115,232,0.12); background:#fff; }
+#address-modal .field-wrapper.invalid input { border-color: var(--error-color, #cc2d2d); box-shadow: 0 0 0 3px rgba(204,45,45,0.10); }
+
+/* Centralizar título mantendo o botão fechar à direita */
+#address-modal .modal__header { position: relative; }
+#address-modal .modal__header h3 { margin: 0 auto; text-align: center; }
+#address-modal .modal__header .modal__close { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); }
+
+/* Responsividade */
+@media (max-width: 540px) {
+  #address-modal .grid, #address-modal .addr-grid { grid-template-columns: 1fr !important; }
+  #address-modal .checkout-form { width: 100%; }
+}
+
+/* Desktop refinements */
+@media (min-width: 992px) {
+  #address-modal .modal__content { max-width: 540px; }
+  #address-modal .checkout-form { width: 65%; }
+  #address-modal .modal__header h3 { font-size: 1.2rem !important; }
+  #address-modal .modal__subtitle { font-size: .85rem !important; }
+  #address-modal label { font-size: .9rem; }
+  #address-modal input { padding: .6rem .8rem; font-size: .95rem; }
+  #address-modal .field-error { font-size: .7rem; }
+  #address-modal .grid { gap: var(--spacing-2, .75rem); }
+}
+
+/* Auth modal defaults for register-only blocks (JS toggles display) */
+#auth-modal .auth-register-only { display:none; }
+
+/* Footer buttons look */
+#address-modal #address-cancel-btn { background:var(--gray-100); color:var(--gray-700); border-radius:7px; font-weight:500; }
+#address-modal .btn.btn--primary { border-radius:7px; font-weight:600; background:var(--primary-color, #1a73e8); box-shadow:0 2px 8px rgba(26,115,232,0.08); }
