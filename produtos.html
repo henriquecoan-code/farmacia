@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Produtos - Farmácia São Benedito</title>
     <meta name="description" content="Confira todos os produtos da Farmácia São Benedito: medicamentos, dermocosméticos, suplementos e muito mais.">
+    <meta name="theme-color" content="#1e40af">
+    <!-- Canonical (ajuste para seu domínio em produção) -->
+    <link rel="canonical" href="produtos.html">
+    <!-- Open Graph básico -->
+    <meta property="og:title" content="Produtos - Farmácia São Benedito">
+    <meta property="og:description" content="Confira todos os produtos: medicamentos, dermocosméticos, suplementos e mais.">
+    <meta property="og:type" content="website">
     
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="img/favicon.ico">
@@ -18,9 +25,11 @@
     <link rel="stylesheet" href="modern/css/modern-styles.css">
     
     <!-- Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" referrerpolicy="no-referrer" crossorigin="anonymous">
 </head>
 <body>
+    <!-- Skip link para acessibilidade -->
+    <a class="skip-link" href="#products-container">Pular para a lista de produtos</a>
     <!-- Header Container -->
     <div id="header-container"></div>
 
@@ -31,29 +40,29 @@
             <div class="container">
                 <div class="filters__content">
                     <div class="filters__categories">
-                        <button class="filter-btn filter-btn--active" data-category="all">
-                            <i class="fas fa-th-large"></i>
+                        <button class="filter-btn filter-btn--active" data-category="all" aria-pressed="true">
+                            <i class="fas fa-th-large" aria-hidden="true"></i>
                             Todos
                         </button>
-                        <button class="filter-btn" data-category="medicamentos">
-                            <i class="fas fa-pills"></i>
+                        <button class="filter-btn" data-category="medicamentos" aria-pressed="false">
+                            <i class="fas fa-pills" aria-hidden="true"></i>
                             Medicamentos
                         </button>
-                        <button class="filter-btn" data-category="dermocosmeticos">
-                            <i class="fas fa-heart"></i>
+                        <button class="filter-btn" data-category="dermocosmeticos" aria-pressed="false">
+                            <i class="fas fa-heart" aria-hidden="true"></i>
                             Dermocosméticos
                         </button>
-                        <button class="filter-btn" data-category="suplementos">
-                            <i class="fas fa-dumbbell"></i>
+                        <button class="filter-btn" data-category="suplementos" aria-pressed="false">
+                            <i class="fas fa-dumbbell" aria-hidden="true"></i>
                             Suplementos
                         </button>
-                        <button class="filter-btn" data-category="infantil">
-                            <i class="fas fa-baby"></i>
+                        <button class="filter-btn" data-category="infantil" aria-pressed="false">
+                            <i class="fas fa-baby" aria-hidden="true"></i>
                             Infantil
                         </button>
                     </div>
                     <div class="filters__sort">
-                        <select class="sort-select">
+                        <select class="sort-select" aria-label="Ordenar produtos">
                             <option value="name">Nome A-Z</option>
                             <option value="price-low">Menor Preço</option>
                             <option value="price-high">Maior Preço</option>
@@ -80,13 +89,13 @@
     <div id="footer-container"></div>
 
     <!-- Loading Spinner -->
-    <div class="loading-spinner" id="loading-spinner">
+    <div class="loading-spinner" id="loading-spinner" role="status" aria-live="polite" aria-busy="true">
         <div class="spinner"></div>
         <p>Carregando produtos...</p>
     </div>
 
     <!-- Error Message -->
-    <div class="error-message" id="error-message">
+    <div class="error-message" id="error-message" role="alert" aria-live="assertive">
         <p>Erro ao carregar produtos. Tente novamente.</p>
         <button class="btn btn--primary" onclick="location.reload()">Recarregar</button>
     </div>
@@ -111,12 +120,12 @@
                             }
                         } catch {}
                         try {
-                            const resp = await fetch('/data/products.json', { cache: 'no-store' });
+                            const resp = await fetch('./data/products.json', { cache: 'no-store' });
                             const items = await resp.json();
                             try { localStorage.setItem(cacheKey, JSON.stringify({ items, ts: now })); } catch {}
                             return Array.isArray(items) ? items : [];
                         } catch (e) {
-                            console.error('[Showcase] Falha ao carregar /data/products.json', e);
+                            console.error('[Showcase] Falha ao carregar ./data/products.json', e);
                             return [];
                         }
                     };
@@ -129,6 +138,11 @@
                 });
             }
         </script>
+        <noscript>
+            <div class="no-js-warning" style="padding:1rem; text-align:center; background:#fff3cd; color:#664d03;">
+                Para visualizar os produtos, ative o JavaScript no seu navegador.
+            </div>
+        </noscript>
         <script type="module" src="modern/js/produtos-firebase.js"></script>
 </body>
 </html>

@@ -119,7 +119,9 @@ class ProdutosFirebaseApp {
         }
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', () => this.handleFilter(btn.dataset.category));
-            btn.classList.toggle('filter-btn--active', btn.dataset.category === this.currentFilter);
+            const isActive = btn.dataset.category === this.currentFilter;
+            btn.classList.toggle('filter-btn--active', isActive);
+            btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
         });
         const sortSelect = document.querySelector('.sort-select');
         if (sortSelect) {
@@ -195,7 +197,11 @@ class ProdutosFirebaseApp {
     handleFilter(category) {
         this.currentFilter = category;
         this.currentPage = 1;
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('filter-btn--active', b.dataset.category === category));
+        document.querySelectorAll('.filter-btn').forEach(b => {
+            const active = b.dataset.category === category;
+            b.classList.toggle('filter-btn--active', active);
+            b.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
     this.updateURLState();
     eventBus.emit('products:filterChange', { filter: this.currentFilter });
     this.renderProducts();
