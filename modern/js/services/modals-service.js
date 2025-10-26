@@ -69,6 +69,10 @@ export class ModalsManager {
     const authBackdrop = document.getElementById('auth-modal-backdrop');
     const authToggle = document.getElementById('auth-toggle');
     const authForm = document.getElementById('auth-form');
+    const authPwdToggle = document.getElementById('auth-password-toggle');
+    const authPwdConfirmToggle = document.getElementById('auth-password-confirm-toggle');
+    const authPwdInput = document.getElementById('auth-password');
+    const authPwdConfirmInput = document.getElementById('auth-password-confirm');
     
     if (authCloseBtn) {
       authCloseBtn.addEventListener('click', () => this.closeAuthModal());
@@ -87,6 +91,24 @@ export class ModalsManager {
     
     if (authForm) {
       authForm.addEventListener('submit', (e) => this.handleAuthSubmit(e));
+    }
+
+    // Show/hide password
+    const toggleType = (input, btn) => {
+      if (!input || !btn) return;
+      const isPwd = input.getAttribute('type') === 'password';
+      input.setAttribute('type', isPwd ? 'text' : 'password');
+      const icon = btn.querySelector('i');
+      if (icon) { icon.classList.toggle('fa-eye'); icon.classList.toggle('fa-eye-slash'); }
+    };
+    if (authPwdToggle) authPwdToggle.addEventListener('click', () => toggleType(authPwdInput, authPwdToggle));
+    if (authPwdConfirmToggle) authPwdConfirmToggle.addEventListener('click', () => toggleType(authPwdConfirmInput, authPwdConfirmToggle));
+
+    // Password strength (only meaningful in register mode, but we update anyway)
+    const pwdStrengthEl = document.getElementById('auth-password-strength');
+    const pwdStrengthLabel = document.getElementById('auth-password-strength-label');
+    if (authPwdInput && pwdStrengthEl && pwdStrengthLabel) {
+      authPwdInput.addEventListener('input', () => this._updatePasswordStrength(authPwdInput.value, pwdStrengthEl, pwdStrengthLabel));
     }
 
     // Address Modal Events
@@ -434,17 +456,26 @@ export class ModalsManager {
     const submitButton = document.querySelector('#auth-form button[type="submit"]');
     const toggleLink = document.getElementById('auth-toggle');
     const switchText = document.querySelector('.auth-switch');
+    const registerOnly = document.querySelectorAll('#auth-modal .auth-register-only');
+    const pwdInput = document.getElementById('auth-password');
+    const pwdStrengthEl = document.getElementById('auth-password-strength');
     
     if (this.currentAuthMode === 'login') {
       if (titleElement) titleElement.textContent = 'Entrar';
       if (submitButton) submitButton.textContent = 'Entrar';
       if (toggleLink) toggleLink.textContent = 'Cadastre-se';
-      if (switchText) switchText.innerHTML = 'Não tem conta? <a href="#" id="auth-toggle">Cadastre-se</a>';
+      if (switchText) switchText.innerHTML = 'Não tem conta? <a href="#" id="auth-toggle" class="auth-switch__link">Cadastre-se</a>';
+      registerOnly.forEach(el => el.style.display = 'none');
+      if (pwdInput) pwdInput.setAttribute('autocomplete', 'current-password');
+      if (pwdStrengthEl) pwdStrengthEl.style.display = 'none';
     } else {
       if (titleElement) titleElement.textContent = 'Cadastrar';
       if (submitButton) submitButton.textContent = 'Cadastrar';
       if (toggleLink) toggleLink.textContent = 'Entrar';
-      if (switchText) switchText.innerHTML = 'Já tem conta? <a href="#" id="auth-toggle">Entrar</a>';
+      if (switchText) switchText.innerHTML = 'Já tem conta? <a href="#" id="auth-toggle" class="auth-switch__link">Entrar</a>';
+      registerOnly.forEach(el => el.style.display = 'block');
+      if (pwdInput) pwdInput.setAttribute('autocomplete', 'new-password');
+      if (pwdStrengthEl) pwdStrengthEl.style.display = 'flex';
     }
     
     // Re-attach event listener for toggle
@@ -460,19 +491,64 @@ export class ModalsManager {
   async handleAuthSubmit(e) {
     e.preventDefault();
     
-    const email = document.getElementById('auth-email').value;
-    const password = document.getElementById('auth-password').value;
+    const emailInput = document.getElementById('auth-email');
+    const passwordInput = document.getElementById('auth-password');
+    const nameInput = document.getElementById('auth-name');
+    const confirmInput = document.getElementById('auth-password-confirm');
+    const email = emailInput?.value || '';
+    const password = passwordInput?.value || '';
+    const name = nameInput?.value || '';
+    const passwordConfirm = confirmInput?.value || '';
+    const setInvalid = (el, msgId, msg) => {
+      const m = msgId ? document.getElementById(msgId) : null;
+      if (el) { el.setAttribute('aria-invalid', 'true'); el.closest('.field-wrapper')?.classList.add('invalid'); }
+      if (m) { m.textContent = msg || ''; }
+    };
+    const clearInvalid = (el, msgId) => {
+      const m = msgId ? document.getElementById(msgId) : null;
+      if (el) { el.removeAttribute('aria-invalid'); el.closest('.field-wrapper')?.classList.remove('invalid'); }
+      if (m) { m.textContent = ''; }
+    };
+    // clear previous errors
+    clearInvalid(emailInput, 'auth-email-error');
+    clearInvalid(passwordInput, 'auth-password-error');
+    clearInvalid(nameInput, 'auth-name-error');
+    clearInvalid(confirmInput, 'auth-password-confirm-error');
     
     if (!email || !password) {
+      if (!email) setInvalid(emailInput, 'auth-email-error', 'Informe o e-mail.');
+      if (!password) setInvalid(passwordInput, 'auth-password-error', 'Informe a senha.');
       window.toast?.warn('Preencha todos os campos.');
       return;
+    }
+
+    if (this.currentAuthMode === 'register') {
+      if (!name) {
+        setInvalid(nameInput, 'auth-name-error', 'Informe seu nome.');
+        window.toast?.warn('Informe seu nome.');
+        return;
+      }
+      if (password.length < 6) {
+        setInvalid(passwordInput, 'auth-password-error', 'A senha precisa ter ao menos 6 caracteres.');
+        window.toast?.warn('A senha precisa ter ao menos 6 caracteres.');
+        return;
+      }
+      if (password !== passwordConfirm) {
+        setInvalid(confirmInput, 'auth-password-confirm-error', 'As senhas não conferem.');
+        window.toast?.warn('As senhas não conferem.');
+        return;
+      }
     }
 
     this.showLoading();
     
     try {
       // Here you would integrate with your auth service
-      console.log(`${this.currentAuthMode}:`, { email, password });
+      if (this.currentAuthMode === 'register') {
+        console.log('register:', { email, password, name });
+      } else {
+        console.log('login:', { email, password });
+      }
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -487,6 +563,23 @@ export class ModalsManager {
     } finally {
       this.hideLoading();
     }
+  }
+
+  _updatePasswordStrength(value, barEl, labelEl) {
+    const score = this._passwordScore(value);
+    barEl.classList.remove('level-1', 'level-2', 'level-3');
+    if (score <= 1) { barEl.classList.add('level-1'); labelEl.textContent = 'Fraca'; }
+    else if (score === 2) { barEl.classList.add('level-2'); labelEl.textContent = 'Média'; }
+    else { barEl.classList.add('level-3'); labelEl.textContent = 'Forte'; }
+  }
+
+  _passwordScore(pwd) {
+    let s = 0;
+    if (!pwd) return s;
+    if (pwd.length >= 6) s++;
+    if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) s++;
+    if (/\d/.test(pwd) || /[^\w\s]/.test(pwd)) s++;
+    return Math.min(s, 3);
   }
 
   // Loading Methods
