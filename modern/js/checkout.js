@@ -16,6 +16,7 @@ class CheckoutPage {
   this.prefillAttempted = false;
   this.clientRecord = null;
   this.currentAddressId = null; // selected saved address id
+  this._addressModalShown = false; // avoid multiple auto-opens
   // Funnel timing marks
   this.funnel = {
     start: (typeof performance !== 'undefined' ? performance.now() : Date.now()),
@@ -306,7 +307,37 @@ class CheckoutPage {
       if (!container || !list) return;
       list.innerHTML = '';
       const addresses = this.clientRecord?.addresses || [];
-      if (!addresses.length) { container.style.display = 'none'; return; }
+      if (!addresses.length) {
+        container.style.display = 'none';
+        // Auto-open Address Modal if user has no addresses yet (only once)
+        if (!this._addressModalShown && this.isAuth()) {
+          this._addressModalShown = true;
+          window.modalsManager?.openAddressModal({
+            onSave: async (payload) => {
+              try {
+                if (bootstrap.firebase?.isInitialized && this.clientRecord?.id) {
+                  const saved = await bootstrap.firebase.addAddressToClient(this.clientRecord.id, payload, { favorite: payload.favorite });
+                  // Update local cache
+                  this.clientRecord.addresses = this.clientRecord.addresses || [];
+                  if (payload.favorite) this.clientRecord.addresses.forEach(a=> a.favorite = false);
+                  this.clientRecord.addresses.push(saved);
+                  this.currentAddressId = saved.id;
+                  // Prefill form and refresh UI
+                  this.selectSavedAddress(saved.id, { silent: true });
+                  this.loadSavedAddresses();
+                } else {
+                  // Fallback: just prefill checkout form
+                  this.fillFormFromModalPayload(payload);
+                }
+              } catch (e) {
+                console.warn('Falha ao salvar novo endereço via modal', e);
+                this.fillFormFromModalPayload(payload);
+              }
+            }
+          });
+        }
+        return;
+      }
       container.style.display = 'block';
       addresses.forEach(addr => {
         const labelText = `${addr.street || ''} ${addr.number || ''} - ${addr.city || ''} ${addr.state || ''}`.trim();
@@ -354,11 +385,32 @@ class CheckoutPage {
         }
       }, { once: true });
       document.getElementById('new-address-btn')?.addEventListener('click', () => {
+        const hideSaveBtn = () => { const b = document.getElementById('save-address-changes'); if (b) b.style.display = 'none'; };
         this.currentAddressId = null;
-        this.clearAddressForm();
-        document.getElementById('addr-name')?.focus();
-  const saveBtn = document.getElementById('save-address-changes');
-  if (saveBtn) saveBtn.style.display = 'none';
+        hideSaveBtn();
+        window.modalsManager?.openAddressModal({
+          onSave: async (payload) => {
+            try {
+              if (bootstrap.firebase?.isInitialized && this.clientRecord?.id) {
+                const saved = await bootstrap.firebase.addAddressToClient(this.clientRecord.id, payload, { favorite: payload.favorite });
+                // Update local cache
+                this.clientRecord.addresses = this.clientRecord.addresses || [];
+                if (payload.favorite) this.clientRecord.addresses.forEach(a=> a.favorite = false);
+                this.clientRecord.addresses.push(saved);
+                this.currentAddressId = saved.id;
+                // Select and refresh
+                this.selectSavedAddress(saved.id, { silent: true });
+                this.loadSavedAddresses();
+                window.toast?.success('Endereço salvo.');
+              } else {
+                this.fillFormFromModalPayload(payload);
+              }
+            } catch (e) {
+              console.warn('Falha ao salvar novo endereço', e);
+              this.fillFormFromModalPayload(payload);
+            }
+          }
+        });
       });
       if (this.currentAddressId) this.selectSavedAddress(this.currentAddressId, { silent:true });
     } catch(e){ console.warn('loadSavedAddresses fail', e); }
@@ -562,6 +614,22 @@ class CheckoutPage {
       comp: document.getElementById('addr-comp')?.value.trim(),
       state: document.getElementById('addr-state')?.value.trim().toUpperCase()
     };
+  }
+
+  // Prefill the inline checkout form with data coming from the modal
+  fillFormFromModalPayload(payload){
+    if (!payload) return;
+    const map = {
+      'addr-cep': payload.zipCode || payload.cep || '',
+      'addr-street': payload.street || '',
+      'addr-number': payload.number || '',
+      'addr-district': payload.district || '',
+      'addr-comp': payload.comp || '',
+      'addr-city': payload.city || '',
+      'addr-state': (payload.state || '').toString().toUpperCase()
+    };
+    Object.entries(map).forEach(([id,val]) => { const el = document.getElementById(id); if (el) el.value = val; });
+    this.updateAll();
   }
 
   validateBeforeOrder(){
