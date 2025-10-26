@@ -60,13 +60,16 @@
         <div class="alert-inline" id="auth-reminder-msg">Você precisa entrar para finalizar a compra. <button id="open-auth" style="margin-left:.5rem;" class="btn btn--small">Entrar</button></div>
       </div>
       <div class="card-box">
-        <h2>Endereço de Entrega</h2>
+        <h2 style="display:flex; align-items:center; justify-content:space-between; gap:.75rem;">
+          <span>Endereço de Entrega</span>
+          <button id="open-address-modal" type="button" class="btn btn--secondary" style="font-size:.75rem;">Cadastrar endereço</button>
+        </h2>
         <div id="saved-addresses-box" style="display:none; margin-bottom:1rem;">
           <label style="margin-bottom:.35rem; font-size:.7rem; letter-spacing:.5px; color:var(--gray-600);">Endereços Salvos</label>
           <div id="saved-addresses-list" class="radio-group" style="max-height:180px; overflow:auto; border:1px solid var(--gray-200); padding:.5rem; border-radius:var(--radius);"></div>
           <button id="new-address-btn" type="button" style="margin-top:.5rem; font-size:.7rem; background:none; border:none; color:var(--primary-color); cursor:pointer;">+ Novo Endereço</button>
         </div>
-        <form class="checkout-form" id="address-form">
+  <form class="checkout-form" id="address-form" style="display:none;">
           <div class="grid-2">
             <div class="field-wrapper" data-field="addr-name"><label>Nome</label><input required id="addr-name" autocomplete="name" /><div class="field-error">Informe o nome</div></div>
             <div class="field-wrapper" data-field="addr-phone"><label>Telefone</label><input required id="addr-phone" placeholder="(00) 00000-0000" /><div class="field-error">Telefone inválido</div></div>
@@ -90,6 +93,7 @@
           </div>
           <button type="button" id="save-address-changes" class="btn btn--secondary" style="display:none; margin-top:.5rem; font-size:.75rem; align-self:flex-start;">Salvar Alterações</button>
         </form>
+        <div id="address-selected-summary" class="status-msg" style="display:none; margin-top:.5rem;"></div>
       </div>
       <div class="card-box">
         <h2>Entrega</h2>
