@@ -56,7 +56,7 @@
     </div>
 </div>
 <!-- Address Modal -->
-<div class="modal modern-modal" id="address-modal">
+<div class="modal modern-modal" id="address-modal" style="text-align: center;">
     <div class="modal__backdrop" id="address-modal-backdrop"></div>
     <div class="modal__content modal__content--wide modern-card" style="box-shadow:0 8px 32px rgba(0,0,0,0.18); border-radius: 18px; background: var(--surface, #fff);">
         <div class="modal__header" style="border-bottom:1px solid var(--gray-200); padding-bottom:1rem;">
@@ -116,7 +116,7 @@
                                 <option value="SP"><option value="SE"><option value="TO">
                               </datalist>
                 </div>
-                <div style="display:flex; align-items:center; gap:.5rem; margin-top:.25rem;">
+                <div class="favorite-row" style="display:flex; align-items:center; gap:.5rem; margin-top:.25rem;">
                     <input type="checkbox" id="addrm-favorite" style="accent-color:var(--primary-color, #1a73e8);" />
                     <label for="addrm-favorite" style="margin:0; font-size:.95rem; color:var(--gray-700);">Definir como favorito</label>
                 </div>
@@ -128,11 +128,26 @@
         </div>
     </div>
 </div>
-    <style>
-      /* Reusa estilos do checkout form */
-      #address-modal .field-error { font-size:.65rem; color: var(--error-color); margin-top:.15rem; display:none; }
-      #address-modal .field-wrapper.invalid .field-error { display:block; }
-    </style>
+        <style>
+            /* Reusa estilos do checkout form */
+            #address-modal .field-error { font-size:.65rem; color: var(--error-color); margin-top:.15rem; display:none; text-align:center; }
+            #address-modal .field-wrapper.invalid .field-error { display:block; }
+      
+            /* Centralização do conteúdo do modal de endereço */
+            #address-modal .checkout-form { max-width: 520px; margin: 0 auto; }
+            #address-modal .grid { justify-items: center; }
+            #address-modal .favorite-row { justify-content: center; }
+            #address-modal .modal__footer { justify-content: center !important; }
+      
+            /* Centralizar título mantendo o botão fechar à direita */
+            #address-modal .modal__header { position: relative; }
+            #address-modal .modal__header h3 { margin: 0 auto; text-align: center; }
+            #address-modal .modal__header .modal__close { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); }
+
+            @media (max-width: 540px) {
+                #address-modal .grid { grid-template-columns: 1fr !important; }
+            }
+        </style>
 </div>
 
 <style>
