@@ -34,7 +34,7 @@ $env:SYNC_LIMIT = "0"            # limite de itens
 
 # Flags operacionais (opcionais)
 # Ativar logs detalhados e simular sem gravar
-$env:VERBOSE = "0"      # 1 para logs detalhados
+$env:VERBOSE = "1"      # 1 para logs detalhados
 $env:DRY_RUN = "1"      # 1 para simular sem escrever no Firestore
 # Otimizações/idempotência
 $env:SKIP_UNCHANGED = "1"  # 1 para evitar gravações quando nada mudou
