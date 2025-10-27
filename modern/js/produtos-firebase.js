@@ -317,14 +317,52 @@ class ProdutosFirebaseApp {
     }
 
     sortProducts(list) {
-        const arr = [...list];
-        switch (this.currentSort) {
-            case 'price-low': return arr.sort((a, b) => (a.precoDesconto || 0) - (b.precoDesconto || 0));
-            case 'price-high': return arr.sort((a, b) => (b.precoDesconto || 0) - (a.precoDesconto || 0));
-            case 'featured': return arr.sort((a, b) => (b.destaque ? 1 : 0) - (a.destaque ? 1 : 0));
-            case 'name':
-            default: return arr.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
-        }
+            const arr = [...list];
+
+            const sortByChoice = (items) => {
+                const copy = [...items];
+                switch (this.currentSort) {
+                    case 'price-low': return copy.sort((a, b) => (a.precoDesconto || 0) - (b.precoDesconto || 0));
+                    case 'price-high': return copy.sort((a, b) => (b.precoDesconto || 0) - (a.precoDesconto || 0));
+                    case 'featured': return copy.sort((a, b) => (b.destaque ? 1 : 0) - (a.destaque ? 1 : 0));
+                    case 'name':
+                    default: return copy.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+                }
+            };
+
+            // When there is a search query, prioritize: 1) name matches, 2) DCB matches, 3) others
+            const q = (this.searchQuery || '').trim().toLowerCase();
+            if (q) {
+                const nameMatches = [];
+                const dcbMatches = [];
+                const others = [];
+                const inName = new Set();
+                const inDcb = new Set();
+
+                for (const p of arr) {
+                    const nameHas = (p.nome || '').toLowerCase().includes(q);
+                    if (nameHas) {
+                        nameMatches.push(p);
+                        inName.add(p.id);
+                        continue;
+                    }
+                    const dcbHas = (p.dcb || '').toLowerCase().includes(q);
+                    if (dcbHas) {
+                        dcbMatches.push(p);
+                        inDcb.add(p.id);
+                        continue;
+                    }
+                    others.push(p);
+                }
+
+                return [
+                    ...sortByChoice(nameMatches),
+                    ...sortByChoice(dcbMatches),
+                    ...sortByChoice(others)
+                ];
+            }
+
+            return sortByChoice(arr);
     }
 
     renderProducts() {

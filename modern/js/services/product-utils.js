@@ -17,6 +17,9 @@ export function normalizeProduct(raw) {
   const descricao = raw.descricao || raw.description || '';
   const categoria = raw.categoria || raw.category || 'outros';
   const imagens = Array.isArray(raw.fotos) ? raw.fotos : (raw.image ? [raw.image] : []);
+  // Campos auxiliares para busca
+  const dcbRaw = raw.dcb || raw.DCB || raw.nomeDCB || raw.nome_dcb || raw.nomeComumBrasileiro || raw.nome_comum_brasileiro || raw.principioAtivo || raw.principio_ativo || raw.principioativo || '';
+  const ean = raw.ean || raw.EAN || raw.codBarras || raw.codigoBarras || raw.barcode || raw.barCode || null;
   const descontoCalc = (precoCheio && precoDesconto && precoCheio > precoDesconto)
     ? Math.round(((precoCheio - precoDesconto)/precoCheio) * 100)
     : (raw.desconto ? Math.round(raw.desconto * 100) : 0);
@@ -32,6 +35,8 @@ export function normalizeProduct(raw) {
     quantidade: raw.quantidade ?? raw.stock ?? 0,
     ativo: (raw.ativo !== false),
     codRed: raw.codRed || raw.codigo || null,
+    dcb: dcbRaw ? escapeHTML(String(dcbRaw)) : '',
+    ean,
     destaque: !!(raw.destaque || raw.featured),
     laboratorio: raw.laboratorio || raw.marca || '',
     _raw: raw
