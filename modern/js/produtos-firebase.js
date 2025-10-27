@@ -404,7 +404,42 @@ class ProdutosFirebaseApp {
         const imageUrl = (product.imagens && product.imagens.length) ? product.imagens[0] : 'img/produtos/default-product.svg';
         const highlightedName = this.highlightSearch(product.nome);
         const highlightedDesc = this.highlightSearch(product.descricao || '');
-        return `<div class="product-card" data-product-id="${product.id}" data-category="${product.categoria}"><div class="product-card__image"><img data-src="${imageUrl}" src="img/produtos/default-product.svg" alt="${product.nome}" loading="lazy" class="lazy-img" onerror="this.src='img/produtos/default-product.svg'">${product.destaque ? '<div class=\"product-card__badge\">Destaque</div>' : ''}${product.desconto > 0 ? `<div class=\"product-card__discount-badge\">${product.desconto}% OFF</div>` : ''}</div><div class="product-card__content"><h3 class="product-card__title">${highlightedName}</h3><p class="product-card__description">${highlightedDesc}</p>${product.codRed ? `<p class=\"product-card__code\">Cód: ${escapeHTML(product.codRed)}</p>` : ''}<div class="product-card__price">${product.precoCheio && product.precoCheio > product.precoDesconto ? `<span class=\"product-card__price-old\">${formatPrice(product.precoCheio)}</span>` : ''}<span class="product-card__price-current">${formatPrice(product.precoDesconto)}</span></div><div class="product-card__stock">${product.quantidade > 0 ? `<span class=\"in-stock\">Em estoque (${product.quantidade})</span>` : '<span class=\"out-of-stock\">Fora de estoque</span>'}</div><div class="product-card__actions" data-product-id="${product.id}"><div class="quantity-selector"><button class="quantity-btn quantity-btn--minus" data-action="qty-minus" aria-label="Diminuir quantidade"><i class="fas fa-minus" aria-hidden="true"></i></button><input type="number" class="quantity-input" value="1" min="1" max="${product.quantidade || 99}" aria-label="Quantidade"><button class="quantity-btn quantity-btn--plus" data-action="qty-plus" aria-label="Aumentar quantidade"><i class="fas fa-plus" aria-hidden="true"></i></button></div><div class="action-buttons"><button class="btn btn--primary btn--add-cart" data-action="add-cart" ${product.quantidade <= 0 ? 'disabled' : ''}><i class="fas fa-shopping-cart" aria-hidden="true"></i>Adicionar</button><button class="btn--wishlist" data-action="wishlist" aria-label="Adicionar aos favoritos"><i class="fas fa-heart" aria-hidden="true"></i></button></div></div></div></div>`;
+        const cat = (product.categoria || '').toLowerCase();
+        const isMeds = ['medicamentos','genericos','referencia','similares'].includes(cat);
+        const labInline = (isMeds && product.laboratorio)
+          ? `<div class="product-card__lab-inline"><i class="fas fa-flask" aria-hidden="true"></i><span>${escapeHTML(product.laboratorio)}</span></div>`
+          : '';
+        return `<div class="product-card" data-product-id="${product.id}" data-category="${product.categoria}">
+    <div class="product-card__image">
+        <img data-src="${imageUrl}" src="img/produtos/default-product.svg" alt="${product.nome}" loading="lazy" class="lazy-img" onerror="this.src='img/produtos/default-product.svg'">
+        ${product.destaque ? '<div class="product-card__badge">Destaque</div>' : ''}
+        ${product.desconto > 0 ? `<div class="product-card__discount-badge">${product.desconto}% OFF</div>` : ''}
+    </div>
+    ${labInline}
+    <div class="product-card__content">
+        <h3 class="product-card__title">${highlightedName}</h3>
+        <p class="product-card__description">${highlightedDesc}</p>
+        ${product.codRed ? `<p class="product-card__code">Cód: ${escapeHTML(product.codRed)}</p>` : ''}
+        <div class="product-card__price">
+            ${product.precoCheio && product.precoCheio > product.precoDesconto ? `<span class="product-card__price-old">${formatPrice(product.precoCheio)}</span>` : ''}
+            <span class="product-card__price-current">${formatPrice(product.precoDesconto)}</span>
+        </div>
+        <div class="product-card__stock">
+            ${product.quantidade > 0 ? `<span class="in-stock">Em estoque (${product.quantidade})</span>` : '<span class="out-of-stock">Fora de estoque</span>'}
+        </div>
+        <div class="product-card__actions" data-product-id="${product.id}">
+            <div class="quantity-selector">
+                <button class="quantity-btn quantity-btn--minus" data-action="qty-minus" aria-label="Diminuir quantidade"><i class="fas fa-minus" aria-hidden="true"></i></button>
+                <input type="number" class="quantity-input" value="1" min="1" max="${product.quantidade || 99}" aria-label="Quantidade">
+                <button class="quantity-btn quantity-btn--plus" data-action="qty-plus" aria-label="Aumentar quantidade"><i class="fas fa-plus" aria-hidden="true"></i></button>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn--primary btn--add-cart" data-action="add-cart" ${product.quantidade <= 0 ? 'disabled' : ''}><i class="fas fa-shopping-cart" aria-hidden="true"></i>Adicionar</button>
+                <button class="btn--wishlist" data-action="wishlist" aria-label="Adicionar aos favoritos"><i class="fas fa-heart" aria-hidden="true"></i></button>
+            </div>
+        </div>
+    </div>
+</div>`;
     }
 
     renderPagination(current, total) {
