@@ -10,12 +10,12 @@
   "disallowedGroups": [],
   "minPrice": 0.01,
   "minPriceByCategory": {
-    "perfumaria": 0.01,
-    "conveniencia": 0.01,
+    "dermocosmeticos": 0.01,
+    "suplementos": 0.01,
     "genericos": 0.01,
     "referencia": 0.01,
     "similares": 0.01,
-    "correlatos": 0.01,
+    "hospitalares": 0.01,
     "medicamentos": 0.01
   },
   "minPriceByGroup": {

@@ -123,6 +123,8 @@ class ProdutosFirebaseApp {
             btn.classList.toggle('filter-btn--active', isActive);
             btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
         });
+        // Ajusta visibilidade de subfiltros (Genéricos/Referência/Similares) atrelados a Medicamentos
+        this.updateFilterVisibility();
         const sortSelect = document.querySelector('.sort-select');
         if (sortSelect) {
             sortSelect.value = this.currentSort;
@@ -202,9 +204,20 @@ class ProdutosFirebaseApp {
             b.classList.toggle('filter-btn--active', active);
             b.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
+        this.updateFilterVisibility();
     this.updateURLState();
     eventBus.emit('products:filterChange', { filter: this.currentFilter });
     this.renderProducts();
+    }
+
+    updateFilterVisibility() {
+        // Subfiltros de medicamentos devem aparecer quando o filtro atual é
+        // 'medicamentos' ou um dos subitens (genericos, referencia, similares)
+        const f = (this.currentFilter || '').toLowerCase();
+        const showMedsSubs = ['medicamentos','genericos','referencia','similares'].includes(f);
+        document.querySelectorAll('.filter-btn[data-subfilter="medicamentos"]').forEach(btn => {
+            btn.style.display = showMedsSubs ? '' : 'none';
+        });
     }
 
     handleSort(sort) {
@@ -228,7 +241,13 @@ class ProdutosFirebaseApp {
     filterProducts() {
         let filtered = this.products;
         if (this.currentFilter !== 'all') {
-            filtered = filtered.filter(p => (p.categoria || '').toLowerCase() === this.currentFilter.toLowerCase());
+            const f = (this.currentFilter || '').toLowerCase();
+            if (f === 'medicamentos') {
+                const medsSet = new Set(['medicamentos','genericos','referencia','similares']);
+                filtered = filtered.filter(p => medsSet.has((p.categoria || '').toLowerCase()));
+            } else {
+                filtered = filtered.filter(p => (p.categoria || '').toLowerCase() === f);
+            }
         }
         if (this.searchQuery) {
             const q = this.searchQuery.toLowerCase();

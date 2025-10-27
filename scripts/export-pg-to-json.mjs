@@ -19,12 +19,12 @@ const pool = new pg.Pool({
 });
 
 const GRUPO_TO_CATEGORIA = {
-  10000: 'conveniencia',
-  9000:  'correlatos',
-  4000:  'genericos',
-  8000:  'perfumaria',
-  3000:  'referencia',
-  2000:  'similares'
+  10000: 'suplementos',    // conveniência -> suplementos (site)
+  9000:  'hospitalares',   // correlatos -> hospitalares (site)
+  4000:  'genericos',      // subcategoria de medicamentos
+  8000:  'dermocosmeticos',// perfumaria -> dermocosméticos (site)
+  3000:  'referencia',     // subcategoria de medicamentos
+  2000:  'similares'       // subcategoria de medicamentos
 };
 const mapCategoria = g => GRUPO_TO_CATEGORIA[g] || 'medicamentos';
 

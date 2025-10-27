@@ -64,12 +64,12 @@ const pool = new pg.Pool({
 
 // Mapeie códigos de grupo do ERP para categorias usadas no site
 const GRUPO_TO_CATEGORIA = {
-  10000: 'conveniencia',   // conveniência
-  9000:  'correlatos',     // correlatos
-  4000:  'genericos',      // genéricos
-  8000:  'perfumaria',     // perfumaria
-  3000:  'referencia',     // referência
-  2000:  'similares'       // similares
+  10000: 'suplementos',     // conveniência -> suplementos (site)
+  9000:  'hospitalares',    // correlatos -> hospitalares (site)
+  4000:  'genericos',       // subcategoria de medicamentos
+  8000:  'dermocosmeticos', // perfumaria -> dermocosméticos (site)
+  3000:  'referencia',      // subcategoria de medicamentos
+  2000:  'similares'        // subcategoria de medicamentos
 };
 const mapCategoria = g => GRUPO_TO_CATEGORIA[g] || 'medicamentos';
 
