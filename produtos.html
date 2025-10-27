@@ -99,11 +99,58 @@
         <!-- Products Grid -->
         <section class="products-grid">
             <div class="container">
-                <div id="products-results-info" class="products-results-info" aria-live="polite" style="margin-bottom:1rem;font-size:.9rem;color:#555"></div>
-                <div class="products-grid__container" id="products-container">
-                    <!-- Products will be dynamically loaded here -->
+                <div class="products-layout">
+                    <aside class="filters-sidebar" aria-label="Filtros de produtos">
+                        <div class="filters-sidebar__section">
+                            <h3 class="filters-sidebar__title">Categorias</h3>
+                            <div class="filters-sidebar__buttons">
+                                <button class="filter-btn filter-btn--active" data-category="all" aria-pressed="true">
+                                    <i class="fas fa-th-large" aria-hidden="true"></i>
+                                    Todos
+                                </button>
+                                <button class="filter-btn" data-category="medicamentos" aria-pressed="false">
+                                    <i class="fas fa-pills" aria-hidden="true"></i>
+                                    Medicamentos
+                                </button>
+                                <button class="filter-btn" data-category="genericos" data-subfilter="medicamentos" aria-pressed="false">
+                                    <i class="fas fa-capsules" aria-hidden="true"></i>
+                                    Genéricos
+                                </button>
+                                <button class="filter-btn" data-category="referencia" data-subfilter="medicamentos" aria-pressed="false">
+                                    <i class="fas fa-capsules" aria-hidden="true"></i>
+                                    Referência
+                                </button>
+                                <button class="filter-btn" data-category="similares" data-subfilter="medicamentos" aria-pressed="false">
+                                    <i class="fas fa-capsules" aria-hidden="true"></i>
+                                    Similares
+                                </button>
+                                <button class="filter-btn" data-category="dermocosmeticos" aria-pressed="false">
+                                    <i class="fas fa-heart" aria-hidden="true"></i>
+                                    Dermocosméticos
+                                </button>
+                                <button class="filter-btn" data-category="suplementos" aria-pressed="false">
+                                    <i class="fas fa-dumbbell" aria-hidden="true"></i>
+                                    Suplementos
+                                </button>
+                                <button class="filter-btn" data-category="hospitalares" aria-pressed="false">
+                                    <i class="fas fa-hospital" aria-hidden="true"></i>
+                                    Hospitalares
+                                </button>
+                                <button class="filter-btn" data-category="infantil" aria-pressed="false">
+                                    <i class="fas fa-baby" aria-hidden="true"></i>
+                                    Infantil
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
+                    <div class="products-content">
+                        <div id="products-results-info" class="products-results-info" aria-live="polite" style="margin-bottom:1rem;font-size:.9rem;color:#555"></div>
+                        <div class="products-grid__container" id="products-container">
+                            <!-- Products will be dynamically loaded here -->
+                        </div>
+                        <div id="pagination-container" class="pagination" aria-label="Paginação de produtos" style="margin-top:2rem"></div>
+                    </div>
                 </div>
-                <div id="pagination-container" class="pagination" aria-label="Paginação de produtos" style="margin-top:2rem"></div>
             </div>
         </section>
     </main>

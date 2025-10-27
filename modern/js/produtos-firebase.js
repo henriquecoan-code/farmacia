@@ -215,7 +215,8 @@ class ProdutosFirebaseApp {
         // 'medicamentos' ou um dos subitens (genericos, referencia, similares)
         const f = (this.currentFilter || '').toLowerCase();
         const showMedsSubs = ['medicamentos','genericos','referencia','similares'].includes(f);
-        document.querySelectorAll('.filter-btn[data-subfilter="medicamentos"]').forEach(btn => {
+        // Só controlar a visibilidade dos subfiltros na barra lateral
+        document.querySelectorAll('.filters-sidebar .filter-btn[data-subfilter="medicamentos"]').forEach(btn => {
             btn.style.display = showMedsSubs ? '' : 'none';
         });
     }

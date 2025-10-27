@@ -1193,6 +1193,11 @@ img.lazy-img:not([data-src]) { filter: blur(0); }
   flex-wrap: wrap;
 }
 
+/* Oculta subfiltros (Genéricos/Referência/Similares) na barra superior */
+.filters .filter-btn[data-subfilter="medicamentos"] {
+  display: none !important;
+}
+
 /* Filter buttons with icons */
 .filter-btn {
   display: flex;
@@ -1232,6 +1237,55 @@ img.lazy-img:not([data-src]) { filter: blur(0); }
 /* Products Grid */
 .products-grid {
   padding: var(--spacing-12) 0;
+}
+
+.products-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: var(--spacing-6);
+}
+
+.filters-sidebar {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-4);
+  height: fit-content;
+  position: sticky;
+  top: 96px; /* abaixo do header sticky */
+}
+
+.filters-sidebar__title {
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--spacing-3);
+  color: var(--gray-800);
+}
+
+.filters-sidebar__buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.filters-sidebar .filter-btn {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+/* Estilo para subcategorias (Genéricos/Referência/Similares) dentro da sidebar */
+.filters-sidebar .filter-btn[data-subfilter="medicamentos"] {
+  font-size: 0.95em;
+  background: var(--gray-100);
+  border-color: var(--gray-200);
+  border-left: 3px solid var(--gray-300);
+  padding-left: calc(var(--spacing-4) + 6px);
+}
+.filters-sidebar .filter-btn[data-subfilter="medicamentos"].filter-btn--active {
+  border-left-color: var(--primary-color);
+}
+
+.products-content {
+  min-width: 0; /* evita overflow em grid */
 }
 
 .products-grid__container {
@@ -1489,6 +1543,14 @@ img.lazy-img:not([data-src]) { filter: blur(0); }
     justify-content: center;
   }
   
+  .products-layout {
+    grid-template-columns: 1fr; /* sidebar acima no mobile */
+  }
+
+  .filters-sidebar {
+    position: static;
+  }
+
   .products-grid__container {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--spacing-4);
