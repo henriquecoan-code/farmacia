@@ -93,6 +93,9 @@ class PharmacyApp {
   }
 
   setupHeaderEventListeners() {
+    // Ensure showcase badge visibility according to querystring or global flag
+    this.showShowcaseBadge();
+
     // Header search
     const searchInput = document.querySelector('.search-box__input');
     const searchButton = document.querySelector('.search-box__button');
@@ -493,6 +496,20 @@ class PharmacyApp {
     window.location.href = searchUrl.toString();
   }
 
+  // Toggle showcase badge based on URL param or global flag
+  showShowcaseBadge() {
+    try {
+      const params = new URLSearchParams(location.search);
+      const showcase = (typeof window !== 'undefined' && window.SHOWCASE_MODE) || params.get('vitrine') === '1';
+      const badge = document.getElementById('showcase-badge');
+      if (badge) {
+        badge.style.display = showcase ? 'inline-flex' : 'none';
+      }
+    } catch (e) {
+      // no-op
+    }
+  }
+
   filterProductsByCategory(categoryId) {
     console.log('Filtering by category:', categoryId);
     this.ui.showInfo(`Carregando produtos da categoria...`);
@@ -521,9 +538,13 @@ class PharmacyApp {
       sidebar.classList.toggle('active');
       overlay.classList.toggle('active');
       toggle.classList.toggle('active');
+      const isOpen = sidebar.classList.contains('active');
+      // Update ARIA state
+      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      overlay.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
       
       // Prevent body scroll when sidebar is open
-      if (sidebar.classList.contains('active')) {
+      if (isOpen) {
         document.body.style.overflow = 'hidden';
       } else {
         document.body.style.overflow = '';
@@ -540,6 +561,8 @@ class PharmacyApp {
       sidebar.classList.remove('active');
       overlay.classList.remove('active');
       toggle.classList.remove('active');
+      toggle.setAttribute('aria-expanded', 'false');
+      overlay.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
     }
   }

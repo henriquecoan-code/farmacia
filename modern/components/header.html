@@ -5,28 +5,19 @@
             <!-- Logo -->
             <div class="header__logo">
                 <a href="modern-index.html" class="logo" aria-label="Farmácia São Benedito">
-                    <img src="img/logo.png" alt="Farmácia São Benedito" class="logo__img" />
+                    <img src="img/logo.png" alt="Farmácia São Benedito" class="logo__img" decoding="async" fetchpriority="high" />
                 </a>
             </div>
 
-            <script>
-                try {
-                    const params = new URLSearchParams(location.search);
-                    const showcase = (typeof window !== 'undefined' && window.SHOWCASE_MODE) || params.get('vitrine') === '1';
-                    const badge = document.getElementById('showcase-badge');
-                    if (badge && showcase) {
-                        badge.style.display = 'inline-flex';
-                    }
-                } catch {}
-                </script>
+            <!-- Script do badge movido para modern/js/app.js -->
             <!-- Search -->
             <div class="header__search">
-                <div class="search-box">
-                    <input type="text" class="search-box__input" placeholder="Buscar medicamentos, produtos...">
-                    <button class="search-box__button">
-                        <i class="fas fa-search"></i>
+                <form class="search-box" role="search" action="produtos.html" method="get">
+                    <input id="site-search" name="search" type="search" class="search-box__input" placeholder="Buscar medicamentos, produtos..." aria-label="Buscar produtos" />
+                    <button class="search-box__button" type="submit" aria-label="Buscar">
+                        <i class="fas fa-search" aria-hidden="true"></i>
                     </button>
-                </div>
+                </form>
             </div>
 
             <!-- Actions -->
@@ -34,22 +25,22 @@
                 <span id="showcase-badge" style="display:none;align-items:center;gap:.35rem;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;padding:.25rem .5rem;border-radius:.375rem;font-size:.75rem;font-weight:600;margin-right:.5rem">
                     <i class="fas fa-eye"></i> Modo vitrine
                 </span>
-                <button class="action-btn" id="user-btn">
-                    <i class="fas fa-user"></i>
+                <button class="action-btn" id="user-btn" type="button" aria-label="Abrir login/conta" aria-describedby="user-tooltip">
+                    <i class="fas fa-user" aria-hidden="true"></i>
                     <span>Entrar</span>
-                    <div class="user-tooltip">
+                    <div class="user-tooltip" id="user-tooltip" role="tooltip">
                         Clique para fazer login<br>
                         <small>Ou criar sua conta</small>
                     </div>
                 </button>
-                <button class="action-btn cart-btn" id="cart-btn">
-                    <i class="fas fa-shopping-cart"></i>
+                <button class="action-btn cart-btn" id="cart-btn" type="button" aria-label="Abrir carrinho">
+                    <i class="fas fa-shopping-cart" aria-hidden="true"></i>
                     <span class="cart-counter" id="cart-counter">0</span>
                 </button>
             </div>
 
             <!-- Mobile Menu Toggle -->
-            <button class="mobile-menu-toggle" id="mobile-menu-toggle">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" type="button" aria-label="Abrir menu" aria-controls="mobile-sidebar" aria-expanded="false">
                 <span></span>
                 <span></span>
                 <span></span>
@@ -59,24 +50,24 @@
 </header>
 
 <!-- Navigation -->
-<nav class="nav" id="nav">
+<nav class="nav" id="nav" aria-label="Navegação principal">
     <div class="container">
         <ul class="nav__list">
             <li class="nav__item">
                 <a href="modern-index.html" class="nav__link">
-                    <i class="fas fa-home"></i>
+                    <i class="fas fa-home" aria-hidden="true"></i>
                     Início
                 </a>
             </li>
             <li class="nav__item">
                 <a href="produtos.html" class="nav__link">
-                    <i class="fas fa-pills"></i>
+                    <i class="fas fa-pills" aria-hidden="true"></i>
                     Produtos
                 </a>
             </li>
             <li class="nav__item">
                 <a href="contato.html" class="nav__link">
-                    <i class="fas fa-phone"></i>
+                    <i class="fas fa-phone" aria-hidden="true"></i>
                     Contatos
                 </a>
             </li>
@@ -85,25 +76,25 @@
 </nav>
 
 <!-- Mobile Sidebar -->
-<div class="mobile-overlay" id="mobile-overlay"></div>
-<div class="mobile-sidebar" id="mobile-sidebar">
+<div class="mobile-overlay" id="mobile-overlay" aria-hidden="true"></div>
+<div class="mobile-sidebar" id="mobile-sidebar" role="dialog" aria-modal="true" aria-labelledby="mobile-sidebar-title">
     <div class="mobile-sidebar__header">
-        <h3 class="mobile-sidebar__title">Menu</h3>
-        <button class="mobile-sidebar__close" id="mobile-sidebar-close">
-            <i class="fas fa-times"></i>
+        <h3 class="mobile-sidebar__title" id="mobile-sidebar-title">Menu</h3>
+        <button class="mobile-sidebar__close" id="mobile-sidebar-close" type="button" aria-label="Fechar menu">
+            <i class="fas fa-times" aria-hidden="true"></i>
         </button>
     </div>
-    <nav class="mobile-sidebar__nav">
+    <nav class="mobile-sidebar__nav" aria-label="Navegação móvel">
         <a href="modern-index.html" class="nav__link">
-            <i class="fas fa-home"></i>
+            <i class="fas fa-home" aria-hidden="true"></i>
             Início
         </a>
         <a href="produtos.html" class="nav__link">
-            <i class="fas fa-pills"></i>
+            <i class="fas fa-pills" aria-hidden="true"></i>
             Produtos
         </a>
         <a href="contato.html" class="nav__link">
-            <i class="fas fa-phone"></i>
+            <i class="fas fa-phone" aria-hidden="true"></i>
             Contatos
         </a>
     </nav>
