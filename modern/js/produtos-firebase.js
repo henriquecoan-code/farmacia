@@ -27,12 +27,17 @@ class ProdutosFirebaseApp {
             this.checkSearchQuery();
             this.showLoading();
             await this.componentLoader.loadHeader();
+              // Exibe badge de vitrine, se aplicável
+              this.showShowcaseBadge();
             await this.componentLoader.loadFooter();
             // Aguarda bootstrap (já inicia firebase, auth, cart, modals)
             await bootstrap.init();
             this.firebaseService = bootstrap.firebase;
             this.auth = bootstrap.auth;
             this.modals = bootstrap.modals;
+
+              // Se estiver em modo vitrine (?vitrine=1), aplica overrides de leitura e bloqueia escritas
+              await this.enableShowcaseModeIfNeeded();
             // Garantir que modal/form auth está ligado ao AuthService
             this.wireAuthForm();
             await this.loadProducts();
@@ -46,6 +51,59 @@ class ProdutosFirebaseApp {
             this.hideLoading();
         }
     }
+
+        async enableShowcaseModeIfNeeded() {
+            try {
+                const params = new URLSearchParams(location.search);
+                const showcase = params.get('vitrine') === '1' || window.SHOWCASE_MODE === true;
+                if (!showcase) return;
+                window.SHOWCASE_MODE = true;
+                const cacheKey = 'products_cache_vitrine';
+                const ttl = 60 * 60 * 1000; // 60 min
+                const originalGetProducts = this.firebaseService?.getProducts;
+                // Override fonte de produtos para arquivo local em modo vitrine
+                if (this.firebaseService) {
+                    this.firebaseService.getProducts = async () => {
+                        const now = Date.now();
+                        try {
+                            const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+                            if (cached?.items && now - (cached.ts || 0) < ttl) {
+                                return cached.items;
+                            }
+                        } catch {}
+                        try {
+                            const resp = await fetch('./data/products.json', { cache: 'no-store' });
+                            const items = await resp.json();
+                            try { localStorage.setItem(cacheKey, JSON.stringify({ items, ts: now })); } catch {}
+                            return Array.isArray(items) ? items : [];
+                        } catch (e) {
+                            console.error('[Showcase] Falha ao carregar ./data/products.json', e);
+                            // Fallback: tenta original se existir
+                            if (typeof originalGetProducts === 'function') return await originalGetProducts.call(this.firebaseService);
+                            return [];
+                        }
+                    };
+
+                    ['addProduct','updateProduct','deleteProduct','createOrder','addClient','updateClient','deleteClient']
+                        .forEach(m => {
+                            if (typeof this.firebaseService[m] === 'function') {
+                                this.firebaseService[m] = async () => { throw new Error('Modo vitrine: operação não permitida'); };
+                            }
+                        });
+                }
+            } catch (e) {
+                console.warn('Falha ao habilitar modo vitrine:', e);
+            }
+        }
+
+        showShowcaseBadge() {
+            try {
+                const params = new URLSearchParams(location.search);
+                const showcase = (typeof window !== 'undefined' && window.SHOWCASE_MODE) || params.get('vitrine') === '1';
+                const badge = document.getElementById('showcase-badge');
+                if (badge) badge.style.display = showcase ? 'inline-flex' : 'none';
+            } catch {}
+        }
 
     checkSearchQuery() {
         const urlParams = new URLSearchParams(window.location.search);
