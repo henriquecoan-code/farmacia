@@ -490,6 +490,10 @@ export class ModalsManager {
 
   async handleAuthSubmit(e) {
     e.preventDefault();
+    // If the global AuthService is available, delegate to it (unificado com Firebase)
+    if (window.authService?.handleAuthSubmit) {
+      try { return await window.authService.handleAuthSubmit(e); } catch (err) { console.error('Delegated auth error:', err); }
+    }
     
     const emailInput = document.getElementById('auth-email');
     const passwordInput = document.getElementById('auth-password');
@@ -550,12 +554,10 @@ export class ModalsManager {
         console.log('login:', { email, password });
       }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-  // Success
-  window.toast?.success(`${this.currentAuthMode === 'login' ? 'Login' : 'Cadastro'} realizado!`);
-      this.closeAuthModal();
+    // Fallback simples (sem AuthService): simular ok
+    await new Promise(resolve => setTimeout(resolve, 500));
+    window.toast?.success(`${this.currentAuthMode === 'login' ? 'Login' : 'Cadastro'} realizado! (modo demo)`);
+    this.closeAuthModal();
       
     } catch (error) {
       console.error('Auth error:', error);

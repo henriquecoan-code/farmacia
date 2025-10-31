@@ -51,6 +51,18 @@ export class FirebaseService {
     return signInWithEmailAndPassword(this.auth, email, password);
   }
 
+  async getIdTokenClaims(forceRefresh = false) {
+    if (!this.isInitialized || !this.auth?.currentUser) return null;
+    const { getIdTokenResult } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js');
+    try {
+      const res = await getIdTokenResult(this.auth.currentUser, forceRefresh);
+      return res?.claims || null;
+    } catch (e) {
+      console.warn('Failed to get token claims', e);
+      return null;
+    }
+  }
+
   // =============== ORDERS (NEW) ===============
   /**
    * Create a new order document. Expects shape:
@@ -79,13 +91,38 @@ export class FirebaseService {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
     try {
       const { collection, getDocs, query, where, orderBy, limit } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
-      let q = query(collection(this.firestore, 'pedidos'), orderBy('createdAt','desc'), limit(lim));
-      if (status) {
-        q = query(collection(this.firestore, 'pedidos'), where('status','==', status), orderBy('createdAt','desc'), limit(lim));
+      // Try primary collection 'pedidos'
+      const pedidosCol = collection(this.firestore, 'pedidos');
+      const buildQuery = (col) => {
+        try {
+          let q = query(col, orderBy('createdAt','desc'), limit(lim));
+          if (status) q = query(col, where('status','==', status), orderBy('createdAt','desc'), limit(lim));
+          return q;
+        } catch {
+          // Fallback without orderBy (in case of missing index or mixed types)
+          let q = query(col, limit(lim));
+          if (status) q = query(col, where('status','==', status), limit(lim));
+          return q;
+        }
+      };
+
+      let snap = await getDocs(buildQuery(pedidosCol));
+      let orders = [];
+      snap.forEach(doc => orders.push(Object.assign({ _docId: doc.id, _collection: 'pedidos' }, doc.data())));
+
+      // If empty, try legacy collection 'orders'
+      if (!orders.length) {
+        const ordersCol = collection(this.firestore, 'orders');
+        try {
+          snap = await getDocs(buildQuery(ordersCol));
+          const alt = [];
+          snap.forEach(doc => alt.push(Object.assign({ _docId: doc.id, _collection: 'orders' }, doc.data())));
+          orders = alt;
+        } catch (err) {
+          console.warn('[FirebaseService] Fallback to orders collection failed', err);
+        }
       }
-      const snap = await getDocs(q);
-      const orders = [];
-      snap.forEach(doc => orders.push(Object.assign({ _docId: doc.id }, doc.data())));
+
       return orders;
     } catch (e) {
       console.error('Error listing orders', e);
@@ -186,11 +223,21 @@ export class FirebaseService {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
     try {
       const { doc, getDoc, updateDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
-      const ref = doc(this.firestore, 'orders', docId);
-      const snap = await getDoc(ref);
+
+      // Try on 'pedidos' first
+      let ref = doc(this.firestore, 'pedidos', docId);
+      let snap = await getDoc(ref);
+
+      // If not found, fallback to 'orders'
+      if (!snap.exists()) {
+        ref = doc(this.firestore, 'orders', docId);
+        snap = await getDoc(ref);
+      }
+
       if (!snap.exists()) throw new Error('Order not found');
-      const data = snap.data();
-      const history = Array.isArray(data.history)? data.history.slice(): [];
+
+      const data = snap.data() || {};
+      const history = Array.isArray(data.history) ? data.history.slice() : [];
       history.push({ status: newStatus, at: new Date().toISOString(), note });
       await updateDoc(ref, { status: newStatus, history });
       return true;
@@ -366,16 +413,38 @@ export class FirebaseService {
   // Cliente methods
   async getClients() {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
-    
     try {
       const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
-      const querySnapshot = await getDocs(collection(this.firestore, 'clientes'));
-      
-      const clients = [];
-      querySnapshot.forEach((doc) => {
-        clients.push(Object.assign({ id: doc.id }, doc.data()));
-      });
-      
+
+      // Prefer new schema: 'usuarios'
+      let clients = [];
+      try {
+        const usersSnap = await getDocs(collection(this.firestore, 'usuarios'));
+        usersSnap.forEach((d) => {
+          const data = d.data() || {};
+          clients.push(Object.assign({
+            id: d.id,
+            name: data.name || data.nome || data.displayName || '-',
+            email: data.email || '-',
+            phone: data.phone || data.telefone || '',
+            createdAt: data.createdAt || data.criadoEm || null,
+            addresses: data.addresses || undefined
+          }, data));
+        });
+      } catch (e) {
+        // If reading 'usuarios' fails (permissions/absent), continue to fallback
+      }
+
+      // Fallback/merge with legacy 'clientes'
+      if (!clients.length) {
+        try {
+          const snap = await getDocs(collection(this.firestore, 'clientes'));
+          snap.forEach((d) => clients.push(Object.assign({ id: d.id }, d.data())));
+        } catch (e) {
+          console.warn('[FirebaseService] Failed to read clientes collection', e);
+        }
+      }
+
       return clients;
     } catch (error) {
       console.error('Error getting clients:', error);

@@ -1,28 +1,140 @@
 // Clean rebuilt Admin Panel (products + orders)
-import { FirebaseService } from './services/firebase-service.js';
+import { bootstrap } from './bootstrap.js';
 
 class AdminApp {
   constructor(){
     this.currentSection='dashboard';
     this.products=[]; this.clients=[]; this.orders=[]; this.ordersLoaded=false;
     this.editingProduct=null;
-    this.firebase=new FirebaseService();
+    this.firebase=null;
     this.init();
   }
 
   async init(){
     try {
-      await this.firebase.init();
-      if (this.firebase.isInitialized) await this.firebase.initializeSampleData();
+      await bootstrap.init();
+      this.firebase = bootstrap.firebase;
       this.setupEventListeners();
-      await this.loadFirestoreData();
-      await this.loadAndRenderOrders();
-      this.renderProducts();
-      this.updateDashboard();
+      await this.enforceAdminAuth();
     } catch(err){
       console.warn('Init fallback', err); this.loadSampleData(); this.renderProducts(); this.updateDashboard();
       this.showNotification('Falha ao conectar dados remotos. Modo local.', 'warning');
     }
+  }
+
+  async enforceAdminAuth(){
+    // Dev bypass: enable by adding ?adminDev=1 or localStorage.setItem('adminDev','1')
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      const devBypass = qs.has('adminDev') || localStorage.getItem('adminDev') === '1';
+      if (devBypass) {
+        this.showNotification('Admin (DEV bypass): autenticação desabilitada nesta sessão.', 'warning');
+        if (this.firebase.isInitialized) {
+          await this.loadFirestoreData();
+          await this.loadAndRenderOrders();
+        } else {
+          this.loadSampleData();
+        }
+        this.renderProducts();
+        this.renderCustomers();
+        this.updateDashboard();
+        return;
+      }
+    } catch {}
+
+    // If Firebase not available, proceed in local mode
+    if (!this.firebase?.isInitialized) {
+      this.showNotification('Modo offline: admin sem autenticação.', 'warning');
+      this.renderProducts();
+      this.renderCustomers();
+      this.updateDashboard();
+      return;
+    }
+    // Inject minimal auth overlay and wait for admin user
+    const ensureOverlay = () => {
+      if (document.getElementById('admin-auth-overlay')) return;
+      const wrap = document.createElement('div');
+      wrap.id = 'admin-auth-overlay';
+      Object.assign(wrap.style, { position:'fixed', inset:'0', background:'rgba(0,0,0,.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:'10000' });
+      wrap.innerHTML = `
+        <div style="background:#fff; padding:1rem 1.25rem; border-radius:12px; width:100%; max-width:380px; box-shadow:var(--shadow-lg);">
+          <h3 style="margin:0 0 .75rem 0;">Login do Administrador</h3>
+          <div class="form-group"><label>E-mail</label><input id="admin-login-email" type="email" style="width:100%; padding:.5rem; border:1px solid var(--gray-300); border-radius:8px;"></div>
+          <div class="form-group" style="margin-top:.5rem"><label>Senha</label><input id="admin-login-pass" type="password" style="width:100%; padding:.5rem; border:1px solid var(--gray-300); border-radius:8px;"></div>
+          <div id="admin-login-status" style="margin:.5rem 0; font-size:.85rem; color:var(--gray-600);"></div>
+          <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.5rem;">
+            <button id="admin-login-btn" class="btn btn--primary">Entrar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(wrap);
+      const btn = wrap.querySelector('#admin-login-btn');
+      btn?.addEventListener('click', async () => {
+        const email = document.getElementById('admin-login-email')?.value?.trim();
+        const pass = document.getElementById('admin-login-pass')?.value;
+        const st = document.getElementById('admin-login-status');
+        if (!email || !pass) { if (st) st.textContent = 'Informe e-mail e senha.'; return; }
+        try {
+          btn.disabled = true; if (st) st.textContent = 'Entrando...';
+          await this.firebase.signIn(email, pass);
+          if (st) st.textContent = 'Autenticado. Verificando permissões...';
+        } catch(e){
+          if (st) st.textContent = 'Falha no login: ' + (e?.message || 'erro');
+          btn.disabled = false;
+        }
+      });
+    };
+
+    const hideOverlay = () => { const el = document.getElementById('admin-auth-overlay'); if (el) el.remove(); };
+    const showUnauthorized = () => {
+      let u = document.getElementById('admin-unauth-overlay');
+      if (!u){
+        u = document.createElement('div');
+        u.id='admin-unauth-overlay';
+        Object.assign(u.style,{position:'fixed',inset:'0',background:'rgba(0,0,0,.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:'10000'});
+        u.innerHTML = `<div style="background:#fff;padding:1rem 1.25rem;border-radius:12px;max-width:420px;width:100%;text-align:center;">
+          <h3>Acesso não autorizado</h3>
+          <p>Seu usuário não possui permissão de administrador.</p>
+          <div style="display:flex;gap:.5rem;justify-content:center;margin-top:.5rem;">
+            <button id="admin-unauth-logout" class="btn btn--secondary">Sair</button>
+          </div>
+        </div>`;
+        document.body.appendChild(u);
+        u.querySelector('#admin-unauth-logout')?.addEventListener('click', async ()=>{
+          try { await this.firebase.signOut(); } catch {}
+          u.remove(); ensureOverlay();
+        });
+      }
+    };
+
+    const openUnifiedAuthModal = () => { try { window.modalsManager?.openAuthModal('login'); } catch {} };
+    // Prefer modal unificado se disponível
+    openUnifiedAuthModal();
+    // Fallback mínimo se modal não existir
+    ensureOverlay();
+
+    return new Promise((resolve)=>{
+      this.firebase.onAuthStateChanged(async (user)=>{
+        if (!user){ openUnifiedAuthModal(); ensureOverlay(); return; }
+        try{
+          const claims = await this.firebase.getIdTokenClaims(true);
+          const isAdmin = !!(claims && (claims.admin === true || claims.role === 'admin'));
+          if (!isAdmin){ hideOverlay(); showUnauthorized(); return; }
+          // Authorized
+          hideOverlay();
+          document.getElementById('admin-user-name')?.textContent = user.email || 'Administrador';
+          // Optional: seed sample data only if really desired; keeping off by default in admin
+          // await this.firebase.initializeSampleData();
+          await this.loadFirestoreData();
+          await this.loadAndRenderOrders();
+          this.renderProducts();
+          this.renderCustomers();
+          this.updateDashboard();
+          resolve();
+        } catch(e){
+          console.warn('Auth claims check failed', e);
+        }
+      });
+    });
   }
 
   // Navigation
@@ -270,9 +382,54 @@ class AdminApp {
       ${this.nextStatus(order.status)?`<button id="od-advance" class="btn btn--primary">Avançar para ${this.getOrderStatusLabel(this.nextStatus(order.status))}</button>`:''}`;
     if(this.nextStatus(order.status)) body.querySelector('#od-advance').addEventListener('click',()=>{ this.advanceOrderStatus(order); modal.remove(); }); }
 
+  // Customers
+  renderCustomers(list=null){
+    // Find the customers table body within the customers section
+    const section = document.getElementById('customers-section');
+    const tbody = section?.querySelector('tbody');
+    if(!tbody) return;
+    const data = list || this.clients || [];
+    if(!data.length){
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum cliente encontrado</td></tr>';
+      return;
+    }
+    const getName = (c)=> c.name || c.nome || c.displayName || '—';
+    const getEmail = (c)=> c.email || '—';
+    const getPhone = (c)=> c.phone || c.telefone || '—';
+    const getCreated = (c)=> c.createdAt ? this.formatDate(c.createdAt) : '—';
+    const ordersCountFor = (c)=> this.orders.filter(o => (o.userId && c.id && o.userId===c.id) || (o.user && getEmail(c) && String(o.user).toLowerCase()===String(getEmail(c)).toLowerCase())).length;
+    tbody.innerHTML = data.map(c=>`
+      <tr>
+        <td>${getName(c)}</td>
+        <td>${getEmail(c)}</td>
+        <td>${getPhone(c)}</td>
+        <td>${getCreated(c)}</td>
+        <td>${ordersCountFor(c)}</td>
+        <td>
+          <button class="btn-icon" title="Ver perfil" data-action="view" data-id="${c.id}">👁️</button>
+          <button class="btn-icon" title="Editar" data-action="edit" data-id="${c.id}">✏️</button>
+        </td>
+      </tr>`).join('');
+    // Minimal actions wiring (placeholder)
+    tbody.querySelectorAll('button[data-action]')
+      .forEach(btn => btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-id');
+        const action = btn.getAttribute('data-action');
+        const c = this.clients.find(x=>x.id===id);
+        if(!c) return;
+        if(action==='view') this.showNotification(`Cliente: ${getName(c)} <${getEmail(c)}>`, 'info');
+        if(action==='edit') this.showNotification('Edição de cliente em breve.', 'warning');
+      }));
+  }
+
   // Sample data fallback
   loadSampleData(){ this.products=[{id:'1',name:'Dipirona 500mg',category:'medicamentos',price:8.90,stock:50,description:'20 comprimidos',status:'active'},{id:'2',name:'Protetor Solar FPS 60',category:'dermocosmeticos',price:45.90,stock:25,description:'FPS 60',status:'active'}]; this.clients=[{id:'c1',name:'Maria',email:'maria@example.com'}]; }
-  handleLogout(){ if(!confirm('Sair do painel?')) return; this.showNotification('Logout efetuado','success'); setTimeout(()=>{ window.location='modern-index.html'; },800); }
+  async handleLogout(){
+    if(!confirm('Sair do painel?')) return;
+    try { if (this.firebase?.isInitialized) await this.firebase.signOut(); } catch {}
+    this.showNotification('Logout efetuado','success');
+    setTimeout(()=>{ window.location='modern-index.html'; },800);
+  }
 
   // Notifications
   showNotification(msg,type='info'){ const n=document.createElement('div'); n.className=`notification notification--${type}`; n.innerHTML=`<div class="notification__content"><span>${this.getNotificationIcon(type)}</span><span>${msg}</span><button class="notification__close">❌</button></div>`; this.addNotificationStyles(); document.body.appendChild(n); setTimeout(()=> n.classList.add('show'),30); n.querySelector('.notification__close')?.addEventListener('click',()=> this.hideNotification(n)); setTimeout(()=> this.hideNotification(n),4500); return n; }
