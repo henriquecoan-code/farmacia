@@ -28,13 +28,22 @@ export class FirebaseService {
       // Dynamic import Firebase modules
       const { initializeApp } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js');
       const { getAuth } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js');
-      const { getFirestore } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      const { getFirestore, enableIndexedDbPersistence } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
 
       this.app = initializeApp(firebaseConfig);
       this.auth = getAuth(this.app);
       this.firestore = getFirestore(this.app);
-      this.isInitialized = true;
 
+      // Habilita cache persistente (IndexedDB) para reduzir leituras repetidas
+      try {
+        await enableIndexedDbPersistence(this.firestore);
+        console.log('[FirebaseService] IndexedDB persistence enabled');
+      } catch (e) {
+        // Conflito multi-aba ou navegador não suporta: segue sem persistência
+        console.warn('[FirebaseService] Persistence not enabled:', e?.code || e?.message || e);
+      }
+
+      this.isInitialized = true;
       console.log('Firebase initialized successfully');
     } catch (error) {
       console.warn('Firebase initialization failed, running in offline mode:', error);
@@ -267,19 +276,25 @@ export class FirebaseService {
     const cached = this._getLocalCache(this._productsCacheKey);
     const now = Date.now();
 
-    // If not initialized, try to serve cache; otherwise throw for caller fallback
-    if (!this.isInitialized) {
+    // Query param para ignorar caches
+    const nocache = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache');
+
+    // 1) Se não inicializado, tente cache local; senão erro
+      if (!this.isInitialized) {
       if (cached?.items && cached.items.length) return cached.items;
+      // Como fallback extra, tente JSON estático
+      try {
+        const resp = await fetch(this._getProductsJsonUrl(), { cache: 'force-cache' });
+        if (resp.ok) return await resp.json();
+      } catch {}
       throw new Error('Firebase not initialized');
     }
 
     try {
-      const { collection, getDocs, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      const { doc, getDoc, collection, getDocs, getDocsFromCache } =
+        await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
 
-      // Allow manual bypass via query param (?nocache=1)
-      const nocache = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache');
-
-      // First, get remote productsVersion (cheap single-doc read)
+      // 2) Versão remota barata (1 leitura) para invalidar cache quando possível
       let remoteVersion = null;
       try {
         const metaRef = doc(this.firestore, 'meta', 'counters');
@@ -288,27 +303,50 @@ export class FirebaseService {
           const data = metaSnap.data();
           remoteVersion = typeof data.productsVersion === 'number' ? data.productsVersion : null;
         }
-      } catch (e) {
-        // ignore; we may still use TTL cache below
-      }
+      } catch {}
 
-      // Decide if we can return cache
+      // 3) Cache local (localStorage) válido?
       if (!nocache && cached?.items && Array.isArray(cached.items)) {
         const ageOk = (now - (cached.ts || 0) < this._productsCacheTTL);
         if (remoteVersion !== null) {
-          if (cached.version === remoteVersion && ageOk) {
-            return cached.items;
-          }
-        } else {
-          // If meta/counters not readable, fallback to TTL-based cache
-          if (ageOk) {
-            console.info('[FirebaseService] Using cached products (meta unavailable)');
-            return cached.items;
-          }
+          if (cached.version === remoteVersion && ageOk) return cached.items;
+        } else if (ageOk) {
+          console.info('[FirebaseService] Using cached products (meta unavailable)');
+          return cached.items;
         }
       }
 
-      // Fetch from Firestore when no valid cache
+      // 4) Static-first: tente JSON estático antes de bater no Firestore
+      if (!nocache && typeof fetch === 'function') {
+        try {
+          const resp = await fetch(this._getProductsJsonUrl(), { cache: 'force-cache' });
+          if (resp.ok) {
+            const items = await resp.json();
+            if (Array.isArray(items) && items.length) {
+              this._setLocalCache(this._productsCacheKey, { items, version: remoteVersion ?? (cached?.version ?? 0), ts: now });
+              console.info('[FirebaseService] Loaded products from data/products.json');
+              return items;
+            }
+          }
+        } catch {}
+      }
+
+      // 5) Cache do Firestore (IndexedDB) primeiro
+      try {
+        const col = collection(this.firestore, 'produtos');
+        const snapCached = await getDocsFromCache(col);
+        if (!snapCached.empty) {
+          const items = [];
+          snapCached.forEach(d => items.push(Object.assign({ id: d.id }, d.data())));
+          this._setLocalCache(this._productsCacheKey, { items, version: remoteVersion ?? (cached?.version ?? 0), ts: now });
+          console.info('[FirebaseService] Loaded products from Firestore cache');
+          return items;
+        }
+      } catch {
+        // Sem cache persistente ou primeira visita
+      }
+
+      // 6) Por fim, servidor Firestore
       const querySnapshot = await getDocs(collection(this.firestore, 'produtos'));
       let products = [];
       querySnapshot.forEach((d) => {
@@ -319,29 +357,32 @@ export class FirebaseService {
         products.push(Object.assign({ id: d.id }, data));
       });
 
-      // If Firestore returned empty (e.g., rules blocked or collection empty), fallback to local JSON if available
-      if (!products.length && typeof window !== 'undefined' && !window.SHOWCASE_MODE) {
+      // 7) Último fallback: JSON sem cache se Firestore vier vazio (ambiente travado)
+      if (!products.length) {
         try {
-          const resp = await fetch('/data/products.json', { cache: 'no-store' });
+          const resp = await fetch(this._getProductsJsonUrl(), { cache: 'no-store' });
           const items = await resp.json();
           if (Array.isArray(items) && items.length) {
-            console.info('[FirebaseService] Fallback to /data/products.json');
+            console.info('[FirebaseService] Fallback to data/products.json (no-store)');
             products = items;
           }
         } catch {}
       }
 
-      // Save/update local cache
-      const newCache = {
+      this._setLocalCache(this._productsCacheKey, {
         items: products,
         version: remoteVersion ?? (cached?.version ?? 0),
         ts: now
-      };
-      this._setLocalCache(this._productsCacheKey, newCache);
+      });
       return products;
     } catch (error) {
       console.error('Error getting products:', error);
+      // Em erro, devolve o que tiver: cache local -> JSON -> []
       if (cached?.items && cached.items.length) return cached.items;
+      try {
+        const resp = await fetch(this._getProductsJsonUrl(), { cache: 'force-cache' });
+        if (resp.ok) return await resp.json();
+      } catch {}
       return [];
     }
   }
@@ -825,6 +866,17 @@ export class FirebaseService {
     } catch {
       // ignore quota errors
     }
+  }
+
+  // Build URL for static products JSON relative to current page (works on GitHub Pages project sites)
+  _getProductsJsonUrl() {
+    try {
+      if (typeof window !== 'undefined' && window.location) {
+        return new URL('data/products.json', window.location.href).toString();
+      }
+    } catch {}
+    // Fallback to relative path
+    return 'data/products.json';
   }
 
   async _bumpProductsVersion() {

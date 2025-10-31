@@ -1,0 +1,47 @@
+[
+  {
+    "id": "37099",
+    "nome": "VITAMIN E 400MG 30CAP GEL",
+    "descricao": "",
+    "categoria": "similares",
+    "precoMaximo": 58.85,
+    "precoComDesconto": 32.37,
+    "desconto": 45,
+    "quantidade": 0,
+    "codRed": "37099",
+    "dcb": "ACETATO DE RACEALFATOCOFEROL",
+    "laboratorio": "NATULAB",
+    "destaque": false,
+    "imagens": []
+  },
+  {
+    "id": "7586",
+    "nome": "FLODIN DUO 150MG 10CP L.C",
+    "descricao": "",
+    "categoria": "referencia",
+    "precoMaximo": 62.07,
+    "precoComDesconto": 62.07,
+    "desconto": 0,
+    "quantidade": 0,
+    "codRed": "7586",
+    "dcb": "DICLOFENACO SODICO",
+    "laboratorio": "ADIUM S.A.",
+    "destaque": false,
+    "imagens": []
+  },
+  {
+    "id": "35310",
+    "nome": "PREDNISOLONA 11MG/ML GTS 20ML",
+    "descricao": "",
+    "categoria": "genericos",
+    "precoMaximo": 29.86,
+    "precoComDesconto": 29.86,
+    "desconto": 0,
+    "quantidade": 0,
+    "codRed": "35310",
+    "dcb": "PREDNISOLONA",
+    "laboratorio": "EUROFARMA",
+    "destaque": false,
+    "imagens": []
+  }
+]
