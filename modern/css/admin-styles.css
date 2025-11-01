@@ -221,7 +221,9 @@
   background-color: var(--white);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow);
-  overflow: hidden;
+  overflow-x: hidden; /* keep horizontal hidden */
+  overflow-y: auto;   /* allow vertical scroll */
+  max-height: 70vh;   /* cap height to viewport for internal scrolling */
 }
 
 .products-table,

@@ -9,6 +9,7 @@ class AdminApp {
     this.editingProduct=null;
     this.firebase=null;
     this.loginPromptShown=false;
+    this.pagination={ products:{page:1,pageSize:50}, moderation:{page:1,pageSize:50}, orders:{page:1,pageSize:50} };
     this.init();
   }
 
@@ -150,6 +151,41 @@ class AdminApp {
       if (btnLogout) btnLogout.style.display = isAuth ? '' : 'none';
     } catch {}
   }
+
+  // Utils: pagination + debounce
+  paginate(list, {page, pageSize}){
+    const total = Array.isArray(list) ? list.length : 0;
+    const pages = Math.max(1, Math.ceil(total / pageSize));
+    const current = Math.min(Math.max(1, page), pages);
+    const start = (current - 1) * pageSize;
+    const end = start + pageSize;
+    return { total, pages, current, slice: (list||[]).slice(start, end) };
+  }
+  renderPagination(containerId, total, pagerKey, onPage){
+    const el = document.getElementById(containerId); if(!el) return;
+    const pageSize = this.pagination[pagerKey].pageSize;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const current = Math.min(this.pagination[pagerKey].page, totalPages);
+    if(totalPages <= 1){ el.innerHTML=''; return; }
+    const btn = (label, page, disabled=false, active=false)=>`<button class="pagination__btn ${active?'pagination__btn--active':''}" data-page="${page}" ${disabled?'disabled':''}>${label}</button>`;
+    const parts=[];
+    parts.push(btn('«', 1, current===1));
+    parts.push(btn('‹', current-1, current===1));
+    // window of pages around current
+    const span=2; let from=Math.max(1,current-span); let to=Math.min(totalPages,current+span);
+    if(from>1){ parts.push(`<span class="pagination__ellipsis">…</span>`); }
+    for(let p=from;p<=to;p++){ parts.push(btn(String(p), p, false, p===current)); }
+    if(to<totalPages){ parts.push(`<span class="pagination__ellipsis">…</span>`); }
+    parts.push(btn('›', current+1, current===totalPages));
+    parts.push(btn('»', totalPages, current===totalPages));
+    el.innerHTML = parts.join('');
+    el.querySelectorAll('[data-page]')?.forEach(b=> b.addEventListener('click', ()=>{
+      const n = parseInt(b.getAttribute('data-page'),10) || 1;
+      this.pagination[pagerKey].page = Math.min(Math.max(1,n), totalPages);
+      onPage?.(this.pagination[pagerKey].page);
+    }));
+  }
+  debounce(fn, delay=250){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=> fn.apply(this,args), delay); }; }
 
   ensureLoginOverlay(){
     if (document.getElementById('admin-auth-overlay')) return;
@@ -296,16 +332,18 @@ class AdminApp {
       // Fallback overlay mínimo
       if (!window.modalsManager) this.ensureLoginOverlay();
     });
-    document.getElementById('add-product-btn')?.addEventListener('click',()=> this.showProductModal());
-    document.getElementById('product-form')?.addEventListener('submit',e=> this.handleProductSubmit(e));
-    document.getElementById('products-search')?.addEventListener('input',()=> this.filterProducts());
-    document.getElementById('category-filter')?.addEventListener('change',()=> this.filterProducts());
-    document.getElementById('orders-status-filter')?.addEventListener('change',()=> this.renderOrders());
+  document.getElementById('add-product-btn')?.addEventListener('click',()=> this.showProductModal());
+  document.getElementById('product-form')?.addEventListener('submit',e=> this.handleProductSubmit(e));
+  const debouncedProducts = this.debounce(()=>{ this.pagination.products.page=1; this.filterProducts(); }, 250);
+  document.getElementById('products-search')?.addEventListener('input', debouncedProducts);
+  document.getElementById('category-filter')?.addEventListener('change', ()=>{ this.pagination.products.page=1; this.filterProducts(); });
+  document.getElementById('orders-status-filter')?.addEventListener('change',()=>{ this.pagination.orders.page=1; this.renderOrders(); });
     document.getElementById('admin-logout')?.addEventListener('click', ()=> this.handleLogout());
     this.setupProductModalEvents();
     // Moderation
-    document.getElementById('moderation-refresh')?.addEventListener('click', ()=> this.loadAndRenderModeration());
-    document.getElementById('moderation-search')?.addEventListener('input', ()=> this.renderModeration());
+  document.getElementById('moderation-refresh')?.addEventListener('click', ()=> this.loadAndRenderModeration());
+  const debouncedModeration = this.debounce(()=>{ this.pagination.moderation.page=1; this.renderModeration(); }, 250);
+  document.getElementById('moderation-search')?.addEventListener('input', debouncedModeration);
   }
   // Lê o hash atual e mostra a seção correspondente
   applyInitialSectionFromHash(){
@@ -410,10 +448,20 @@ class AdminApp {
   async toggleProductStatus(id){ const p=this.products.find(pr=>pr.id===id); if(!p) return; const ns=p.status==='active'?'inactive':'active'; try { await this.firebase.updateProduct(id,{status:ns,updatedAt:new Date().toISOString()}); p.status=ns; this.renderProducts(); this.updateDashboard(); } catch(e){ this.showNotification('Erro status','error'); } }
 
   // Products list
-  filterProducts(){ const term=(document.getElementById('products-search')?.value||'').toLowerCase(); const cat=document.getElementById('category-filter')?.value||''; let list=[...this.products]; if(term) list=list.filter(p=>(p.name||'').toLowerCase().includes(term)||(p.description||'').toLowerCase().includes(term)); if(cat) list=list.filter(p=>p.category===cat); this.renderProducts(list); }
+  filterProducts(){
+    const term=(document.getElementById('products-search')?.value||'').toLowerCase();
+    const cat=document.getElementById('category-filter')?.value||'';
+    let list=[...this.products];
+    if(term) list=list.filter(p=> (p.name||'').toLowerCase().includes(term) || (p.description||'').toLowerCase().includes(term));
+    if(cat) list=list.filter(p=> p.category===cat);
+    this.renderProducts(list);
+  }
   renderProducts(list=null){
-    const tbody=document.getElementById('products-table-body'); if(!tbody) return; const data=list||this.products;
-    if(!data.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum produto</td></tr>'; return; }
+    const tbody=document.getElementById('products-table-body'); if(!tbody) return; const full=list||this.products;
+    if(!full.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum produto</td></tr>'; document.getElementById('products-pagination')?.replaceChildren(); return; }
+    const pageData = this.paginate(full, this.pagination.products);
+    if (this.pagination.products.page !== pageData.current) this.pagination.products.page = pageData.current;
+    const data = pageData.slice;
     tbody.innerHTML=data.map(p=>`<tr>
       <td><div class="product-image">${this.getCategoryIcon(p.category)}</div></td>
       <td><strong>${p.name||'Produto'}</strong><br><small style="color:var(--gray-500);">${p.description||'—'}</small></td>
@@ -427,6 +475,7 @@ class AdminApp {
         <button class="btn-icon" onclick="adminApp.deleteProduct('${p.id}')">🗑️</button>
       </td>
     </tr>`).join('');
+    this.renderPagination('products-pagination', full.length, 'products', ()=> this.renderProducts(full));
   }
 
   // Moderation (validation)
@@ -442,8 +491,11 @@ class AdminApp {
   }
   renderModeration(){
     const tbody=document.getElementById('moderation-table-body'); if(!tbody) return;
-    const data=this.getModerationItems();
-    if(!data.length){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum item pendente</td></tr>'; return; }
+    const full=this.getModerationItems();
+    if(!full.length){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum item pendente</td></tr>'; document.getElementById('moderation-pagination')?.replaceChildren(); return; }
+    const pageData = this.paginate(full, this.pagination.moderation);
+    if (this.pagination.moderation.page !== pageData.current) this.pagination.moderation.page = pageData.current;
+    const data = pageData.slice;
     tbody.innerHTML = data.map(p=>`<tr>
       <td>${p.codRed||p.id}</td>
       <td><strong>${p.name||'-'}</strong>${p.pendente? ' <span class="status status--inactive">pendente</span>':''}${p.publicado===false? ' <span class="status status--inactive">não publicado</span>':''}</td>
@@ -457,6 +509,7 @@ class AdminApp {
     </tr>`).join('');
     tbody.querySelectorAll('button[data-action]')
       .forEach(btn=> btn.addEventListener('click', ()=> this.handleModerationAction(btn.getAttribute('data-action'), btn.getAttribute('data-id'))));
+    this.renderPagination('moderation-pagination', full.length, 'moderation', ()=> this.renderModeration());
   }
   async handleModerationAction(action, id){
     const p = this.products.find(x=>x.id===id); if(!p) return;
@@ -480,7 +533,6 @@ class AdminApp {
   getCategoryName(c){ const names={medicamentos:'Medicamentos',dermocosmeticos:'Dermocosméticos',suplementos:'Suplementos',higiene:'Higiene',bebes:'Bebês',equipamentos:'Equipamentos'}; return names[c]||c; }
 
   // Orders
-  async loadAndRenderOrders(force=false){ if(!this.firebase.isInitialized) return; if(this.ordersLoaded && !force) return; try { this.orders=await this.firebase.listOrders({limit:200}); this.ordersLoaded=true; this.renderOrders(); } catch(e){ console.warn('Orders load fail', e); } }
   async loadAndRenderOrders(force=false){
     if(!this.firebase.isInitialized){
       console.info('[Admin] Firebase não inicializado - pulando carregamento de pedidos');
@@ -502,7 +554,7 @@ class AdminApp {
           const localOrder = JSON.parse(raw);
             if(localOrder){
               // Ajusta para formato esperado
-              if(!localOrder._docId) localOrder._docId = 'local-'+localOrder.id;
+        if(!localOrder._docId) localOrder._docId = 'local-'+localOrder.id;
               this.orders = [ localOrder ];
               this.showNotification('Mostrando pedido local (nenhum no Firestore).','warning');
               console.info('[Admin] Usando fallback last_order do localStorage');
@@ -516,7 +568,21 @@ class AdminApp {
   formatDate(iso){ try { const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});} catch{return iso;} }
   getOrderStatusLabel(s){ return ({pending:'Pendente',processing:'Processando',shipped:'Enviado',delivered:'Entregue',cancelled:'Cancelado'})[s]||s; }
   nextStatus(s){ const flow=['pending','processing','shipped','delivered']; const i=flow.indexOf(s); return (i>-1 && i<flow.length-1)?flow[i+1]:null; }
-  renderOrders(){ const tbody=document.getElementById('orders-table-body'); if(!tbody) return; const filter=document.getElementById('orders-status-filter')?.value||''; let list=[...this.orders]; if(filter) list=list.filter(o=>o.status===filter); if(!list.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum pedido'+(filter?' filtrado':'')+'</td></tr>'; this.updateDashboard(); return; } tbody.innerHTML=list.map(o=>`<tr>
+  renderOrders(){
+    const tbody=document.getElementById('orders-table-body'); if(!tbody) return;
+    const filter=document.getElementById('orders-status-filter')?.value||'';
+    let full=[...this.orders];
+    if(filter) full=full.filter(o=>o.status===filter);
+    if(!full.length){
+      tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum pedido'+(filter?' filtrado':'')+'</td></tr>';
+      document.getElementById('orders-pagination')?.replaceChildren();
+      this.updateDashboard();
+      return;
+    }
+    const pageData=this.paginate(full, this.pagination.orders);
+    if(this.pagination.orders.page!==pageData.current) this.pagination.orders.page=pageData.current;
+    const list=pageData.slice;
+    tbody.innerHTML=list.map(o=>`<tr>
       <td>#${o.id}</td>
       <td>${o.user||'-'}</td>
       <td>${this.formatDate(o.createdAt)}</td>
@@ -527,7 +593,18 @@ class AdminApp {
         <button class="btn-icon" data-action="advance" data-id="${o._docId}">⏭️</button>
       </td>
     </tr>`).join('');
-    tbody.querySelectorAll('button[data-action]').forEach(btn=> btn.addEventListener('click',()=>{ const id=btn.getAttribute('data-id'); const action=btn.getAttribute('data-action'); const order=this.orders.find(o=>o._docId===id); if(!order) return; if(action==='view') this.showOrderDetail(order); if(action==='advance') this.advanceOrderStatus(order); })); this.updateDashboard(); }
+    tbody.querySelectorAll('button[data-action]')
+      .forEach(btn=> btn.addEventListener('click',()=>{
+        const id=btn.getAttribute('data-id');
+        const action=btn.getAttribute('data-action');
+        const order=this.orders.find(o=>o._docId===id);
+        if(!order) return;
+        if(action==='view') this.showOrderDetail(order);
+        if(action==='advance') this.advanceOrderStatus(order);
+      }));
+    this.updateDashboard();
+    this.renderPagination('orders-pagination', full.length, 'orders', ()=> this.renderOrders());
+  }
   async advanceOrderStatus(order){ const next=this.nextStatus(order.status); if(!next){ this.showNotification('Status final','warning'); return; } if(!confirm(`Avançar pedido #${order.id} para ${this.getOrderStatusLabel(next)}?`)) return; try { await this.firebase.updateOrderStatus(order._docId,next,'Avanço manual'); order.status=next; (order.history=order.history||[]).push({status:next,at:new Date().toISOString(),note:'Avanço manual (admin)'}); this.renderOrders(); this.showNotification('Status atualizado','success'); } catch(e){ this.showNotification('Falha status','error'); } }
   showOrderDetail(order){ let modal=document.getElementById('order-detail-modal'); if(!modal){ modal=document.createElement('div'); modal.id='order-detail-modal'; Object.assign(modal.style,{position:'fixed',inset:'0',background:'rgba(0,0,0,.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:'10000'}); modal.innerHTML=`<div style="background:var(--white);padding:1rem 1.25rem;max-width:640px;width:100%;border-radius:12px;max-height:80vh;overflow:auto;box-shadow:var(--shadow-lg);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;">
