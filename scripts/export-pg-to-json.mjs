@@ -129,4 +129,6 @@ async function main(){
   }
 }
 
-main().catch(err => { console.error('[export] Erro', err); process.exit(1); });
+main()
+  .then(() => { try { process.exit(0); } catch {} })
+  .catch(err => { console.error('[export] Erro', err); try { process.exit(1); } catch {} });

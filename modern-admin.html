@@ -9,9 +9,18 @@
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="img/favicon.ico">
     
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
     <!-- Styles -->
     <link rel="stylesheet" href="modern/css/modern-styles.css">
     <link rel="stylesheet" href="modern/css/admin-styles.css">
+    <link rel="stylesheet" href="modern/css/modals.css">
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <!-- Header -->
@@ -22,8 +31,11 @@
                     <h1>🏥 Admin - Farmácia São Benedito</h1>
                 </div>
                 <div class="admin-header__user">
-                    <span id="admin-user-name">Administrador</span>
-                    <button class="btn btn--secondary" id="admin-logout">Sair</button>
+                    <span id="admin-user-name">Visitante</span>
+                    <div class="admin-header__auth-buttons" style="display:flex; gap:.5rem; align-items:center;">
+                        <button class="btn btn--primary" id="admin-login">Entrar</button>
+                        <button class="btn btn--secondary" id="admin-logout" style="display:none;">Sair</button>
+                    </div>
                 </div>
             </div>
         </div>

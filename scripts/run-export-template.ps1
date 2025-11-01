@@ -24,3 +24,6 @@ $env:SYNC_LIMIT = "0"
 # $env:ESTOQUE_COD_FILIAL = "3"
 
 node .\scripts\export-pg-to-json.mjs
+$code = $LASTEXITCODE
+Write-Host "[export] node exit code = $code"
+exit $code

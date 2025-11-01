@@ -1,5 +1,6 @@
 // Clean rebuilt Admin Panel (products + orders)
 import { bootstrap } from './bootstrap.js';
+import { eventBus } from './services/event-bus.js';
 
 class AdminApp {
   constructor(){
@@ -7,6 +8,7 @@ class AdminApp {
     this.products=[]; this.clients=[]; this.orders=[]; this.ordersLoaded=false;
     this.editingProduct=null;
     this.firebase=null;
+    this.loginPromptShown=false;
     this.init();
   }
 
@@ -15,10 +17,49 @@ class AdminApp {
       await bootstrap.init();
       this.firebase = bootstrap.firebase;
       this.setupEventListeners();
+      this.setupAuthObservers();
+      await this.ensureModalsAvailable();
+      // Respeita a seção inicial da URL (#dashboard, #products, #orders, #customers, #reports)
+      this.applyInitialSectionFromHash();
       await this.enforceAdminAuth();
     } catch(err){
       console.warn('Init fallback', err); this.loadSampleData(); this.renderProducts(); this.updateDashboard();
       this.showNotification('Falha ao conectar dados remotos. Modo local.', 'warning');
+      this.updateHeaderAuthUI(false, null);
+      // Mesmo em modo offline, tente injetar os modais para permitir login simulado
+      await this.ensureModalsAvailable();
+    }
+  }
+
+  setupAuthObservers(){
+    try {
+      eventBus.on('auth:stateChanged', ({ user }) => {
+        this.updateHeaderAuthUI(!!user, user?.email || null);
+      });
+      eventBus.on('auth:login', ({ user }) => {
+        this.updateHeaderAuthUI(true, user?.email || null);
+      });
+      eventBus.on('auth:logout', () => {
+        this.updateHeaderAuthUI(false, null);
+      });
+    } catch {}
+  }
+
+  async ensureModalsAvailable(){
+    try {
+      if (document.getElementById('auth-modal')) return;
+      // Se o ModalsManager global existir, ele cuida; senão, injeta diretamente
+      if (window.modalsManager?.init) {
+        await window.modalsManager.init();
+        return;
+      }
+      const resp = await fetch('modern/components/modals.html');
+      if (resp.ok) {
+        const html = await resp.text();
+        document.body.insertAdjacentHTML('beforeend', html);
+      }
+    } catch (e) {
+      console.warn('[Admin] Falha ao garantir modais', e);
     }
   }
 
@@ -38,6 +79,7 @@ class AdminApp {
         this.renderProducts();
         this.renderCustomers();
         this.updateDashboard();
+        this.updateHeaderAuthUI(true, 'DEV');
         return;
       }
     } catch {}
@@ -51,77 +93,37 @@ class AdminApp {
       return;
     }
     // Inject minimal auth overlay and wait for admin user
-    const ensureOverlay = () => {
-      if (document.getElementById('admin-auth-overlay')) return;
-      const wrap = document.createElement('div');
-      wrap.id = 'admin-auth-overlay';
-      Object.assign(wrap.style, { position:'fixed', inset:'0', background:'rgba(0,0,0,.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:'10000' });
-      wrap.innerHTML = `
-        <div style="background:#fff; padding:1rem 1.25rem; border-radius:12px; width:100%; max-width:380px; box-shadow:var(--shadow-lg);">
-          <h3 style="margin:0 0 .75rem 0;">Login do Administrador</h3>
-          <div class="form-group"><label>E-mail</label><input id="admin-login-email" type="email" style="width:100%; padding:.5rem; border:1px solid var(--gray-300); border-radius:8px;"></div>
-          <div class="form-group" style="margin-top:.5rem"><label>Senha</label><input id="admin-login-pass" type="password" style="width:100%; padding:.5rem; border:1px solid var(--gray-300); border-radius:8px;"></div>
-          <div id="admin-login-status" style="margin:.5rem 0; font-size:.85rem; color:var(--gray-600);"></div>
-          <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.5rem;">
-            <button id="admin-login-btn" class="btn btn--primary">Entrar</button>
-          </div>
-        </div>`;
-      document.body.appendChild(wrap);
-      const btn = wrap.querySelector('#admin-login-btn');
-      btn?.addEventListener('click', async () => {
-        const email = document.getElementById('admin-login-email')?.value?.trim();
-        const pass = document.getElementById('admin-login-pass')?.value;
-        const st = document.getElementById('admin-login-status');
-        if (!email || !pass) { if (st) st.textContent = 'Informe e-mail e senha.'; return; }
-        try {
-          btn.disabled = true; if (st) st.textContent = 'Entrando...';
-          await this.firebase.signIn(email, pass);
-          if (st) st.textContent = 'Autenticado. Verificando permissões...';
-        } catch(e){
-          if (st) st.textContent = 'Falha no login: ' + (e?.message || 'erro');
-          btn.disabled = false;
-        }
-      });
-    };
-
-    const hideOverlay = () => { const el = document.getElementById('admin-auth-overlay'); if (el) el.remove(); };
-    const showUnauthorized = () => {
-      let u = document.getElementById('admin-unauth-overlay');
-      if (!u){
-        u = document.createElement('div');
-        u.id='admin-unauth-overlay';
-        Object.assign(u.style,{position:'fixed',inset:'0',background:'rgba(0,0,0,.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:'10000'});
-        u.innerHTML = `<div style="background:#fff;padding:1rem 1.25rem;border-radius:12px;max-width:420px;width:100%;text-align:center;">
-          <h3>Acesso não autorizado</h3>
-          <p>Seu usuário não possui permissão de administrador.</p>
-          <div style="display:flex;gap:.5rem;justify-content:center;margin-top:.5rem;">
-            <button id="admin-unauth-logout" class="btn btn--secondary">Sair</button>
-          </div>
-        </div>`;
-        document.body.appendChild(u);
-        u.querySelector('#admin-unauth-logout')?.addEventListener('click', async ()=>{
-          try { await this.firebase.signOut(); } catch {}
-          u.remove(); ensureOverlay();
-        });
-      }
-    };
+    const ensureOverlay = () => this.ensureLoginOverlay();
+    const hideOverlay = () => this.hideLoginOverlay();
+    const showUnauthorized = () => this.showUnauthorizedOverlay();
 
     const openUnifiedAuthModal = () => { try { window.modalsManager?.openAuthModal('login'); } catch {} };
-    // Prefer modal unificado se disponível
-    openUnifiedAuthModal();
-    // Fallback mínimo se modal não existir
-    ensureOverlay();
 
     return new Promise((resolve)=>{
       this.firebase.onAuthStateChanged(async (user)=>{
-        if (!user){ openUnifiedAuthModal(); ensureOverlay(); return; }
+        if (!user){
+          if (!this.loginPromptShown){
+            if (window.modalsManager?.openAuthModal) openUnifiedAuthModal();
+            else ensureOverlay();
+            this.loginPromptShown = true;
+          }
+          return;
+        }
         try{
           const claims = await this.firebase.getIdTokenClaims(true);
           const isAdmin = !!(claims && (claims.admin === true || claims.role === 'admin'));
-          if (!isAdmin){ hideOverlay(); showUnauthorized(); return; }
+          // Fallbacks de produção: aceita admin por Firestore (usuarios/{uid}.role|admin, admins/{uid}, adminsByEmail/{email}, meta/admins)
+          let allow = isAdmin;
+          if (!allow) {
+            try { allow = await this.checkAdminInFirestore(user); } catch (e) { console.warn('[Admin] Fallback admin check failed', e); }
+          }
+          if (!allow){ hideOverlay(); showUnauthorized(); this.updateHeaderAuthUI(false, user.email || null); return; }
           // Authorized
           hideOverlay();
-          document.getElementById('admin-user-name')?.textContent = user.email || 'Administrador';
+          const _nameEl = document.getElementById('admin-user-name');
+          if (_nameEl) _nameEl.textContent = user.email || 'Administrador';
+          this.updateHeaderAuthUI(true, user.email || null);
+          this.loginPromptShown = false;
           // Optional: seed sample data only if really desired; keeping off by default in admin
           // await this.firebase.initializeSampleData();
           await this.loadFirestoreData();
@@ -137,9 +139,163 @@ class AdminApp {
     });
   }
 
+  // Header auth UI toggling
+  updateHeaderAuthUI(isAuth, email){
+    try {
+      const nameEl = document.getElementById('admin-user-name');
+      const btnLogin = document.getElementById('admin-login');
+      const btnLogout = document.getElementById('admin-logout');
+      if (nameEl) nameEl.textContent = isAuth ? (email || 'Administrador') : 'Visitante';
+      if (btnLogin) btnLogin.style.display = isAuth ? 'none' : '';
+      if (btnLogout) btnLogout.style.display = isAuth ? '' : 'none';
+    } catch {}
+  }
+
+  ensureLoginOverlay(){
+    if (document.getElementById('admin-auth-overlay')) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'admin-auth-overlay';
+    Object.assign(wrap.style, { position:'fixed', inset:'0', background:'rgba(0,0,0,.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:'10000' });
+    wrap.innerHTML = `
+      <div style="background:#fff; padding:1rem 1.25rem; border-radius:12px; width:100%; max-width:380px; box-shadow:var(--shadow-lg);">
+        <h3 style="margin:0 0 .75rem 0;">Login do Administrador</h3>
+        <div class="form-group"><label>E-mail</label><input id="admin-login-email" type="email" style="width:100%; padding:.5rem; border:1px solid var(--gray-300); border-radius:8px;"></div>
+        <div class="form-group" style="margin-top:.5rem"><label>Senha</label><input id="admin-login-pass" type="password" style="width:100%; padding:.5rem; border:1px solid var(--gray-300); border-radius:8px;"></div>
+        <div id="admin-login-status" style="margin:.5rem 0; font-size:.85rem; color:var(--gray-600);"></div>
+        <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.5rem;">
+          <button id="admin-login-btn" class="btn btn--primary">Entrar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const btn = wrap.querySelector('#admin-login-btn');
+    btn?.addEventListener('click', async () => {
+      const email = document.getElementById('admin-login-email')?.value?.trim();
+      const pass = document.getElementById('admin-login-pass')?.value;
+      const st = document.getElementById('admin-login-status');
+      if (!email || !pass) { if (st) st.textContent = 'Informe e-mail e senha.'; return; }
+      try {
+        btn.disabled = true; if (st) st.textContent = 'Entrando...';
+        await this.firebase.signIn(email, pass);
+        if (st) st.textContent = 'Autenticado. Verificando permissões...';
+      } catch(e){
+        if (st) st.textContent = 'Falha no login: ' + (e?.message || 'erro');
+        btn.disabled = false;
+      }
+    });
+  }
+
+  hideLoginOverlay(){ const el = document.getElementById('admin-auth-overlay'); if (el) el.remove(); }
+
+  showUnauthorizedOverlay(){
+    let u = document.getElementById('admin-unauth-overlay');
+    if (!u){
+      u = document.createElement('div');
+      u.id='admin-unauth-overlay';
+      Object.assign(u.style,{position:'fixed',inset:'0',background:'rgba(0,0,0,.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:'10000'});
+      u.innerHTML = `<div style="background:#fff;padding:1rem 1.25rem;border-radius:12px;max-width:420px;width:100%;text-align:center;">
+        <h3>Acesso não autorizado</h3>
+        <p>Seu usuário não possui permissão de administrador.</p>
+        <div style="display:flex;gap:.5rem;justify-content:center;margin-top:.5rem;">
+          <button id="admin-unauth-logout" class="btn btn--secondary">Sair</button>
+        </div>
+      </div>`;
+      document.body.appendChild(u);
+      u.querySelector('#admin-unauth-logout')?.addEventListener('click', async ()=>{
+        try { await this.firebase.signOut(); } catch {}
+        u.remove();
+        this.loginPromptShown = false; // allow auth listener to show the appropriate prompt once
+        this.updateHeaderAuthUI(false, null);
+      });
+    }
+  }
+
+  // Verificações alternativas de admin em Firestore (1–2 leituras no máximo)
+  async checkAdminInFirestore(user){
+    if (!this.firebase?.isInitialized) return false;
+    const db = this.firebase.firestore;
+    const email = String(user?.email || '').toLowerCase();
+    const uid = user?.uid;
+    try {
+      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+
+      // 1) usuarios/{uid} com flags admin/role
+      if (uid) {
+        try {
+          const uref = doc(db, 'usuarios', uid);
+          const usnap = await getDoc(uref);
+          if (usnap.exists()) {
+            const data = usnap.data() || {};
+            if (data.admin === true || data.role === 'admin' || (data.roles && Array.isArray(data.roles) && data.roles.includes('admin'))) {
+              console.info('[Admin] Grant by usuarios/{uid}');
+              return true;
+            }
+          }
+        } catch {}
+      }
+
+      // 2) admins/{uid}
+      if (uid) {
+        try {
+          const aref = doc(db, 'admins', uid);
+          const asnap = await getDoc(aref);
+          if (asnap.exists()) {
+            console.info('[Admin] Grant by admins/{uid}');
+            return true;
+          }
+        } catch {}
+      }
+
+      // 3) adminsByEmail/{email}
+      if (email) {
+        try {
+          const eref = doc(db, 'adminsByEmail', email);
+          const esnap = await getDoc(eref);
+          if (esnap.exists()) {
+            console.info('[Admin] Grant by adminsByEmail/{email}');
+            return true;
+          }
+        } catch {}
+      }
+
+      // 4) meta/admins com arrays 'uids' e/ou 'emails'
+      try {
+        const mref = doc(db, 'meta', 'admins');
+        const msnap = await getDoc(mref);
+        if (msnap.exists()) {
+          const d = msnap.data() || {};
+          const uids = Array.isArray(d.uids) ? d.uids : [];
+          const emails = Array.isArray(d.emails) ? d.emails.map(x=>String(x).toLowerCase()) : [];
+          if ((uid && uids.includes(uid)) || (email && emails.includes(email))) {
+            console.info('[Admin] Grant by meta/admins');
+            return true;
+          }
+        }
+      } catch {}
+
+      return false;
+    } catch (e) {
+      console.warn('[Admin] Firestore admin check error', e);
+      return false;
+    }
+  }
+
   // Navigation
   setupEventListeners(){
-    document.querySelectorAll('.admin-nav__link').forEach(a=> a.addEventListener('click',e=>{e.preventDefault();this.showSection(a.dataset.section);}));
+    document.querySelectorAll('.admin-nav__link').forEach(a=> a.addEventListener('click',e=>{
+      e.preventDefault();
+      const sec = a.dataset.section;
+      this.showSection(sec);
+      // Reflete a seção na URL para facilitar recarregamento e compartilhamento
+      try { window.history.replaceState({}, '', `#${sec}`); } catch {}
+    }));
+    // Suporta navegação via hash (ex.: voltar/avançar do navegador)
+    window.addEventListener('hashchange', ()=> this.applyInitialSectionFromHash());
+    // Header auth buttons
+    document.getElementById('admin-login')?.addEventListener('click', ()=>{
+      try { window.modalsManager?.openAuthModal('login'); } catch {}
+      // Fallback overlay mínimo
+      if (!window.modalsManager) this.ensureLoginOverlay();
+    });
     document.getElementById('add-product-btn')?.addEventListener('click',()=> this.showProductModal());
     document.getElementById('product-form')?.addEventListener('submit',e=> this.handleProductSubmit(e));
     document.getElementById('products-search')?.addEventListener('input',()=> this.filterProducts());
@@ -150,6 +306,15 @@ class AdminApp {
     // Moderation
     document.getElementById('moderation-refresh')?.addEventListener('click', ()=> this.loadAndRenderModeration());
     document.getElementById('moderation-search')?.addEventListener('input', ()=> this.renderModeration());
+  }
+  // Lê o hash atual e mostra a seção correspondente
+  applyInitialSectionFromHash(){
+    try {
+      const raw = (window.location.hash || '').replace(/^#/, '').trim();
+      const allowed = new Set(['dashboard','products','orders','customers','reports','moderation']);
+      const sec = allowed.has(raw) ? raw : (this.currentSection || 'dashboard');
+      this.showSection(sec);
+    } catch {}
   }
   showSection(id){
     document.querySelectorAll('.admin-nav__link').forEach(a=>a.classList.remove('admin-nav__link--active'));
