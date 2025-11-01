@@ -344,12 +344,15 @@ class AdminApp {
   document.getElementById('moderation-refresh')?.addEventListener('click', ()=> this.loadAndRenderModeration());
   const debouncedModeration = this.debounce(()=>{ this.pagination.moderation.page=1; this.renderModeration(); }, 250);
   document.getElementById('moderation-search')?.addEventListener('input', debouncedModeration);
+  // Admin section events
+  document.getElementById('admin-grant-form')?.addEventListener('submit', (e)=> this.handleAdminGrantSubmit(e));
+  document.getElementById('admin-requests-refresh')?.addEventListener('click', ()=> this.loadAndRenderAdminRequests());
   }
   // Lê o hash atual e mostra a seção correspondente
   applyInitialSectionFromHash(){
     try {
       const raw = (window.location.hash || '').replace(/^#/, '').trim();
-      const allowed = new Set(['dashboard','products','orders','customers','reports','moderation']);
+  const allowed = new Set(['dashboard','products','orders','customers','reports','moderation','admin']);
       const sec = allowed.has(raw) ? raw : (this.currentSection || 'dashboard');
       this.showSection(sec);
     } catch {}
@@ -394,6 +397,7 @@ class AdminApp {
     this.products = this.mapAdminProducts(rawProducts);
     this.clients = await this.firebase.getClients();
     await this.loadAndRenderModeration();
+    await this.loadAndRenderAdminRequests();
   }
 
   mapAdminProducts(list){
@@ -662,6 +666,72 @@ class AdminApp {
         if(action==='view') this.showNotification(`Cliente: ${getName(c)} <${getEmail(c)}>`, 'info');
         if(action==='edit') this.showNotification('Edição de cliente em breve.', 'warning');
       }));
+  }
+
+  // ======= Admin (grant/revoke) =======
+  async handleAdminGrantSubmit(e){
+    e.preventDefault();
+    try{
+      const email = document.getElementById('admin-target-email')?.value?.trim().toLowerCase();
+      const action = document.getElementById('admin-action')?.value || 'grant';
+      if(!email){ this.showNotification('Informe um e-mail válido.','warning'); return; }
+      if(!this.firebase?.isInitialized){ this.showNotification('Modo offline.','warning'); return; }
+      const { collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      const col = collection(this.firebase.firestore, 'adminRequests');
+      const user = this.firebase.getCurrentUser();
+      const payload = {
+        email,
+        action: (action==='revoke'?'revoke':'grant'),
+        status: 'pending',
+        requestedBy: user?.uid || null,
+        requestedByEmail: user?.email || null,
+        createdAt: new Date().toISOString(),
+        createdAtTs: serverTimestamp()
+      };
+      await addDoc(col, payload);
+      this.showNotification('Solicitação registrada. Aguarde processamento.','success');
+      document.getElementById('admin-grant-form')?.reset();
+      await this.loadAndRenderAdminRequests();
+    }catch(err){
+      console.error(err);
+      this.showNotification('Falha ao registrar solicitação.','error');
+    }
+  }
+
+  async loadAndRenderAdminRequests(){
+    if(!this.firebase?.isInitialized) return;
+    try{
+      const { collection, getDocs, query, orderBy, limit } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      const col = collection(this.firebase.firestore, 'adminRequests');
+      let q = null;
+      try{ q = query(col, orderBy('createdAtTs','desc'), limit(50)); }
+      catch{ q = query(col, limit(50)); }
+      const snap = await getDocs(q);
+      const items = [];
+      snap.forEach(d=> items.push(Object.assign({ id:d.id }, d.data())));
+      this.renderAdminRequests(items);
+    }catch(e){ console.warn('adminRequests load fail', e); this.renderAdminRequests([]); }
+  }
+
+  renderAdminRequests(list){
+    const tbody = document.getElementById('admin-requests-table-body'); if(!tbody) return;
+    if(!Array.isArray(list) || !list.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhuma solicitação</td></tr>'; return; }
+    tbody.innerHTML = list.map(r=>{
+      const created = r.createdAt || '-';
+      const processed = r.processedAt || '-';
+      const result = r.result || r.error || '-';
+      const st = String(r.status||'pending');
+      const statusCls = st==='done'?'status--active':(st==='failed'?'status--cancelled':'status--pending');
+      return `<tr>
+        <td><span class="status ${statusCls}">${st}</span></td>
+        <td>${r.action||'-'}</td>
+        <td>${r.email||'-'}</td>
+        <td>${r.requestedByEmail||r.requestedBy||'-'}</td>
+        <td>${created}</td>
+        <td>${processed}</td>
+        <td>${result}</td>
+      </tr>`;
+    }).join('');
   }
 
   // Sample data fallback

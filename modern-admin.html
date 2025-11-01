@@ -75,6 +75,11 @@
                         📈 Relatórios
                     </a>
                 </li>
+                <li class="admin-nav__item">
+                    <a href="#admin" class="admin-nav__link" data-section="admin">
+                        🛡️ Administração
+                    </a>
+                </li>
             </ul>
         </div>
     </nav>
@@ -314,6 +319,60 @@
                         <p>Produtos com estoque baixo</p>
                         <button class="btn btn--secondary">Gerar</button>
                     </div>
+                </div>
+            </section>
+
+            <!-- Admin Section -->
+            <section id="admin-section" class="admin-section">
+                <div class="section-header">
+                    <div>
+                        <h2>Administração</h2>
+                        <p>Conceder ou revogar acesso de administrador por e-mail</p>
+                    </div>
+                    <div style="display:flex;gap:.5rem;align-items:center;">
+                        <button class="btn btn--secondary" id="admin-requests-refresh">Atualizar lista</button>
+                    </div>
+                </div>
+
+                <div class="products-table-container" style="padding:1rem;">
+                    <form id="admin-grant-form" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;">
+                        <div class="form-group" style="min-width:280px;flex:1;">
+                            <label for="admin-target-email">E-mail do usuário</label>
+                            <input type="email" id="admin-target-email" placeholder="usuario@dominio.com" required>
+                        </div>
+                        <div class="form-group" style="min-width:200px;">
+                            <label for="admin-action">Ação</label>
+                            <select id="admin-action">
+                                <option value="grant">Conceder admin</option>
+                                <option value="revoke">Revogar admin</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <button type="submit" class="btn btn--primary">Enviar solicitação</button>
+                        </div>
+                    </form>
+                    <p style="margin:.5rem 0 0;color:var(--gray-600);font-size:.9rem;">
+                        Nota: a alteração de claims é processada por um script com credenciais administrativas. Após aprovada, o usuário precisa fazer logout/login para o efeito.
+                    </p>
+                </div>
+
+                <div class="orders-table-container" style="margin-top:1rem;">
+                    <table class="orders-table">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Ação</th>
+                                <th>E-mail</th>
+                                <th>Solicitado por</th>
+                                <th>Criado em</th>
+                                <th>Processado em</th>
+                                <th>Resultado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-requests-table-body">
+                            <tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhuma solicitação</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
         </div>
