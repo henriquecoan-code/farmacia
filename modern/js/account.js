@@ -177,14 +177,15 @@ function renderAddressSection(container, client){
 function renderAccount(root, user, client){
   const email = user?.email || '—';
   const uid = user?.uid || '—';
+  const nome = client?.nome || client?.name || 'Usuário';
   root.innerHTML = `
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap: var(--spacing-6);max-width:1200px;margin-inline:auto;">
       <div class="card">
         <div class="card__content">
           <h2 class="card__title"><i class="fas fa-user-circle"></i> Informações do usuário</h2>
           <div class="card__text">
+            <p><strong>Nome:</strong> ${nome}</p>
             <p><strong>E-mail:</strong> ${email}</p>
-            <p><strong>ID do usuário:</strong> <code>${uid}</code></p>
           </div>
           <div class="card__actions">
             <a class="btn btn--secondary" href="pedidos.html"><i class="fas fa-box"></i> Meus pedidos</a>
