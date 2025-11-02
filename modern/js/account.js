@@ -179,8 +179,8 @@ function renderAccount(root, user, client){
   const uid = user?.uid || '—';
   const nome = client?.nome || client?.name || 'Usuário';
   root.innerHTML = `
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap: var(--spacing-6);max-width:1200px;margin-inline:auto;">
-      <div class="card">
+    <div class="grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-6); max-width: 900px; margin-inline: auto;">
+      <div class="card" style="min-width: 320px;">
         <div class="card__content">
           <h2 class="card__title"><i class="fas fa-user-circle"></i> Informações do usuário</h2>
           <div class="card__text">
@@ -193,7 +193,7 @@ function renderAccount(root, user, client){
           </div>
         </div>
       </div>
-      <div id="addresses-section"></div>
+      <div id="addresses-section" style="min-width: 320px;"></div>
     </div>`;
 
   // logout

@@ -28,3 +28,11 @@
 - [x] Remover eventuais referências ao backend em `README.md` ou outros arquivos de documentação.
 - [x] Garantir que o fluxo de produtos está 100% via frontend + Firebase.
 - [x] Testar o site após a exclusão para garantir que tudo funciona normalmente.
+
+## Notas técnicas (Pedidos)
+
+- [x] Incremento sequencial de número do pedido: implementado no cliente usando transação do Firestore em `modern/js/services/firebase-service.js#createOrder`.
+	- Documento do contador: `meta/counters` com campo `orderSeq`.
+	- O pedido recebe `orderNumber` e `id` com o valor sequencial.
+	- Caso as regras do Firestore não permitam escrever em `meta/counters`, há fallback: o pedido é criado sem `orderNumber` e o front usa sequência local como backup.
+	- Recomendado: garantir permissão de escrita ao documento `meta/counters` para usuários autenticados que possam finalizar pedidos OU mover o incremento para uma Cloud Function/Admin (mais seguro).

@@ -161,15 +161,15 @@ class CheckoutPage {
     if (!input) return;
     const code = (input.value || '').trim().toUpperCase();
     if (!code) return;
-  if (this.couponApplied) { window.toast?.warn('Cupom já aplicado.'); this.setStatus('checkout-status','Cupom já aplicado.', 'warn'); return; }
+    if (this.couponApplied) { window.toast?.warn('Cupom já aplicado.'); this.setStatus('checkout-status','Cupom já aplicado.', 'warn'); return; }
     // Simple mock coupons
     const coupons = { DESCONTO10: 0.10, BEMVINDO5: 0.05 };
-  if (!coupons[code]) { this.setStatus('checkout-status','Cupom inválido', 'error'); window.toast?.error('Cupom inválido.'); return; }
+    if (!coupons[code]) { this.setStatus('checkout-status','Cupom inválido', 'error'); window.toast?.error('Cupom inválido.'); return; }
     this.coupon = code;
     this.discountValue = coupons[code];
     this.couponApplied = true;
-  this.setStatus('checkout-status','Cupom aplicado!','success');
-  window.toast?.success('Cupom aplicado!');
+    this.setStatus('checkout-status','Cupom aplicado!','success');
+    window.toast?.success('Cupom aplicado!');
     analytics.track('checkout_coupon', { code });
     this.updateAll();
   }
@@ -198,8 +198,8 @@ class CheckoutPage {
       if (discount > 0) { dRow.style.display = 'flex'; dVal.textContent = '-'+this.format(discount); }
       else { dRow.style.display = 'none'; }
     }
-  // Update installments if card
-  if (this.payment === 'card') this.updateInstallments(total);
+    // Update installments if card
+    if (this.payment === 'card') this.updateInstallments(total);
     if (instRow && instVal) {
       if (this.payment === 'card' && this.selectedInstallment) {
         const si = this.selectedInstallment;
@@ -207,10 +207,10 @@ class CheckoutPage {
         instVal.textContent = `${si.count}x de ${this.format(si.perInstallment)}${si.rate?` (total ${this.format(si.totalWithInterest)})`:''}`;
       } else instRow.style.display = 'none';
     }
-  const btn = document.getElementById('place-order');
-  if (btn) btn.disabled = !(this.items.length && this.isAddressValid() && this.isAuth());
-  this.saveAddressDraft();
-  this.renderSelectedAddressSummary();
+    const btn = document.getElementById('place-order');
+    if (btn) btn.disabled = !(this.items.length && this.isAddressValid() && this.isAuth());
+    this.saveAddressDraft();
+    this.renderSelectedAddressSummary();
     if (!this.funnel.addressValidAt && this.isAddressValid()) {
       this.funnel.addressValidAt = this._funnelNow();
       analytics.track('checkout_funnel_address', { t: this._funnelElapsed(this.funnel.addressValidAt) });
@@ -723,16 +723,8 @@ class CheckoutPage {
     if (!this.validateBeforeOrder()) return;
     const btn = document.getElementById('place-order');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
-    // Obtain incremental numeric order id (local only fallback). Could be replaced by server/Firestore transaction later.
-    let orderSeq = 0;
-    try {
-      orderSeq = parseInt(localStorage.getItem('order_sequence')||'0',10) || 0;
-      orderSeq += 1;
-      localStorage.setItem('order_sequence', String(orderSeq));
-    } catch {}
-    const orderId = orderSeq || Date.now();
+    // Build initial order (id/orderNumber will be assigned by backend if available)
     const order = {
-      id: orderId,
       createdAt: new Date().toISOString(),
       items: this.items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
       totals: this.calcTotals(),
@@ -745,6 +737,30 @@ class CheckoutPage {
   coupon: this.coupon || null,
   status: 'pending'
     };
+    // Persist order (Firestore if available, else local fallback)
+    let persisted = null;
+    if (bootstrap.firebase?.isInitialized) {
+      try {
+        persisted = await bootstrap.firebase.createOrder(order);
+        if (persisted && typeof persisted.orderNumber === 'number') {
+          order.orderNumber = persisted.orderNumber;
+          order.id = persisted.orderNumber; // legacy compatibility
+        }
+        if (persisted?.docId) order._docId = persisted.docId;
+      } catch (e) {
+        console.warn('Persist order failed, storing locally only', e);
+      }
+    }
+    // Fallback local sequential id if backend didn't assign
+    if (typeof order.id !== 'number') {
+      let orderSeq = 0;
+      try {
+        orderSeq = parseInt(localStorage.getItem('order_sequence')||'0',10) || 0;
+        orderSeq += 1;
+        localStorage.setItem('order_sequence', String(orderSeq));
+      } catch {}
+      order.id = orderSeq || Date.now();
+    }
     analytics.track('checkout_place_order', { id: order.id, total: order.totals.total, items: order.items.length });
     if (!this.funnel.orderPlacedAt) {
       this.funnel.orderPlacedAt = this._funnelNow();
@@ -757,15 +773,6 @@ class CheckoutPage {
         installments: this.selectedInstallment ? this.selectedInstallment.count : null
       });
     }
-    // Persist order (Firestore if available, else local fallback)
-    if (bootstrap.firebase?.isInitialized) {
-      try {
-        const docId = await bootstrap.firebase.createOrder(order);
-        order._docId = docId;
-      } catch (e) {
-        console.warn('Persist order failed, storing locally only', e);
-      }
-    }
     try { localStorage.setItem('last_order', JSON.stringify(order)); } catch {}
     // Limpa carrinho
     if (window.cartService) window.cartService.clear(); else localStorage.removeItem('modern_pharmacy_cart');
@@ -777,11 +784,12 @@ class CheckoutPage {
   // Número do WhatsApp da loja (formato internacional sem +). Ajuste aqui se necessário.
   const storeWhatsApp = '554834643201';
   const lineItems = order.items.map(i=>`- ${i.quantity}x ${i.name} (R$ ${i.price.toFixed(2)})`).join('\n');
-  const msg = `Olá! Pedido *#${order.id}* confirmado.\nTotal: R$ ${order.totals.total.toFixed(2)}\nPagamento: ${order.paymentMethod}${order.installments?` (${order.installments.count}x)`:''}\nItens:\n${lineItems}`;
+  const displayNum = order.orderNumber || order.id;
+  const msg = `Olá! Pedido *#${displayNum}* confirmado.\nTotal: R$ ${order.totals.total.toFixed(2)}\nPagamento: ${order.paymentMethod}${order.installments?` (${order.installments.count}x)`:''}\nItens:\n${lineItems}`;
   const waLink = `https://wa.me/${storeWhatsApp}?text=${encodeURIComponent(msg)}`;
     root.innerHTML = `<div class="card-box success-box">
       <h2><i class="fas fa-check-circle"></i> Pedido Confirmado</h2>
-      <p>Número do Pedido: <strong>${order.id}</strong></p>
+      <p>Número do Pedido: <strong>${displayNum}</strong></p>
       <p>Total: <strong>${this.format(order.totals.total)}</strong></p>
       <div style="display:flex; flex-direction:column; gap:.75rem; max-width:320px; margin:1rem auto;">
     <button class="btn-primary" onclick="window.open('${waLink}','_blank')">Enviar para WhatsApp da Loja</button>

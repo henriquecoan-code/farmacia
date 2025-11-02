@@ -42,7 +42,7 @@ function renderOrders(root, orders){
         const total = o.totals?.total ?? o.total ?? 0;
         const items = (o.items?.length)||0;
         const status = o.status || 'pendente';
-        const num = o.id || o._docId || '—';
+        const num = o.orderNumber || o.id || o._docId || '—';
         return `
           <div class="card">
             <div class="card__content">

@@ -74,25 +74,36 @@ export class FirebaseService {
 
   // =============== ORDERS (NEW) ===============
   /**
-   * Create a new order document. Expects shape:
-   * { id (number), createdAt, items[], totals{subtotal,shipping,discount,total}, shippingMethod, paymentMethod, installments?, address{}, user, coupon?, status, history[] }
+   * Create a new order via Cloud Function (secure sequential numbering).
+   * Expects 'order' without id/orderNumber; server fills and returns { docId, orderNumber }.
    */
   async createOrder(order) {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const uid = this.auth?.currentUser?.uid || order.userId || null;
+    const payload = Object.assign({}, order, {
+      status: order.status || 'pending',
+      history: order.history || [ { status: order.status || 'pending', at: new Date().toISOString(), note: 'Pedido criado' } ],
+      userId: uid,
+      createdAt: order.createdAt || new Date().toISOString()
+    });
+    // Primary path: Cloud Function callable
     try {
-      const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
-      const uid = this.auth?.currentUser?.uid || order.userId || null;
-      const payload = Object.assign({}, order, {
-        status: order.status || 'pending',
-        history: order.history || [ { status: order.status || 'pending', at: new Date().toISOString(), note: 'Pedido criado' } ],
-        userId: uid
-      });
-      // Conforme regras, coleção é 'pedidos'
-      const docRef = await addDoc(collection(this.firestore, 'pedidos'), payload);
-      return docRef.id; // Firestore id (string) returned; keep numeric id inside payload.id
+      const { getFunctions, httpsCallable } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-functions.js');
+      const fns = getFunctions(this.app);
+      const callCreate = httpsCallable(fns, 'createOrder');
+      const res = await callCreate({ order: payload });
+      return res?.data || null; // { docId, orderNumber }
     } catch (e) {
-      console.error('Error creating order', e);
-      throw e;
+      console.warn('[FirebaseService] createOrder via Cloud Function failed, fallback to Firestore', e);
+      // Fallback: create order document without sequential number
+      try {
+        const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+        const docRef = await addDoc(collection(this.firestore, 'pedidos'), payload);
+        return { docId: docRef.id, orderNumber: null };
+      } catch (e2) {
+        console.error('Error creating order (fallback addDoc)', e2);
+        throw e2;
+      }
     }
   }
 
