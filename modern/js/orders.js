@@ -30,6 +30,33 @@ function renderLoading(root){
     </div>`;
 }
 
+function getOrderDisplayNumber(o){
+  // Prefer explicit sequential numbers
+  const candidates = [
+    o.orderNumber,
+    o.id,
+    o.number,
+    o.numero,
+    o.orderNo,
+    o.nPedido,
+    o.npedido,
+    o.nr,
+    o.n,
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'number' && Number.isFinite(c)) return String(c);
+    if (typeof c === 'string' && c.trim()) {
+      // If it's a numeric-looking string, return it; else still use it
+      const trimmed = c.trim();
+      if (/^\d+$/.test(trimmed)) return trimmed;
+      return trimmed;
+    }
+  }
+  // Fallback to Firestore doc id if available
+  if (o._docId && String(o._docId).trim()) return String(o._docId);
+  return '—';
+}
+
 function renderOrders(root, orders){
   if (!orders.length){
     root.innerHTML = `<div class="card" style="max-width:720px"><div class="card__content"><p class="card__text">Você ainda não possui pedidos.</p><a href="produtos.html" class="btn btn--primary">Ver produtos</a></div></div>`;
@@ -42,7 +69,7 @@ function renderOrders(root, orders){
         const total = o.totals?.total ?? o.total ?? 0;
         const items = (o.items?.length)||0;
         const status = o.status || 'pendente';
-        const num = o.orderNumber || o.id || o._docId || '—';
+        const num = getOrderDisplayNumber(o);
         return `
           <div class="card">
             <div class="card__content">
