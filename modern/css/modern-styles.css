@@ -1204,12 +1204,31 @@ img.lazy-img:not([data-src]) { filter: blur(0); }
   border: none;
   text-decoration: none;
   font-size: 11px;
+  position: relative; /* for badge positioning */
 }
 .bottom-nav__item i { font-size: 20px; }
 .bottom-nav__item:hover { color: var(--primary-color); }
 
 @media (max-width: 768px) {
   .bottom-nav { display: flex; }
+}
+
+/* Bottom nav cart badge */
+.bottom-nav__badge {
+  position: absolute;
+  top: 6px;
+  right: 28px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--secondary-color);
+  color: var(--white);
+  font-size: 11px;
+  line-height: 18px;
+  display: none; /* shown when count > 0 */
+  align-items: center;
+  justify-content: center;
 }
 
 /* Mobile filters section visible only on mobile */
@@ -1696,5 +1715,20 @@ img.lazy-img:not([data-src]) { filter: blur(0); }
   .filter-btn {
     font-size: var(--font-size-xs);
     padding: var(--spacing-2) var(--spacing-3);
+  }
+}
+
+/* Account page responsive grid */
+.account-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-6);
+  max-width: 900px;
+  margin-inline: auto;
+}
+@media (max-width: 768px) {
+  .account-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-4);
   }
 }

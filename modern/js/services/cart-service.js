@@ -107,11 +107,20 @@ export class CartService {
 
   // Update cart counter in UI
   updateCartCounter() {
-    const counter = document.getElementById('cart-counter');
-    if (counter) {
-      const count = this.getItemCount();
-      counter.textContent = count;
-      counter.style.display = count > 0 ? 'flex' : 'none';
+    const count = this.getItemCount();
+
+    // Header counter (desktop)
+    const headerCounter = document.getElementById('cart-counter');
+    if (headerCounter) {
+      headerCounter.textContent = count;
+      headerCounter.style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    // Bottom nav counter (mobile)
+    const bottomCounter = document.getElementById('bottom-cart-counter');
+    if (bottomCounter) {
+      bottomCounter.textContent = String(count);
+      bottomCounter.style.display = count > 0 ? 'inline-flex' : 'none';
     }
   }
 

@@ -179,8 +179,8 @@ function renderAccount(root, user, client){
   const uid = user?.uid || '—';
   const nome = client?.nome || client?.name || 'Usuário';
   root.innerHTML = `
-    <div class="grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-6); max-width: 900px; margin-inline: auto;">
-      <div class="card" style="min-width: 320px;">
+    <div class="account-grid">
+      <div class="card">
         <div class="card__content">
           <h2 class="card__title"><i class="fas fa-user-circle"></i> Informações do usuário</h2>
           <div class="card__text">
@@ -193,7 +193,7 @@ function renderAccount(root, user, client){
           </div>
         </div>
       </div>
-      <div id="addresses-section" style="min-width: 320px;"></div>
+      <div id="addresses-section"></div>
     </div>`;
 
   // logout
@@ -208,6 +208,22 @@ async function main(){
   await loader.loadHeader();
   await loader.loadFooter();
   await bootstrap.init();
+  // Wire bottom menu button to toggle mobile sidebar
+  const toggleMobileMenu = () => {
+    const sidebar = document.getElementById('mobile-sidebar');
+    const overlay = document.getElementById('mobile-overlay');
+    const toggle = document.getElementById('mobile-menu-toggle');
+    if (sidebar && overlay && toggle) {
+      sidebar.classList.toggle('active');
+      overlay.classList.toggle('active');
+      toggle.classList.toggle('active');
+      const isOpen = sidebar.classList.contains('active');
+      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      overlay.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+    }
+  };
+  document.getElementById('bottom-menu-btn')?.addEventListener('click', toggleMobileMenu);
   const root = document.getElementById('account-root');
   if (!root) return;
   const user = bootstrap.auth?.user || bootstrap.firebase?.getCurrentUser?.();
