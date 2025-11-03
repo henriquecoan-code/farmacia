@@ -11,14 +11,42 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="modern/css/modern-styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .account-layout { display:grid; grid-template-columns: 240px 1fr; gap: 1.25rem; }
+    @media (max-width: 960px){ .account-layout { grid-template-columns: 1fr; } }
+    .account-sidebar { background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-lg); padding: 1rem; height: fit-content; }
+    .sidebar-title { font-size: .9rem; font-weight: 700; margin: 0 0 .5rem; color: var(--gray-700); }
+    .sidebar-nav { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:.35rem; }
+    .sidebar-link { display:flex; align-items:center; gap:.5rem; padding:.5rem .6rem; border-radius: .5rem; color: var(--gray-800); text-decoration:none; border:1px solid transparent; }
+    .sidebar-link:hover { background: var(--gray-50); border-color: var(--gray-200); }
+    .sidebar-link.active { background: var(--primary-50, #eef2ff); color: var(--primary-color); border-color: var(--primary-100, #e0e7ff); font-weight:600; }
+    .sidebar-link .fa { width: 18px; text-align:center; }
+    .sidebar-badge { font-size:.7rem; color: var(--gray-600); }
+    .section-title { margin-bottom: 1rem; }
+  </style>
 </head>
 <body>
   <div id="header-container"></div>
   <main class="main">
     <section class="section">
       <div class="container">
-        <h1 class="section-title">Minha Conta</h1>
-        <div id="account-root"></div>
+        <div class="account-layout">
+          <aside class="account-sidebar" aria-label="Navegação da conta">
+            <h2 class="sidebar-title">Minha área</h2>
+            <nav>
+              <ul class="sidebar-nav">
+                <li><a class="sidebar-link active" href="conta.html" aria-current="page"><i class="fa fa-user"></i> Minha Conta</a></li>
+                <li><a class="sidebar-link" href="pedidos.html"><i class="fa fa-box"></i> Meus Pedidos</a></li>
+                <li><a class="sidebar-link" href="conta.html#favoritos"><i class="fa fa-heart"></i> Favoritos <span class="sidebar-badge">(em breve)</span></a></li>
+                <li><a class="sidebar-link" href="conta.html#recorrentes"><i class="fa fa-rotate"></i> Recorrentes <span class="sidebar-badge">(em breve)</span></a></li>
+              </ul>
+            </nav>
+          </aside>
+          <div>
+            <h1 class="section-title">Minha Conta</h1>
+            <div id="account-root"></div>
+          </div>
+        </div>
       </div>
     </section>
   </main>
