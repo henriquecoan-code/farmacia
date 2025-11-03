@@ -62,10 +62,35 @@ function renderOrders(root, orders){
     root.innerHTML = `<div class="card" style="max-width:720px"><div class="card__content"><p class="card__text">Você ainda não possui pedidos.</p><a href="produtos.html" class="btn btn--primary">Ver produtos</a></div></div>`;
     return;
   }
+  // Normalize and sort by createdAt desc (most recent first), regardless of backend ordering
+  const toTs = (v) => {
+    try {
+      if (!v) return 0;
+      // Firestore Timestamp
+      if (typeof v === 'object' && typeof v.toDate === 'function') return v.toDate().getTime();
+      // ISO string or date-like string
+      if (typeof v === 'string') { const t = Date.parse(v); return isNaN(t) ? 0 : t; }
+      // Number timestamp (ms)
+      if (typeof v === 'number') return v;
+      // Date instance
+      if (v instanceof Date) return v.getTime();
+    } catch {}
+    return 0;
+  };
+  const sorted = orders.slice().sort((a,b)=> toTs(b.createdAt) - toTs(a.createdAt));
   root.innerHTML = `
     <div class="grid" style="grid-template-columns:1fr;gap: var(--spacing-4)">
-      ${orders.map(o=>{
-        const created = o.createdAt ? new Date(o.createdAt).toLocaleString('pt-BR') : '—';
+      ${sorted.map(o=>{
+        // Format createdAt robustly
+        let created = '—';
+        try {
+          const v = o.createdAt;
+          if (v) {
+            if (typeof v === 'object' && typeof v.toDate === 'function') created = v.toDate().toLocaleString('pt-BR');
+            else if (typeof v === 'string') created = new Date(v).toLocaleString('pt-BR');
+            else if (typeof v === 'number') created = new Date(v).toLocaleString('pt-BR');
+          }
+        } catch {}
         const total = o.totals?.total ?? o.total ?? 0;
         const items = (o.items?.length)||0;
         const status = o.status || 'pendente';
