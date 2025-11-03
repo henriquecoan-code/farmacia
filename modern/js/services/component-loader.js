@@ -18,8 +18,10 @@ class ComponentLoader {
      */
     async loadComponent(componentName, targetSelector, options = {}) {
         try {
-            // Show skeleton placeholder
-            this.injectSkeleton(targetSelector, componentName);
+            // Show skeleton placeholder (avoid clearing <body> and allow skip)
+            if (!options.skipSkeleton && targetSelector !== 'body') {
+                this.injectSkeleton(targetSelector, componentName);
+            }
 
             // In-memory cache first
             let html = this.cache.get(componentName);
@@ -130,7 +132,15 @@ class ComponentLoader {
      * Load footer component
      */
     async loadFooter() {
-        return await this.loadComponent('footer', '#footer-container');
+        const ok = await this.loadComponent('footer', '#footer-container');
+        // Also load bottom navigation (mobile) appended to body, without affecting desktop
+        try {
+            await this.loadComponent('bottom-nav', 'body', { append: true, skipSkeleton: true });
+        } catch (e) {
+            // non-fatal if bottom-nav fails
+            console.warn('Bottom nav load failed:', e);
+        }
+        return ok;
     }
 
     /**
@@ -179,6 +189,8 @@ class ComponentLoader {
     injectSkeleton(targetSelector, componentName){
         const target = document.querySelector(targetSelector);
         if (!target) return;
+        // Never inject skeleton by wiping the entire <body>
+        if (target.tagName === 'BODY') return;
         if (target.dataset.skeletonInserted) return;
         // Basic skeleton style (only once)
         if (!document.getElementById('component-skeleton-style')) {
