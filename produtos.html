@@ -84,14 +84,6 @@
                             Infantil
                         </button>
                     </div>
-                    <div class="filters__sort">
-                        <select class="sort-select" aria-label="Ordenar produtos">
-                            <option value="name">Nome A-Z</option>
-                            <option value="price-low">Menor Preço</option>
-                            <option value="price-high">Maior Preço</option>
-                            <option value="featured">Em Destaque</option>
-                        </select>
-                    </div>
                 </div>
             </div>
         </section>
@@ -144,7 +136,17 @@
                         </div>
                     </aside>
                     <div class="products-content">
-                        <div id="products-results-info" class="products-results-info" aria-live="polite" style="margin-bottom:1rem;font-size:.9rem;color:#555"></div>
+                        <div class="products-toolbar">
+                            <div id="products-results-info" class="products-results-info" aria-live="polite"></div>
+                            <div class="products-sort">
+                                <select class="sort-select" aria-label="Ordenar produtos">
+                                    <option value="name">Nome A-Z</option>
+                                    <option value="price-low">Menor Preço</option>
+                                    <option value="price-high">Maior Preço</option>
+                                    <option value="featured">Em Destaque</option>
+                                </select>
+                            </div>
+                        </div>
                         <div class="products-grid__container" id="products-container">
                             <!-- Products will be dynamically loaded here -->
                         </div>

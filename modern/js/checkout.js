@@ -79,6 +79,19 @@ class CheckoutPage {
   }
 
   bindEvents() {
+    // Bottom nav menu button (mobile)
+    const bottomMenuBtn = document.getElementById('bottom-menu-btn');
+    if (bottomMenuBtn) bottomMenuBtn.addEventListener('click', () => {
+      const sidebar = document.getElementById('mobile-sidebar');
+      const overlay = document.getElementById('mobile-overlay');
+      const toggle = document.getElementById('mobile-menu-toggle');
+      if (sidebar && overlay && toggle) {
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+        toggle.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+      }
+    });
     const listEl = document.getElementById('checkout-items');
     if (listEl) {
       listEl.addEventListener('click', (e) => {

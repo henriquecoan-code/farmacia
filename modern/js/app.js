@@ -154,6 +154,13 @@ class PharmacyApp {
       mobileMenuToggle.addEventListener('click', () => this.toggleMobileMenu());
     }
 
+    // Bottom navigation (mobile)
+    const bottomMenuBtn = document.getElementById('bottom-menu-btn');
+    if (bottomMenuBtn && !bottomMenuBtn.hasAttribute('data-listener-attached')) {
+      bottomMenuBtn.setAttribute('data-listener-attached', 'true');
+      bottomMenuBtn.addEventListener('click', () => this.toggleMobileMenu());
+    }
+
     // Mobile sidebar close events
     const mobileSidebarClose = document.getElementById('mobile-sidebar-close');
     const mobileOverlay = document.getElementById('mobile-overlay');

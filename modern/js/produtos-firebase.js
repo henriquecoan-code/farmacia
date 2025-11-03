@@ -190,6 +190,9 @@ class ProdutosFirebaseApp {
         }
         const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
         if (mobileMenuToggle) mobileMenuToggle.addEventListener('click', this.toggleMobileMenu);
+    // Bottom nav menu button (mobile)
+    const bottomMenuBtn = document.getElementById('bottom-menu-btn');
+    if (bottomMenuBtn) bottomMenuBtn.addEventListener('click', this.toggleMobileMenu);
         const mobileSidebarClose = document.getElementById('mobile-sidebar-close');
         const mobileOverlay = document.getElementById('mobile-overlay');
         if (mobileSidebarClose) mobileSidebarClose.addEventListener('click', this.closeMobileSidebar);
