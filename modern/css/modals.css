@@ -88,6 +88,9 @@
 /* Auth modal defaults for register-only blocks (JS toggles display) */
 #auth-modal .auth-register-only { display:none; }
 
+/* Defaults for auth modal hidden parts */
+#auth-password-strength { display: none; }
+
 /* Footer buttons look */
 #address-modal #address-cancel-btn { background:var(--gray-100); color:var(--gray-700); border-radius:7px; font-weight:500; }
 #address-modal .btn.btn--primary { border-radius:7px; font-weight:600; background:var(--primary-color, #1a73e8); box-shadow:0 2px 8px rgba(26,115,232,0.08); }

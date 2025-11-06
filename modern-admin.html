@@ -20,7 +20,7 @@
     <link rel="stylesheet" href="modern/css/modals.css">
 
     <!-- Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
 <body>
     <!-- Header -->
@@ -32,9 +32,9 @@
                 </div>
                 <div class="admin-header__user">
                     <span id="admin-user-name">Visitante</span>
-                    <div class="admin-header__auth-buttons" style="display:flex; gap:.5rem; align-items:center;">
+                    <div class="admin-header__auth-buttons">
                         <button class="btn btn--primary" id="admin-login">Entrar</button>
-                        <button class="btn btn--secondary" id="admin-logout" style="display:none;">Sair</button>
+                        <button class="btn btn--secondary is-hidden" id="admin-logout">Sair</button>
                     </div>
                 </div>
             </div>
@@ -329,18 +329,18 @@
                         <h2>Administração</h2>
                         <p>Conceder ou revogar acesso de administrador por e-mail</p>
                     </div>
-                    <div style="display:flex;gap:.5rem;align-items:center;">
+                    <div class="admin-inline-actions">
                         <button class="btn btn--secondary" id="admin-requests-refresh">Atualizar lista</button>
                     </div>
                 </div>
 
-                <div class="products-table-container" style="padding:1rem;">
-                    <form id="admin-grant-form" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;">
-                        <div class="form-group" style="min-width:280px;flex:1;">
+                <div class="products-table-container admin-container--padded">
+                    <form id="admin-grant-form">
+                        <div class="form-group admin-minw-280 flex-1">
                             <label for="admin-target-email">E-mail do usuário</label>
                             <input type="email" id="admin-target-email" placeholder="usuario@dominio.com" required>
                         </div>
-                        <div class="form-group" style="min-width:200px;">
+                        <div class="form-group admin-minw-200">
                             <label for="admin-action">Ação</label>
                             <select id="admin-action">
                                 <option value="grant">Conceder admin</option>
@@ -351,12 +351,12 @@
                             <button type="submit" class="btn btn--primary">Enviar solicitação</button>
                         </div>
                     </form>
-                    <p style="margin:.5rem 0 0;color:var(--gray-600);font-size:.9rem;">
+                    <p class="admin-note">
                         Nota: a alteração de claims é processada por um script com credenciais administrativas. Após aprovada, o usuário precisa fazer logout/login para o efeito.
                     </p>
                 </div>
 
-                <div class="orders-table-container" style="margin-top:1rem;">
+                <div class="orders-table-container admin-mt-1">
                     <table class="orders-table">
                         <thead>
                             <tr>
@@ -370,7 +370,7 @@
                             </tr>
                         </thead>
                         <tbody id="admin-requests-table-body">
-                            <tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhuma solicitação</td></tr>
+                            <tr class="empty-row"><td colspan="7">Nenhuma solicitação</td></tr>
                         </tbody>
                     </table>
                 </div>

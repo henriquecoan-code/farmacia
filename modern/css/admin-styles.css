@@ -25,6 +25,19 @@
   gap: var(--spacing-4);
 }
 
+/* Inline-to-CSS migrations and small utilities */
+.admin-header__auth-buttons { display:flex; gap:.5rem; align-items:center; }
+.is-hidden { display:none !important; }
+.admin-inline-actions { display:flex; gap:.5rem; align-items:center; }
+.admin-container--padded { padding:1rem; }
+#admin-grant-form { display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end; }
+.admin-minw-280 { min-width:280px; }
+.admin-minw-200 { min-width:200px; }
+.flex-1 { flex:1; }
+.admin-note { margin:.5rem 0 0; color: var(--gray-600); font-size:.9rem; }
+.admin-mt-1 { margin-top:1rem; }
+.empty-row td { text-align:center; padding:1rem; color: var(--gray-500); }
+
 /* Admin Navigation */
 .admin-nav {
   background-color: var(--gray-700);

@@ -5,46 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Finalizar Compra - Farmácia São Benedito</title>
   <link rel="stylesheet" href="modern/css/modern-styles.css" />
-  <style>
-    .checkout { max-width: 1200px; margin: 2rem auto; padding: 0 1.25rem; display: grid; gap: 2rem; grid-template-columns: 1fr 360px; }
-    @media (max-width: 960px){ .checkout { grid-template-columns: 1fr; } }
-    .card-box { background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 1.5rem 1.75rem; position: relative; }
-    .card-box h2, .card-box h3 { margin-top: 0; font-size: 1.15rem; }
-    .checkout-items { display: flex; flex-direction: column; gap: 1rem; }
-    .checkout-item { display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: center; padding: .75rem 1rem; border: 1px solid var(--gray-200); border-radius: var(--radius); }
-    .checkout-item__title { font-weight: 600; }
-    .price { font-weight: 600; color: var(--secondary-color); }
-    .line-total { font-weight: 700; color: var(--primary-color); }
-    .qty-control { display: flex; align-items: center; gap: .5rem; }
-    .qty-control button { width: 30px; height: 30px; display:flex; align-items:center; justify-content:center; border:1px solid var(--gray-300); background:var(--white); border-radius: var(--radius); cursor:pointer; }
-    .summary { position: sticky; top: 1rem; display: flex; flex-direction: column; gap: 1rem; }
-    .summary-row { display:flex; justify-content: space-between; font-size: .95rem; }
-    .summary-row.total { font-size: 1.05rem; font-weight: 700; border-top:1px solid var(--gray-200); padding-top:.75rem; }
-    .divider { height:1px; background: var(--gray-200); margin: .75rem 0; }
-    form.checkout-form { display: grid; gap: 1rem; }
-    .grid-2 { display: grid; gap: .75rem; grid-template-columns: 1fr 1fr; }
-    @media (max-width:600px){ .grid-2 { grid-template-columns: 1fr; } }
-    label { font-size: .75rem; text-transform: uppercase; letter-spacing:.5px; font-weight:600; color: var(--gray-600); display:block; margin-bottom: .25rem; }
-    input, select { width:100%; padding:.65rem .75rem; border:1px solid var(--gray-300); border-radius: var(--radius); background: var(--white); }
-    .radio-group { display:flex; flex-direction:column; gap:.5rem; }
-    .radio-item { display:flex; gap:.5rem; align-items:center; padding:.5rem .75rem; border:1px solid var(--gray-200); border-radius: var(--radius); cursor:pointer; }
-    .radio-item input { width:auto; }
-    .coupon-row { display:flex; gap:.5rem; }
-    .coupon-row input { flex:1; }
-    .status-msg { font-size:.8rem; margin-top:.25rem; color: var(--primary-color); }
-    .btn-primary { background: var(--primary-color); color:#fff; border:none; padding:.85rem 1rem; border-radius: var(--radius); cursor:pointer; font-weight:600; width:100%; display:flex; justify-content:center; gap:.5rem; }
-    .btn-primary:disabled { opacity:.6; cursor:not-allowed; }
-    .alert-inline { background: var(--warning-color, #f7b50015); border:1px solid var(--warning-color, #f7b500); color:#8a6d00; padding:.75rem 1rem; border-radius: var(--radius); font-size:.85rem; }
-    .success-box { text-align:center; padding:3rem 1rem; }
-    .success-box h2 { color: var(--success-color); }
-    .pix-box, .card-box-mini { background: var(--gray-50); padding:.75rem .9rem; border-radius: var(--radius); font-size:.8rem; }
-  /* Field validation */
-  .input-invalid { border-color: var(--error-color) !important; background:#fef2f2; }
-  .field-error { font-size:.65rem; color: var(--error-color); margin-top:.15rem; display:none; }
-  .field-wrapper { position:relative; }
-  .field-wrapper.valid .field-error { display:none; }
-  .field-wrapper.invalid .field-error { display:block; }
-  </style>
+  <!-- Icons (Font Awesome) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="modern/css/checkout.css" />
 </head>
 <body>
   <div id="header-container"></div>
@@ -53,23 +16,23 @@
       <div class="card-box" id="checkout-cart-box">
         <h2>Itens do Carrinho</h2>
         <div class="checkout-items" id="checkout-items"></div>
-        <p id="empty-cart-msg" style="display:none;">Seu carrinho está vazio.</p>
+  <p id="empty-cart-msg">Seu carrinho está vazio.</p>
       </div>
-      <div class="card-box" id="auth-reminder" style="display:none;">
+      <div class="card-box" id="auth-reminder">
         <h2>Identificação</h2>
-        <div class="alert-inline" id="auth-reminder-msg">Você precisa entrar para finalizar a compra. <button id="open-auth" style="margin-left:.5rem;" class="btn btn--small">Entrar</button></div>
+        <div class="alert-inline" id="auth-reminder-msg">Você precisa entrar para finalizar a compra. <button id="open-auth" class="btn btn--small">Entrar</button></div>
       </div>
       <div class="card-box">
-        <h2 style="display:flex; align-items:center; justify-content:space-between; gap:.75rem;">
+        <h2 class="section-header-between">
           <span>Endereço de Entrega</span>
-          <button id="open-address-modal" type="button" class="btn btn--secondary" style="font-size:.75rem;">Cadastrar endereço</button>
+          <button id="open-address-modal" type="button" class="btn btn--secondary">Cadastrar endereço</button>
         </h2>
-        <div id="saved-addresses-box" style="display:none; margin-bottom:1rem;">
-          <label style="margin-bottom:.35rem; font-size:.7rem; letter-spacing:.5px; color:var(--gray-600);">Endereços Salvos</label>
-          <div id="saved-addresses-list" class="radio-group" style="max-height:180px; overflow:auto; border:1px solid var(--gray-200); padding:.5rem; border-radius:var(--radius);"></div>
-          <button id="new-address-btn" type="button" style="margin-top:.5rem; font-size:.7rem; background:none; border:none; color:var(--primary-color); cursor:pointer;">+ Novo Endereço</button>
+        <div id="saved-addresses-box">
+          <label>Endereços Salvos</label>
+          <div id="saved-addresses-list" class="radio-group"></div>
+          <button id="new-address-btn" type="button">+ Novo Endereço</button>
         </div>
-  <form class="checkout-form" id="address-form" style="display:none;">
+  <form class="checkout-form" id="address-form">
           <div class="grid-2">
             <div class="field-wrapper" data-field="addr-name"><label>Nome</label><input required id="addr-name" autocomplete="name" /><div class="field-error">Informe o nome</div></div>
             <div class="field-wrapper" data-field="addr-phone"><label>Telefone</label><input required id="addr-phone" placeholder="(00) 00000-0000" /><div class="field-error">Telefone inválido</div></div>
@@ -86,14 +49,14 @@
             <div class="field-wrapper" data-field="addr-district"><label>Bairro</label><input required id="addr-district" /><div class="field-error">Informe o bairro</div></div>
             <div class="field-wrapper" data-field="addr-comp"><label>Complemento</label><input id="addr-comp" /></div>
           </div>
-          <div class="field-wrapper" data-field="addr-state"><label>Estado</label><input required id="addr-state" maxlength="2" style="text-transform:uppercase;" /><div class="field-error">UF inválida</div></div>
+          <div class="field-wrapper" data-field="addr-state"><label>Estado</label><input required id="addr-state" maxlength="2" /><div class="field-error">UF inválida</div></div>
           <p class="status-msg" id="address-status"></p>
-          <div style="display:flex; align-items:center; gap:.5rem; margin-top:.25rem;" id="favorite-toggle-row">
-            <input type="checkbox" id="addr-favorite" /> <label for="addr-favorite" style="margin:0; font-size:.7rem; text-transform:none; font-weight:500;">Definir como favorito</label>
+          <div id="favorite-toggle-row">
+            <input type="checkbox" id="addr-favorite" /> <label for="addr-favorite">Definir como favorito</label>
           </div>
-          <button type="button" id="save-address-changes" class="btn btn--secondary" style="display:none; margin-top:.5rem; font-size:.75rem; align-self:flex-start;">Salvar Alterações</button>
+          <button type="button" id="save-address-changes" class="btn btn--secondary">Salvar Alterações</button>
         </form>
-        <div id="address-selected-summary" class="status-msg" style="display:none; margin-top:.5rem;"></div>
+        <div id="address-selected-summary" class="status-msg"></div>
       </div>
       <div class="card-box">
         <h2>Entrega</h2>
@@ -123,9 +86,9 @@
         <div class="divider"></div>
         <div class="summary-row"><span>Subtotal</span><strong id="order-subtotal">R$ 0,00</strong></div>
         <div class="summary-row"><span>Frete</span><strong id="order-shipping">R$ 0,00</strong></div>
-        <div class="summary-row" id="row-discount" style="display:none;"><span>Desconto</span><strong id="order-discount" style="color:var(--success-color);">-R$ 0,00</strong></div>
+        <div class="summary-row" id="row-discount"><span>Desconto</span><strong id="order-discount">-R$ 0,00</strong></div>
         <div class="summary-row total"><span>Total</span><strong id="order-total">R$ 0,00</strong></div>
-        <div class="summary-row" id="row-installments" style="display:none; font-size:.8rem;">
+        <div class="summary-row" id="row-installments">
           <span>Parcelamento</span><strong id="order-installments"></strong>
         </div>
         <button id="place-order" class="btn-primary" disabled>
