@@ -24,7 +24,14 @@ class AdminApp {
       this.applyInitialSectionFromHash();
       await this.enforceAdminAuth();
     } catch(err){
-      console.warn('Init fallback', err); this.loadSampleData(); this.renderProducts(); this.updateDashboard();
+      console.warn('Init fallback', err);
+      this.loadSampleData();
+      // Em modo offline, renderiza todas as seções possíveis com dados locais
+      this.renderProducts();
+      this.renderCustomers();
+      this.renderModeration();
+      await this.loadAndRenderOrders();
+      this.updateDashboard();
       this.showNotification('Falha ao conectar dados remotos. Modo local.', 'warning');
       this.updateHeaderAuthUI(false, null);
       // Mesmo em modo offline, tente injetar os modais para permitir login simulado
@@ -88,8 +95,11 @@ class AdminApp {
     // If Firebase not available, proceed in local mode
     if (!this.firebase?.isInitialized) {
       this.showNotification('Modo offline: admin sem autenticação.', 'warning');
+      // Renderiza o que for possível em modo offline
       this.renderProducts();
       this.renderCustomers();
+      this.renderModeration();
+      await this.loadAndRenderOrders();
       this.updateDashboard();
       return;
     }
@@ -363,6 +373,15 @@ class AdminApp {
     document.querySelectorAll('.admin-section').forEach(s=>s.classList.remove('admin-section--active'));
     document.getElementById(`${id}-section`)?.classList.add('admin-section--active');
     this.currentSection=id;
+    // Ao trocar de seção, garante a renderização/carregamento necessário
+    try{
+      if(id==='products') this.filterProducts();
+      if(id==='moderation') this.loadAndRenderModeration();
+      if(id==='orders') this.loadAndRenderOrders();
+      if(id==='customers') this.renderCustomers();
+      if(id==='dashboard') this.updateDashboard();
+      if(id==='admin') this.loadAndRenderAdminRequests();
+    } catch(e){ console.warn('Erro ao preparar seção', id, e); }
   }
 
   // Product modal
@@ -538,17 +557,17 @@ class AdminApp {
 
   // Orders
   async loadAndRenderOrders(force=false){
-    if(!this.firebase.isInitialized){
-      console.info('[Admin] Firebase não inicializado - pulando carregamento de pedidos');
-      return;
-    }
     if(this.ordersLoaded && !force) return;
-    try {
-      this.orders = await this.firebase.listOrders({ limit:200 });
-      console.debug('[Admin] Pedidos Firestore carregados:', this.orders.length);
-    } catch(e){
-      console.warn('[Admin] Falha ao buscar pedidos Firestore', e);
-      this.orders = [];
+    this.orders = [];
+    // 1) Tenta Firestore se disponível
+    if(this.firebase?.isInitialized){
+      try {
+        this.orders = await this.firebase.listOrders({ limit:200 });
+        console.debug('[Admin] Pedidos Firestore carregados:', this.orders.length);
+      } catch(e){
+        console.warn('[Admin] Falha ao buscar pedidos Firestore', e);
+        this.orders = [];
+      }
     }
     // Fallback: mostrar último pedido local (checkout) se nenhum no Firestore
     if(!this.orders.length){
