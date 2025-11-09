@@ -16,7 +16,11 @@ export function normalizeProduct(raw) {
   const nome = raw.nome || raw.name || 'Produto sem nome';
   const descricao = raw.descricao || raw.description || '';
   const categoria = raw.categoria || raw.category || 'outros';
-  const imagens = Array.isArray(raw.fotos) ? raw.fotos : (raw.image ? [raw.image] : []);
+  const imagens = Array.isArray(raw.fotos)
+    ? raw.fotos
+    : (raw.image
+      ? [raw.image]
+      : (Array.isArray(raw.imagens) ? raw.imagens : []));
   // Campos auxiliares para busca
   const dcbRaw = raw.dcb || raw.DCB || raw.nomeDCB || raw.nome_dcb || raw.nomeComumBrasileiro || raw.nome_comum_brasileiro || raw.principioAtivo || raw.principio_ativo || raw.principioativo || '';
   const ean = raw.ean || raw.EAN || raw.codBarras || raw.codigoBarras || raw.barcode || raw.barCode || null;

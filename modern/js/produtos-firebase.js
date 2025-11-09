@@ -404,17 +404,18 @@ class ProdutosFirebaseApp {
     }
 
     renderProductCard(product) {
-        const imageUrl = (product.imagens && product.imagens.length) ? product.imagens[0] : 'img/produtos/default-product.svg';
-        const highlightedName = this.highlightSearch(product.nome);
-        const highlightedDesc = this.highlightSearch(product.descricao || '');
         const cat = (product.categoria || '').toLowerCase();
         const isMeds = ['medicamentos','genericos','referencia','similares'].includes(cat);
+        const placeholder = isMeds ? 'img/medicamento.png' : 'img/produtos/default-product.svg';
+        const imageUrl = (product.imagens && product.imagens.length) ? product.imagens[0] : placeholder;
+        const highlightedName = this.highlightSearch(product.nome);
+        const highlightedDesc = this.highlightSearch(product.descricao || '');
         const labInline = (isMeds && product.laboratorio)
           ? `<div class="product-card__lab-inline"><i class="fas fa-flask" aria-hidden="true"></i><span>${escapeHTML(product.laboratorio)}</span></div>`
           : '';
         return `<div class="product-card" data-product-id="${product.id}" data-category="${product.categoria}">
     <div class="product-card__image">
-        <img data-src="${imageUrl}" src="img/produtos/default-product.svg" alt="${product.nome}" loading="lazy" class="lazy-img" onerror="this.src='img/produtos/default-product.svg'">
+        <img data-src="${imageUrl}" src="${placeholder}" alt="${product.nome}" loading="lazy" class="lazy-img" onerror="this.src='${placeholder}'">
         ${product.destaque ? '<div class="product-card__badge">Destaque</div>' : ''}
         ${product.desconto > 0 ? `<div class="product-card__discount-badge">${product.desconto}% OFF</div>` : ''}
     </div>
