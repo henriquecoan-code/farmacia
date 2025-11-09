@@ -595,6 +595,7 @@ class AdminApp {
       <td style="display:flex;gap:.35rem;">
         <button class="btn-icon" data-action="view" data-id="${o._docId}">👁️</button>
         <button class="btn-icon" data-action="advance" data-id="${o._docId}">⏭️</button>
+        <button class="btn-icon" title="WhatsApp" data-action="whatsapp" data-id="${o._docId}">💬</button>
       </td>
     </tr>`).join('');
     tbody.querySelectorAll('button[data-action]')
@@ -605,6 +606,7 @@ class AdminApp {
         if(!order) return;
         if(action==='view') this.showOrderDetail(order);
         if(action==='advance') this.advanceOrderStatus(order);
+        if(action==='whatsapp') this.openWhatsAppModal(order);
       }));
     this.updateDashboard();
     this.renderPagination('orders-pagination', full.length, 'orders', ()=> this.renderOrders());
@@ -625,8 +627,154 @@ class AdminApp {
       <p><strong>Endereço:</strong> ${order.address?.street||''}, ${order.address?.number||''} - ${order.address?.city||''}/${order.address?.state||''}</p>
       <div style="margin:.5rem 0;"><strong>Itens:</strong><ul style="margin:.25rem 0 .5rem 1.1rem;">${itemsHTML}</ul></div>
       <div style="margin:.5rem 0;"><strong>Histórico:</strong><ul style="margin:.25rem 0 .5rem 1.1rem;">${histHTML}</ul></div>
-      ${this.nextStatus(order.status)?`<button id="od-advance" class="btn btn--primary">Avançar para ${this.getOrderStatusLabel(this.nextStatus(order.status))}</button>`:''}`;
-    if(this.nextStatus(order.status)) body.querySelector('#od-advance').addEventListener('click',()=>{ this.advanceOrderStatus(order); modal.remove(); }); }
+      ${this.nextStatus(order.status)?`<button id="od-advance" class="btn btn--primary">Avançar para ${this.getOrderStatusLabel(this.nextStatus(order.status))}</button>`:''}
+      <button id="od-whatsapp" class="btn btn--secondary" style="margin-left:.5rem">Enviar WhatsApp</button>`;
+    if(this.nextStatus(order.status)) body.querySelector('#od-advance').addEventListener('click',()=>{ this.advanceOrderStatus(order); modal.remove(); });
+    const waBtn = body.querySelector('#od-whatsapp'); if (waBtn) waBtn.addEventListener('click',()=>{ this.openWhatsAppModal(order); }); }
+
+  // ===== WhatsApp Messaging (manual) =====
+  findClientForOrder(order){
+    try{
+      const email = (order?.user || '').toLowerCase();
+      const uid = order?.userId || order?.uid || null;
+      // Prefer uid match
+      let c = null;
+      if (uid) c = (this.clients||[]).find(x=> x.id === uid);
+      // Fallback by email
+      if (!c && email) c = (this.clients||[]).find(x=> String(x.email||'').toLowerCase() === email);
+      return c || null;
+    } catch { return null; }
+  }
+  getOrderCustomerPhone(order){
+    // Prefer Firebase profile (clientes/usuarios)
+    const client = this.findClientForOrder(order);
+    const raw = client?.phone || client?.telefone || order?.address?.phone || order?.phone || '';
+    let digits = String(raw||'').replace(/\D/g,'');
+    // If already includes country code (e.g., starts with 55 and length 12/13) keep
+    if (digits.startsWith('55')) return digits;
+    // Brazilian local numbers usually 10 or 11 digits (DDD + number). Prepend 55.
+    if (digits.length >= 10 && digits.length <= 11) digits = '55'+digits;
+    return digits;
+  }
+  getOrderCustomerName(order){
+    const client = this.findClientForOrder(order);
+    const nome = client?.name || client?.nome || client?.displayName || order?.address?.name || order?.name || '';
+    if (nome) return nome;
+    // Fallback: use email local-part as a friendly name
+    const email = order?.user || '';
+    const local = email.includes('@') ? email.split('@')[0] : '';
+    return local || 'Cliente';
+  }
+  getReviewLink(){
+    // Central configurable review link (could move to remote config later)
+    return 'https://g.page/r/CdbJtDrB_SSkEBM/review';
+  }
+  buildWhatsAppTemplates(order){
+    const id = order.orderNumber || order.id;
+    const nome = this.getOrderCustomerName(order);
+    const reviewLink = this.getReviewLink();
+    const fmt = (v)=> 'R$ '+(Number(v)||0).toFixed(2).replace('.', ',');
+    const items = Array.isArray(order.items) ? order.items : [];
+    const lines = items.map(i=>`• ${i.quantity}x ${i.name} — ${fmt((Number(i.price)||0)*(Number(i.quantity)||0))}`).join('\n');
+    const pay = order.installments && order.installments.count ? `${order.paymentMethod} (${order.installments.count}x)` : (order.paymentMethod||'');
+    const total = fmt(order.totals?.total||0);
+    return {
+      pending: `Olá ${nome}! Recebemos seu pedido #${id} e estamos conferindo o estoque para separação.\n\nResumo da compra:\n${lines}\nTotal: ${total}${pay?`\nPagamento: ${pay}`:''}\n\nAssim que estiver pronto avisaremos por aqui. Qualquer dúvida estamos à disposição.`,
+      processing: `Atualização do pedido: itens separados e preparando envio. Logo sairá para a entrega. Obrigado pela confiança!`,
+      shipped: `Seu pedido saiu para entrega 🚚. Em breve chegará até você. Caso precise, responda esta mensagem.`,
+      delivered: `Pedido entregue! Esperamos que tenha gostado. Pode avaliar sua experiência? ${reviewLink} Obrigado pela compra!`
+    };
+  }
+  openWhatsAppModal(order){
+    let modal = document.getElementById('wa-modal');
+    if(!modal){
+      modal = document.createElement('div');
+      modal.id='wa-modal';
+      Object.assign(modal.style,{position:'fixed',inset:'0',background:'rgba(0,0,0,.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:'10002'});
+      modal.innerHTML = `<div style="background:#fff;padding:1rem 1.25rem;border-radius:12px;max-width:520px;width:100%;box-shadow:var(--shadow-lg);font-size:.85rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;">
+          <h3 style="margin:0;">Mensagem WhatsApp</h3>
+          <button id="wa-close" style="background:none;border:none;cursor:pointer;font-size:1rem;">❌</button>
+        </div>
+        <div id="wa-body" style="margin-top:.75rem;display:flex;flex-direction:column;gap:.75rem;"></div>
+      </div>`;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+      modal.querySelector('#wa-close').addEventListener('click',()=> modal.remove());
+    }
+    const phone = this.getOrderCustomerPhone(order);
+    const templates = this.buildWhatsAppTemplates(order);
+    const current = order.status;
+    const body = modal.querySelector('#wa-body');
+    const renderTemplateRow = (key,label,text)=>`
+      <div class="wa-row" data-wa-item="${key}" style="border:1px solid var(--gray-200);padding:.6rem;border-radius:8px;display:flex;flex-direction:column;gap:.5rem;background:var(--gray-50);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
+          <strong style="font-size:.75rem;text-transform:uppercase;">${label}</strong>
+          <div style="display:flex;gap:.35rem;">
+            <button class="btn btn--secondary" data-wa="copy" data-key="${key}" style="font-size:.65rem;padding:.35rem .5rem;">Copiar</button>
+            <button class="btn btn--primary" data-wa="send" data-key="${key}" style="font-size:.65rem;padding:.35rem .5rem;">Abrir WhatsApp</button>
+          </div>
+        </div>
+        <textarea readonly style="width:100%;min-height:70px;font-size:.75rem;border:1px solid var(--gray-300);border-radius:6px;padding:.4rem;background:#fff;resize:vertical;">${text}</textarea>
+      </div>`;
+    const statusLabelMap = { pending:'Confirmação', processing:'Separação', shipped:'Saiu para Entrega', delivered:'Recebido'};
+    // Decide which templates to show: current + next stage proactive
+    const keys = [current];
+    const next = this.nextStatus(current); if (next) keys.push(next);
+    // Always allow final delivered template for manual resend
+    if(!keys.includes('delivered')) keys.push('delivered');
+    body.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:.5rem;">
+        <label style="font-size:.75rem;color:var(--gray-600);">Telefone do cliente (ajuste se necessário)</label>
+        <input id="wa-phone" value="${phone}" style="width:100%;padding:.45rem .6rem;border:1px solid var(--gray-300);border-radius:8px;font-size:.85rem;" />
+        <small style="color:var(--gray-500);">Usar formato internacional sem símbolos. Ex: 55DDDNÚMERO</small>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.75rem;">${keys.map(k=> renderTemplateRow(k,statusLabelMap[k]||k, templates[k])).join('')}</div>
+    `;
+    // Wire copy/send
+    body.querySelectorAll('button[data-wa]')?.forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const action = btn.getAttribute('data-wa');
+        const key = btn.getAttribute('data-key');
+        const row = btn.closest('[data-wa-item]');
+        const txtArea = row ? row.querySelector('textarea') : null;
+        const phoneInput = modal.querySelector('#wa-phone');
+        const dest = String(phoneInput.value||'').replace(/\D/g,'');
+        const message = txtArea?.value || '';
+        if(action==='copy'){
+          const doCopy = async () => {
+            try {
+              if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(message);
+                return true;
+              }
+            } catch(_) {}
+            // Fallback
+            try {
+              const ta = document.createElement('textarea');
+              ta.value = message;
+              ta.style.position = 'fixed';
+              ta.style.opacity = '0';
+              document.body.appendChild(ta);
+              ta.focus();
+              ta.select();
+              const ok = document.execCommand('copy');
+              document.body.removeChild(ta);
+              return ok;
+            } catch (_) { return false; }
+          };
+          doCopy().then(ok=>{
+            this.showNotification(ok?'Mensagem copiada.':'Falha ao copiar.','success');
+          });
+        }
+        if(action==='send'){
+          if(!dest){ this.showNotification('Telefone inválido.','warning'); return; }
+          const url = `https://wa.me/${dest}?text=${encodeURIComponent(message)}`;
+          window.open(url,'_blank');
+        }
+      });
+    });
+  }
 
   // Customers
   renderCustomers(list=null){
