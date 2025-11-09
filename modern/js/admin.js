@@ -9,6 +9,8 @@ class AdminApp {
     this.editingProduct=null;
     this.firebase=null;
     this.loginPromptShown=false;
+    // Evita avisos repetidos ao usuário quando coleções estiverem vazias em produção
+    this._hintsShown = { orders:false, clients:false, moderation:false };
     this.pagination={ products:{page:1,pageSize:50}, moderation:{page:1,pageSize:50}, orders:{page:1,pageSize:50} };
     this.init();
   }
@@ -415,6 +417,15 @@ class AdminApp {
     const rawProducts = await this.firebase.getProducts();
     this.products = this.mapAdminProducts(rawProducts);
     this.clients = await this.firebase.getClients();
+    // Se não carregou clientes, provavelmente falta login admin ou regras bloqueiam leitura
+    if (!this._hintsShown.clients && (!Array.isArray(this.clients) || this.clients.length===0)){
+      this._hintsShown.clients = true;
+      const logged = !!this.firebase.getCurrentUser();
+      this.showNotification(logged
+        ? 'Nenhum cliente carregado. Verifique as regras do Firestore e a coleção usuarios/clientes.'
+        : 'Faça login como administrador para visualizar clientes (ou ajuste as regras do Firestore).',
+        'warning');
+    }
     await this.loadAndRenderModeration();
     await this.loadAndRenderAdminRequests();
   }
@@ -515,7 +526,16 @@ class AdminApp {
   renderModeration(){
     const tbody=document.getElementById('moderation-table-body'); if(!tbody) return;
     const full=this.getModerationItems();
-    if(!full.length){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum item pendente</td></tr>'; document.getElementById('moderation-pagination')?.replaceChildren(); return; }
+    if(!full.length){
+      tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum item pendente</td></tr>';
+      document.getElementById('moderation-pagination')?.replaceChildren();
+      // Dica: esta lista depende de flags pendente/publicado nos produtos
+      if (!this._hintsShown.moderation && Array.isArray(this.products) && this.products.length){
+        this._hintsShown.moderation = true;
+        this.showNotification('Validação vazia: somente produtos com pendente=true ou publicado=false aparecem aqui.', 'info');
+      }
+      return;
+    }
     const pageData = this.paginate(full, this.pagination.moderation);
     if (this.pagination.moderation.page !== pageData.current) this.pagination.moderation.page = pageData.current;
     const data = pageData.slice;
@@ -600,6 +620,15 @@ class AdminApp {
       tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum pedido'+(filter?' filtrado':'')+'</td></tr>';
       document.getElementById('orders-pagination')?.replaceChildren();
       this.updateDashboard();
+      // Ajuda contextual quando não houver pedidos por falta de permissão/login
+      if (!this._hintsShown.orders){
+        this._hintsShown.orders = true;
+        const logged = !!(this.firebase?.isInitialized && this.firebase.getCurrentUser());
+        this.showNotification(logged
+          ? 'Nenhum pedido carregado. Verifique se existem documentos em pedidos/orders e se as regras permitem leitura.'
+          : 'Faça login como administrador para visualizar pedidos (ou ajuste as regras do Firestore).',
+          'warning');
+      }
       return;
     }
     const pageData=this.paginate(full, this.pagination.orders);
