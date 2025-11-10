@@ -172,6 +172,41 @@ class PharmacyApp {
     if (mobileOverlay) {
       mobileOverlay.addEventListener('click', () => this.closeMobileSidebar());
     }
+
+    // Logout buttons (desktop nav + mobile sidebar)
+    const navLogoutBtn = document.getElementById('nav-logout-btn');
+    const navLogoutItem = document.getElementById('nav-logout-item');
+    const mobileLogoutBtn = document.getElementById('mobile-logout-btn');
+
+    const updateLogoutVisibility = (loggedIn) => {
+      if (navLogoutItem) navLogoutItem.style.display = loggedIn ? '' : 'none';
+      if (mobileLogoutBtn) mobileLogoutBtn.style.display = loggedIn ? '' : 'none';
+    };
+
+    // Initial state
+    const isLoggedIn = !!(this.auth && this.auth.user);
+    updateLogoutVisibility(isLoggedIn);
+
+    // React to auth changes
+    try {
+      eventBus.off && eventBus.off('auth:stateChanged', this._onAuthChangedForLogout);
+    } catch {}
+    this._onAuthChangedForLogout = ({ user }) => updateLogoutVisibility(!!user);
+    eventBus.on('auth:stateChanged', this._onAuthChangedForLogout);
+
+    // Wire click
+    const doLogout = async () => {
+      try {
+        if (window.authService?.signOut) await window.authService.signOut();
+        // Close mobile menu if open and redirect home
+        this.closeMobileSidebar();
+        setTimeout(() => { window.location.href = 'modern-index.html'; }, 400);
+      } catch (e) {
+        console.error('Logout failed', e);
+      }
+    };
+    if (navLogoutBtn && !navLogoutBtn._bound) { navLogoutBtn._bound = true; navLogoutBtn.addEventListener('click', doLogout); }
+    if (mobileLogoutBtn && !mobileLogoutBtn._bound) { mobileLogoutBtn._bound = true; mobileLogoutBtn.addEventListener('click', doLogout); }
   }
 
   setupGeneralEventListeners() {

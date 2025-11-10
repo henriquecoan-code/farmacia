@@ -189,7 +189,7 @@ function renderAccount(root, user, client){
           </div>
           <div class="card__actions">
             <a class="btn btn--secondary" href="pedidos.html"><i class="fas fa-box"></i> Meus pedidos</a>
-            <button id="btn-logout" class="btn"><i class="fas fa-sign-out-alt"></i> Sair</button>
+            <button id="btn-logout" class="btn" aria-label="Fazer logout"><i class="fas fa-sign-out-alt"></i> Sair</button>
           </div>
         </div>
       </div>
@@ -197,7 +197,11 @@ function renderAccount(root, user, client){
     </div>`;
 
   // logout
-  root.querySelector('#btn-logout')?.addEventListener('click', ()=>{ window.authService?.signOut(); });
+  root.querySelector('#btn-logout')?.addEventListener('click', ()=>{ 
+    window.authService?.signOut(); 
+    // Opcional: redirecionar para página inicial após logout
+    setTimeout(()=>{ window.location.href = 'modern-index.html'; }, 600);
+  });
 
   // addresses
   const addrContainer = root.querySelector('#addresses-section');
