@@ -455,7 +455,7 @@ export class ModalsManager {
     const titleElement = document.getElementById('auth-modal-title');
     const submitButton = document.querySelector('#auth-form button[type="submit"]');
     const toggleLink = document.getElementById('auth-toggle');
-    const switchText = document.querySelector('.auth-switch');
+  const switchText = document.querySelector('.auth-switch');
     const registerOnly = document.querySelectorAll('#auth-modal .auth-register-only');
     const pwdInput = document.getElementById('auth-password');
     const pwdStrengthEl = document.getElementById('auth-password-strength');
@@ -464,7 +464,7 @@ export class ModalsManager {
       if (titleElement) titleElement.textContent = 'Entrar';
       if (submitButton) submitButton.textContent = 'Entrar';
       if (toggleLink) toggleLink.textContent = 'Cadastre-se';
-      if (switchText) switchText.innerHTML = 'Não tem conta? <a href="#" id="auth-toggle" class="auth-switch__link">Cadastre-se</a>';
+      if (switchText) switchText.innerHTML = 'Não tem conta? <a href="#" id="auth-toggle" class="auth-switch__link">Cadastre-se</a> <a href="#" id="auth-forgot-link" class="auth-switch__link" style="margin-left:auto;">Esqueci minha senha</a>';
       registerOnly.forEach(el => el.style.display = 'none');
       if (pwdInput) pwdInput.setAttribute('autocomplete', 'current-password');
       if (pwdStrengthEl) pwdStrengthEl.style.display = 'none';
@@ -472,7 +472,7 @@ export class ModalsManager {
       if (titleElement) titleElement.textContent = 'Cadastrar';
       if (submitButton) submitButton.textContent = 'Cadastrar';
       if (toggleLink) toggleLink.textContent = 'Entrar';
-      if (switchText) switchText.innerHTML = 'Já tem conta? <a href="#" id="auth-toggle" class="auth-switch__link">Entrar</a>';
+      if (switchText) switchText.innerHTML = 'Já tem conta? <a href="#" id="auth-toggle" class="auth-switch__link">Entrar</a> <a href="#" id="auth-forgot-link" class="auth-switch__link" style="margin-left:auto;">Esqueci minha senha</a>';
       registerOnly.forEach(el => el.style.display = 'block');
       if (pwdInput) pwdInput.setAttribute('autocomplete', 'new-password');
       if (pwdStrengthEl) pwdStrengthEl.style.display = 'flex';

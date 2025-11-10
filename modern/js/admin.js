@@ -209,6 +209,7 @@ class AdminApp {
         <h3 style="margin:0 0 .75rem 0;">Login do Administrador</h3>
         <div class="form-group"><label>E-mail</label><input id="admin-login-email" type="email" style="width:100%; padding:.5rem; border:1px solid var(--gray-300); border-radius:8px;"></div>
         <div class="form-group" style="margin-top:.5rem"><label>Senha</label><input id="admin-login-pass" type="password" style="width:100%; padding:.5rem; border:1px solid var(--gray-300); border-radius:8px;"></div>
+        <div style="margin-top:.35rem;text-align:right;"><a href="#" id="admin-forgot-link" style="font-size:.8rem;">Esqueci minha senha</a></div>
         <div id="admin-login-status" style="margin:.5rem 0; font-size:.85rem; color:var(--gray-600);"></div>
         <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.5rem;">
           <button id="admin-login-btn" class="btn btn--primary">Entrar</button>
@@ -228,6 +229,21 @@ class AdminApp {
       } catch(e){
         if (st) st.textContent = 'Falha no login: ' + (e?.message || 'erro');
         btn.disabled = false;
+      }
+    });
+    // Handler do link de recuperação no overlay mínimo
+    wrap.querySelector('#admin-forgot-link')?.addEventListener('click', async (e)=>{
+      e.preventDefault();
+      const st = document.getElementById('admin-login-status');
+      try {
+        const email = document.getElementById('admin-login-email')?.value?.trim();
+        if(!email){ if(st) st.textContent='Informe o e-mail para recuperar.'; return; }
+        if(!this.firebase?.isInitialized){ if(st) st.textContent='Offline: não é possível enviar.'; return; }
+        await this.firebase.sendPasswordReset(email);
+        if(st) st.textContent='E-mail de redefinição enviado.';
+        this.showNotification('Link de redefinição enviado para seu e-mail.', 'success');
+      } catch(err){
+        this.showNotification('Falha ao enviar redefinição: '+(err?.message||'erro'), 'error');
       }
     });
   }
@@ -344,6 +360,21 @@ class AdminApp {
       // Fallback overlay mínimo
       if (!window.modalsManager) this.ensureLoginOverlay();
     });
+  // Link de recuperação no modal principal de autenticação
+  document.addEventListener('click', async (ev)=>{
+    const a = ev.target?.closest?.('#auth-forgot-link');
+    if (!a) return;
+    ev.preventDefault();
+    try {
+      const email = document.getElementById('auth-email')?.value?.trim();
+      if (!email) { this.showNotification('Informe seu e-mail para recuperar a senha.', 'warning'); return; }
+      if (!this.firebase?.isInitialized) { this.showNotification('Modo offline: não é possível enviar recuperação.', 'warning'); return; }
+      await this.firebase.sendPasswordReset(email);
+      this.showNotification('Enviamos um link de redefinição para o seu e-mail.', 'success');
+    } catch(e){
+      this.showNotification(e?.message || 'Falha ao enviar e-mail de redefinição.', 'error');
+    }
+  });
   document.getElementById('add-product-btn')?.addEventListener('click',()=> this.showProductModal());
   document.getElementById('product-form')?.addEventListener('submit',e=> this.handleProductSubmit(e));
   const debouncedProducts = this.debounce(()=>{ this.pagination.products.page=1; this.filterProducts(); }, 250);

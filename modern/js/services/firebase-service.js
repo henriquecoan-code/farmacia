@@ -320,6 +320,12 @@ export class FirebaseService {
     return signOut(this.auth);
   }
 
+  async sendPasswordReset(email){
+    if(!this.isInitialized) throw new Error('Firebase not initialized');
+    const { sendPasswordResetEmail } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js');
+    return sendPasswordResetEmail(this.auth, email);
+  }
+
   // Firestore methods
   async getProducts() {
     // Local cache
