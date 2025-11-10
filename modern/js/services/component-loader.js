@@ -7,7 +7,7 @@ class ComponentLoader {
         this.components = new Map();
         this.cache = new Map();
     this.cacheTTLms = 1000 * 60 * 60 * 6; // 6h
-    this.version = 'v2';
+    this.version = 'v3';
     }
 
     /**
