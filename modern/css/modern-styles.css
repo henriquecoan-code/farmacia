@@ -1,3 +1,67 @@
+/* --- Overrides: centralização e faixa única sem scroll no mobile (produtos.html) --- */
+/* Centraliza a barra de filtros quando usado o modificador */
+.filters__content--center {
+  justify-content: center;
+}
+
+/* Mobile: uma linha, sem scroll, com ícones menores */
+@media (max-width: 768px) {
+  /* Mantém disposição em linha e centralizado */
+  .filters__content {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Não deixa quebrar de linha */
+  .filters__categories {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: center;
+    gap: 4px; /* gap menor para caber em telas estreitas */
+  }
+
+  /* Oculta subfiltros na barra superior para garantir 1 linha */
+  .filters .filter-btn[data-subfilter] {
+    display: none !important;
+  }
+
+  /* Ícones apenas (texto oculto), tamanho reduzido para caber tudo em 1 linha */
+  .filters .filter-btn,
+  .filters--mobile .filter-btn {
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: var(--radius-full, 9999px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0; /* esconde o texto visualmente */
+    line-height: 1;
+    flex: 0 0 auto; /* não encolhe */
+  }
+  .filters .filter-btn i,
+  .filters--mobile .filter-btn i {
+    font-size: 18px;
+  }
+}
+
+/* Telas muito estreitas: reduções progressivas para garantir 1 linha sem scroll */
+@media (max-width: 360px) {
+  .filters .filter-btn,
+  .filters--mobile .filter-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (max-width: 320px) {
+  .filters .filter-btn,
+  .filters--mobile .filter-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
 @import url('modals.css');
 /* Modern CSS Variables and Reset */
 :root {
