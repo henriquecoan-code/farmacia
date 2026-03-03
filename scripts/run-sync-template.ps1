@@ -34,12 +34,12 @@ $env:SYNC_LIMIT = "0"            # limite de itens
 
 # Flags operacionais (opcionais)
 # Ativar logs detalhados e simular sem gravar
-$env:VERBOSE = "1"      # 1 para logs detalhados
-$env:DRY_RUN = "1"      # 1 para simular sem escrever no Firestore
+$env:VERBOSE = "0"      # 1 para logs detalhados (ajustado para 0 para execução silenciosa)
+$env:DRY_RUN = "0"      # 1 para simular sem escrever no Firestore (ajustado para 0 para sync real)
 # Otimizações/idempotência
 $env:SKIP_UNCHANGED = "1"  # 1 para evitar gravações quando nada mudou
 $env:ONLY_EXISTING = "0"   # 1 para atualizar apenas documentos existentes
-$env:BATCH_SIZE = "400"    # tamanho do batch de writes (1–500, padrão 400)
+$env:BATCH_SIZE = "0"    # tamanho do batch de writes (1–500, padrão 400)
 $env:PROGRESS_EVERY = "50"  # imprime progresso a cada N itens (0 = desliga)
 $env:BUMP_VERSION = "1"     # 1 para atualizar meta/counters.productsVersion
 

@@ -372,8 +372,11 @@ export class FirebaseService {
         }
       }
 
-      // 4) Static-first: tente JSON estático antes de bater no Firestore
-      if (!nocache && typeof fetch === 'function') {
+      // 3.5) Se a versão remota mudou, priorize Firestore em vez do JSON estático
+      const versionChanged = (remoteVersion !== null) && (cached?.version !== remoteVersion);
+
+      // 4) Static-first: tente JSON estático antes de bater no Firestore (somente se versão não mudou)
+      if (!nocache && !versionChanged && typeof fetch === 'function') {
         try {
           const resp = await fetch(this._getProductsJsonUrl(), { cache: 'force-cache' });
           if (resp.ok) {
