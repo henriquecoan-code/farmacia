@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instruções Internas - Farmácia São Benedito</title>
+    <meta name="description" content="Bloco de notas com instruções internas para a equipe da Farmácia São Benedito.">
+    <meta name="theme-color" content="#1e40af">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="img/favicon.ico">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="modern/css/modern-styles.css">
+    <link rel="stylesheet" href="modern/css/instrucoes.css">
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer">
+</head>
+<body>
+    <!-- Skip link para acessibilidade -->
+    <a class="skip-link" href="#instructions-content">Pular para as instruções</a>
+
+    <!-- Header Container -->
+    <div id="header-container"></div>
+
+    <main class="main instructions-page">
+        <section class="instructions-hero">
+            <div class="container">
+                <div class="instructions-hero__content">
+                    <div>
+                        <h1>Instruções da Equipe</h1>
+                        <p class="instructions-hero__subtitle">Um bloco de notas com rotinas, procedimentos e links diretos para cada instrução.</p>
+                    </div>
+                    <div class="instructions-hero__meta">
+                        <span class="instructions-hero__badge"><i class="fas fa-sticky-note" aria-hidden="true"></i> Atualize quando precisar</span>
+                        <span class="instructions-hero__hint">Use o menu ao lado para acessar rapidamente.</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="instructions-board">
+            <div class="container">
+                <div class="instructions-layout">
+                    <aside class="instructions-list" aria-label="Lista de instruções">
+                        <div class="instructions-list__header">
+                            <h2>Bloco de notas</h2>
+                            <p>Links rápidos para as instruções.</p>
+                        </div>
+                        <ul id="instructions-list" class="instructions-list__items"></ul>
+                    </aside>
+
+                    <div class="instructions-notes" id="instructions-content" aria-live="polite">
+                        <!-- Conteúdo gerado pelo JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer Container -->
+    <div id="footer-container"></div>
+
+    <script type="module" src="modern/js/instrucoes.js"></script>
+</body>
+</html>
