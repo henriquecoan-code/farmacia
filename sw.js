@@ -47,15 +47,29 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
+    (async () => {
+      const request = event.request;
+      const cacheMode = request.cache;
+      const networkFirst = ['no-store', 'no-cache', 'reload'].includes(cacheMode);
+      const allowStore = cacheMode !== 'no-store';
 
-      return fetch(event.request).then((response) => {
-        if (!response.ok || response.type === 'opaque') return response;
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      if (!networkFirst) {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+      }
+
+      try {
+        const response = await fetch(request);
+        if (allowStore && response && response.ok && response.type !== 'opaque') {
+          const copy = response.clone();
+          event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
+        }
         return response;
-      });
-    })
+      } catch (err) {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        throw err;
+      }
+    })()
   );
 });
