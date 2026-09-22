@@ -6,6 +6,7 @@ import { ModalsManager } from './services/modals-service.js';
 import { eventBus } from './services/event-bus.js';
 import { analytics } from './services/analytics-service.js';
 import './services/toast-service.js'; // initializes toast global
+import './pwa.js';
 
 class Bootstrap {
   constructor() {
