@@ -1,0 +1,224 @@
+rules_version = '2';
+
+// Regras do Firestore — Farmácia São Benedito (projeto farmaciasaobenedito-bcb2c)
+//
+// Mapa de acessos (base para estas regras):
+//   produtos/{id}                 leitura pública (catálogo); escrita pelo admin (painel) e scripts/*.mjs (Admin SDK)
+//   meta/counters                 leitura pública (productsVersion p/ cache); cliente só incrementa orderSeq (+1) no checkout;
+//                                 admin faz bump de productsVersion/productsUpdatedAt
+//   pedidos/{id}                  create pelo cliente (checkout, transação junto com meta/counters);
+//                                 leitura pelo dono (userId) ou admin; admin atualiza status/history
+//   orders/{id}                   coleção legada: só leitura (dono por user.email/user.uid ou admin)
+//   usuarios/{uid}                perfil do cliente; dono lê/grava, exceto campos de permissão (role/admin/roles)
+//   usuarios/{uid}/enderecos/{id} endereços do cliente (conta/checkout)
+//   clientes/{id}                 coleção legada; dono (por e-mail) lê e altera só addresses; admin total
+//   adminRequests/{id}            pedidos de grant/revoke de admin; processados por scripts/process-admin-requests.mjs
+//   admins/{uid}, adminsByEmail/{email}, meta/admins
+//                                 fallbacks de admin lidos pelo painel; nunca graváveis pelo cliente
+//
+// Scripts em scripts/*.mjs usam o Admin SDK e ignoram estas regras.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===== Helpers =====
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Admin = custom claim (scripts/set-admin-claim.mjs / process-admin-requests.mjs gravam admin:true e role:'admin')
+    // ou usuarios/{uid}.role == 'admin' (campo que o cliente não consegue alterar, ver regra de usuarios).
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        (exists(userPath(request.auth.uid)) && get(userPath(request.auth.uid)).data.get('role', '') == 'admin')
+      );
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/usuarios/$(uid);
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // Campos que dão permissão e não podem ser definidos/alterados pelo próprio usuário
+    function permissionFields() {
+      return ['role', 'admin', 'roles'];
+    }
+
+    function isNullOr(value, type) {
+      return value == null || (
+        (type == 'string' && value is string) ||
+        (type == 'map' && value is map) ||
+        (type == 'number' && value is number)
+      );
+    }
+
+    // ===== Catálogo =====
+    match /produtos/{produtoId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ===== Meta =====
+    match /meta/counters {
+      allow read: if true;
+
+      // Admin: bump de productsVersion etc.
+      allow write: if isAdmin();
+
+      // Cliente autenticado: apenas orderSeq, sempre +1 (transação do checkout)
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['orderSeq'])
+        && request.resource.data.orderSeq == 1;
+      allow update: if signedIn()
+        && changedKeys().hasOnly(['orderSeq'])
+        && request.resource.data.orderSeq is int
+        && request.resource.data.orderSeq == resource.data.get('orderSeq', 0) + 1;
+    }
+
+    // Lista de admins: nunca gravável pelo cliente (nem por admin logado no painel)
+    match /meta/admins {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Demais documentos de meta: só admin lê; escrita só via Admin SDK
+    match /meta/{docId} {
+      allow read: if isAdmin() && docId != 'admins';
+      allow write: if false;
+    }
+
+    // ===== Pedidos =====
+    function counterPath() {
+      return /databases/$(database)/documents/meta/counters;
+    }
+
+    // orderNumber tem que ser o valor de orderSeq gravado na MESMA transação (+1 em relação ao anterior)
+    function orderNumberMatchesCounter(n) {
+      return n is int
+        && getAfter(counterPath()).data.orderSeq == n
+        && ((exists(counterPath()) && get(counterPath()).data.get('orderSeq', 0) == n - 1)
+            || (!exists(counterPath()) && n == 1));
+    }
+
+    function validNewOrder(d) {
+      return d.keys().hasAll(['createdAt', 'items', 'totals', 'shippingMethod', 'paymentMethod',
+                              'address', 'userId', 'status', 'history', 'id', 'orderNumber'])
+        && d.keys().hasOnly(['createdAt', 'items', 'totals', 'shippingMethod', 'paymentMethod',
+                             'installments', 'address', 'user', 'userId', 'coupon', 'status',
+                             'history', 'id', 'orderNumber'])
+        && d.userId == request.auth.uid
+        && d.status == 'pending'
+        && d.createdAt is string
+        && d.items is list && d.items.size() > 0 && d.items.size() <= 100
+        && d.totals is map
+        && d.totals.keys().hasAll(['subtotal', 'shipping', 'discount', 'total'])
+        && d.totals.subtotal is number && d.totals.subtotal >= 0
+        && d.totals.shipping is number && d.totals.shipping >= 0
+        && d.totals.discount is number && d.totals.discount >= 0
+        && d.totals.total is number && d.totals.total >= 0
+        && d.shippingMethod is string
+        && d.paymentMethod is string
+        && d.address is map
+        && isNullOr(d.get('installments', null), 'map')
+        && isNullOr(d.get('user', null), 'string')
+        && isNullOr(d.get('coupon', null), 'string')
+        && d.history is list && d.history.size() == 1
+        && d.history[0].status == 'pending'
+        && d.id == d.orderNumber
+        && orderNumberMatchesCounter(d.orderNumber);
+    }
+
+    match /pedidos/{pedidoId} {
+      allow create: if signedIn() && validNewOrder(request.resource.data);
+
+      // get e list (a query do cliente filtra where('userId','==', uid))
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+
+      // Só o admin muda status (painel: updateOrderStatus grava status + history)
+      allow update: if isAdmin()
+        && changedKeys().hasOnly(['status', 'history', 'updatedAt'])
+        && request.resource.data.status in ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+        && request.resource.data.history is list;
+
+      allow delete: if false;
+    }
+
+    // Coleção legada (somente leitura)
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (signedIn() && (
+        resource.data.get('userId', null) == request.auth.uid ||
+        (request.auth.token.email != null && resource.data.get('user', {}).get('email', null) == request.auth.token.email)
+      ));
+      allow update: if isAdmin()
+        && changedKeys().hasOnly(['status', 'history', 'updatedAt'])
+        && request.resource.data.status in ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+      allow create, delete: if false;
+    }
+
+    // ===== Usuários =====
+    match /usuarios/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isAdmin()
+        || (isOwner(uid) && !request.resource.data.keys().hasAny(permissionFields()));
+      allow update: if isAdmin()
+        || (isOwner(uid) && !changedKeys().hasAny(permissionFields()));
+      allow delete: if isAdmin();
+
+      match /enderecos/{enderecoId} {
+        allow read, write: if isOwner(uid) || isAdmin();
+      }
+    }
+
+    // Coleção legada de clientes (fallback do painel/conta)
+    match /clientes/{clienteId} {
+      function isClienteOwner() {
+        return signedIn()
+          && request.auth.token.email != null
+          && resource.data.get('email', null) == request.auth.token.email;
+      }
+      allow read: if isAdmin() || isClienteOwner();
+      allow update: if isAdmin() || (isClienteOwner() && changedKeys().hasOnly(['addresses']));
+      allow create, delete: if isAdmin();
+    }
+
+    // ===== Administração =====
+    // Criar uma solicitação leva o script process-admin-requests.mjs a conceder claims: só admin pode criar.
+    match /adminRequests/{reqId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['email', 'action', 'status', 'requestedBy',
+                                                 'requestedByEmail', 'createdAt', 'createdAtTs'])
+        && request.resource.data.email is string
+        && request.resource.data.action in ['grant', 'revoke']
+        && request.resource.data.status == 'pending'
+        && request.resource.data.requestedBy == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Fallbacks de admin lidos pelo painel: o usuário só lê o próprio documento; ninguém grava pelo cliente.
+    match /admins/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if false;
+    }
+
+    match /adminsByEmail/{email} {
+      allow read: if isAdmin() || (signedIn() && request.auth.token.email != null
+                                   && request.auth.token.email.lower() == email);
+      allow write: if false;
+    }
+
+    // Qualquer outra coleção: negado
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
