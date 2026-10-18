@@ -2,7 +2,7 @@
 # DRY_RUN=1 apenas exibe; DRY_RUN=0 aplica (desativa ou deleta)
 
 # Credencial Firebase Admin
-$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Keys\farmacia-service-account.json"
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Keys\farmaciasaobenedito-bcb2c-firebase-adminsdk-fbsvc-fa34beab16.json"
 
 # Modo: 'deactivate' (padrão) ou 'delete'
 $env:CLEAN_MODE = "deactivate"

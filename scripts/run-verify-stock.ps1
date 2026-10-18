@@ -12,7 +12,7 @@ if (-not $env:PGPASSWORD) {
   $env:PGPASSWORD = [System.Net.NetworkCredential]::new("", $sec).Password
 }
 
-$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Keys\farmacia-service-account.json"
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Keys\farmaciasaobenedito-bcb2c-firebase-adminsdk-fbsvc-fa34beab16.json"
 
 $env:PG_CONNECT_TIMEOUT = "10000"
 $env:PG_STATEMENT_TIMEOUT = "15000"

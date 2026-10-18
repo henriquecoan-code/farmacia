@@ -19,7 +19,7 @@ if (-not $env:PGPASSWORD) {
 # $env:PG_STATEMENT_TIMEOUT = "15000"
 
 # Caminho do service account (JSON) do Firebase Admin
-$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Keys\farmacia-service-account.json"
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Keys\farmaciasaobenedito-bcb2c-firebase-adminsdk-fbsvc-fa34beab16.json"
 
 # Timeouts (ativado): conexão e statement, em ms
 $env:PG_CONNECT_TIMEOUT = "10000"
