@@ -380,9 +380,13 @@ export class FirebaseService {
 
       // 3) Versão nova: baixa as N partes do catálogo
       if (version !== null && partsCount > 0) {
+        // Falha (ex.: regras ainda sem catalogo/*) cai na coleção completa abaixo
         const snaps = await Promise.all(Array.from({ length: partsCount }, (_, i) =>
-          getDoc(doc(this.firestore, 'catalogo', `parte-${i + 1}`))));
-        if (snaps.every(sn => sn.exists() && sn.data().v === version)) {
+          getDoc(doc(this.firestore, 'catalogo', `parte-${i + 1}`)))).catch((e) => {
+          console.warn('[FirebaseService] Falha ao ler o catálogo agregado', e?.code || e);
+          return [];
+        });
+        if (snaps.length && snaps.every(sn => sn.exists() && sn.data().v === version)) {
           const items = snaps.flatMap(sn => sn.data().itens || []);
           this._setCatalogCache({ items, version, checkedAt: now });
           return items;
