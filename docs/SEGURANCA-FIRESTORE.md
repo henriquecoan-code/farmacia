@@ -3,7 +3,7 @@
 Arquivos:
 - [`firestore.rules`](../firestore.rules): regras propostas (ainda **não** publicadas).
 - [`firebase.json`](../firebase.json): configuração mínima (só regras + emulador).
-- [`tests/firestore-rules/rules.test.mjs`](../tests/firestore-rules/rules.test.mjs): 43 testes no Emulator.
+- [`tests/firestore-rules/rules.test.mjs`](../tests/firestore-rules/rules.test.mjs): 46 testes no Emulator.
 
 ## 1. Mapa de acessos do front
 
@@ -15,7 +15,8 @@ Arquivos:
 | `orders/{id}` (legado) | dono por `user.email`, admin | admin (status) | fallbacks de `listOrders*`/`updateOrderStatus` |
 | `usuarios/{uid}` | dono, admin (`getClients` lista tudo) | dono (perfil) | `getCurrentUserProfile`, `getUserByEmail`, `getClients`, `admin.js` (fallback de role) |
 | `usuarios/{uid}/enderecos/{id}` | dono | dono | `account.js`, `checkout.js` → `addAddressToClient`, `updateClientAddress`, `deleteClientAddress` |
-| `clientes/{id}` (legado) | dono por e-mail, admin | dono (`addresses`), admin | fallbacks de endereço/cliente |
+| `clientes/{id}` (legado) | admin | admin | `getClients`, fallbacks de endereço/cliente |
+| `ofertas`, `carrinhos/{uid}`, `usuarios/{uid}/endereco` | — | — | sem uso no site; mantidas das regras anteriores |
 | `adminRequests/{id}` | admin | admin (painel → `process-admin-requests.mjs` concede claims) | `admin.js` |
 | `admins/{uid}`, `adminsByEmail/{email}`, `meta/admins` | painel no login (fallback de admin) | ninguém pelo cliente | `admin.js` `checkFirestoreAdmin` |
 
@@ -29,7 +30,7 @@ Arquivos:
   - leitura: dono ou admin. update: só admin, só `status`/`history`/`updatedAt`, status em `pending|processing|shipped|delivered|cancelled`. delete: ninguém.
 - **meta/counters**: leitura pública; cliente autenticado só altera `orderSeq` e só +1; admin grava o resto.
 - **usuarios/{uid}**: dono lê/cria/atualiza, mas não pode definir/alterar `role`, `admin`, `roles`. Endereços: só o dono (e admin).
-- **adminRequests**: só admin cria/lê. ⚠️ Se hoje qualquer usuário pode criar, **qualquer pessoa vira admin** na próxima execução de `process-admin-requests.mjs`.
+- **adminRequests**: só admin cria/lê. Nas regras anteriores não havia regra (negado para todos); nunca abrir para não-admin, porque `process-admin-requests.mjs` concede a claim de admin para o e-mail pedido.
 - **admins / adminsByEmail / meta/admins**: nunca graváveis pelo cliente. Usuário só lê o próprio `admins/{uid}` / `adminsByEmail/{seu e-mail}`; `meta/admins` só admin lê.
 - Qualquer outra coleção: negada.
 
@@ -37,7 +38,7 @@ Arquivos:
 1. Quem é admin **apenas** por `admins/{uid}`, `adminsByEmail` ou `meta/admins` continua vendo o painel, mas as gravações passam a falhar. Antes do deploy, rode `scripts/set-admin-claim.mjs` para esses usuários.
 2. O fallback de `createOrder` (pedido sem contador, número do `localStorage`) passa a ser **rejeitado**. Hoje, nesse caso, o checkout mostra sucesso e guarda o pedido só no navegador: a loja não recebe o pedido. Sugestão: remover o fallback e mostrar erro.
 3. `getUserByEmail` (query em `usuarios` por e-mail) só funciona para admin. Para o cliente ela já cai no fallback e não quebra o fluxo (`getCurrentUserProfile` vem antes).
-4. O acesso a `clientes`/`orders` legados por e-mail confia em `token.email`. Exigir `email_verified` seria mais seguro, mas pode bloquear contas antigas.
+4. A leitura de `orders` (legado) por e-mail confia em `token.email`. Exigir `email_verified` seria mais seguro, mas pode bloquear contas antigas.
 5. Qualquer usuário autenticado pode incrementar `orderSeq` sozinho (gera buracos na numeração, não duplicidade). Isso é resolvido pela Cloud Function abaixo.
 
 ## 3. Ponto crítico que as regras NÃO resolvem: o total é calculado no navegador
@@ -117,7 +118,7 @@ cd tests/firestore-rules
 npm install
 npm test
 ```
-Usa o projeto local `demo-farmacia`: nada toca produção. Resultado atual: **43/43 passando**.
+Usa o projeto local `demo-farmacia`: nada toca produção. Resultado atual: **46/46 passando**.
 
 ### Sem emulador: Rules Playground (Console → Firestore → Regras → "Playground de regras")
 Cole o conteúdo de `firestore.rules` no editor **sem publicar** e simule:
@@ -136,16 +137,21 @@ Cole o conteúdo de `firestore.rules` no editor **sem publicar** e simule:
 2. Dar claim de admin a quem usa só os fallbacks (`set-admin-claim.mjs`).
 3. Publicar só com aprovação: `firebase deploy --only firestore:rules --project farmaciasaobenedito-bcb2c`. (O Console guarda o histórico de versões, então dá para voltar para a versão anterior.)
 
-## 6. Diferenças em relação às regras atuais
+## 6. Diferenças em relação às regras anteriores (Console, até 18/10/2026)
 
-_Pendente: as regras publicadas no Console não estão no repositório. Ao recebê-las, preencher:_
-
-| Caminho | Atual | Proposta | Impacto |
+| Caminho | Antes | Agora | Impacto |
 |---|---|---|---|
-| produtos | ? | leitura pública, escrita admin | |
-| pedidos | ? | create validado + contador; leitura dono/admin; update admin | |
-| meta/counters | ? | +1 em orderSeq | |
-| usuarios | ? | dono sem role/admin | |
-| adminRequests | ? | só admin | crítico se hoje for aberto |
-| admins/adminsByEmail/meta/admins | ? | sem escrita pelo cliente | |
-| orders/clientes (legado) | ? | leitura dono/admin | |
+| `isAdmin()` | claims `admin`/`role` | claims + `usuarios/{uid}.role == 'admin'` | seguro só porque `usuarios.role` deixou de ser gravável pelo dono |
+| `usuarios/{uid}` | dono grava **qualquer** campo | dono não cria/altera `role`, `admin`, `roles` | antes, qualquer um podia gravar `role:'admin'` e o painel o reconhecia como admin (os dados continuavam bloqueados porque o antigo `isAdmin` não lia esse campo) |
+| `pedidos` create | só `userId == uid` (ou admin); nenhum outro campo validado | campos/tipos validados, `status 'pending'`, número amarrado ao contador; admin não cria pelo cliente | antes dava para gravar pedido já `delivered`, com qualquer número ou qualquer estrutura |
+| `pedidos` read | dono por `userId` **ou** `user == token.email`, admin | dono por `userId`, admin | pedidos antigos sem `userId` deixam de aparecer para o cliente (o site já busca só por `userId`) |
+| `pedidos` update/delete | admin, qualquer campo; delete permitido | admin, só `status`/`history`/`updatedAt`; delete negado | |
+| `meta/*` read | **público** (inclusive `meta/admins`) | `counters` público; `meta/admins` e demais só admin | antes, a lista de uids/e-mails de admin era pública |
+| `meta/*` write | admin em qualquer doc (inclusive `meta/admins`) | admin só em `counters`; `meta/admins` e demais só via Admin SDK | |
+| `meta/counters` (cliente) | update com `changedKeys()` (ignora campos **adicionados/removidos**); exige que o doc e `orderSeq` já existam | `affectedKeys()`; aceita o primeiro `orderSeq` (doc ausente ou sem o campo) | antes o cliente podia incluir/remover campos (ex.: apagar `productsVersion`) junto com o +1 |
+| `orders` (legado) | cliente **cria**; leitura por `userId`/`user.email` | ninguém cria; admin só altera status | o site não cria em `orders` |
+| `clientes` | só admin | só admin | sem mudança |
+| `adminRequests` | sem regra → negado para todos | só admin lê/cria (campos validados) | não havia escalada; o formulário do painel ficava quebrado e agora funciona para admin |
+| `admins`, `adminsByEmail` | sem regra → negado | usuário lê só o próprio doc; ninguém grava | o fallback do painel volta a funcionar só para leitura |
+| `produtos`, `ofertas`, `carrinhos`, `usuarios/*/endereco(s)` | — | iguais às anteriores | sem mudança |
+| demais coleções | negado (padrão) | negado (explícito) | sem mudança |

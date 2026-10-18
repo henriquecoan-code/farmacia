@@ -11,7 +11,9 @@ rules_version = '2';
 //   orders/{id}                   coleção legada: só leitura (dono por user.email/user.uid ou admin)
 //   usuarios/{uid}                perfil do cliente; dono lê/grava, exceto campos de permissão (role/admin/roles)
 //   usuarios/{uid}/enderecos/{id} endereços do cliente (conta/checkout)
-//   clientes/{id}                 coleção legada; dono (por e-mail) lê e altera só addresses; admin total
+//   clientes/{id}                 coleção legada; só admin
+//   ofertas/{id}, carrinhos/{uid}, usuarios/{uid}/endereco/{id}
+//                                 mantidas das regras anteriores (sem uso no site)
 //   adminRequests/{id}            pedidos de grant/revoke de admin; processados por scripts/process-admin-requests.mjs
 //   admins/{uid}, adminsByEmail/{email}, meta/admins
 //                                 fallbacks de admin lidos pelo painel; nunca graváveis pelo cliente
@@ -176,18 +178,25 @@ service cloud.firestore {
       match /enderecos/{enderecoId} {
         allow read, write: if isOwner(uid) || isAdmin();
       }
+      // Singular: mantido das regras anteriores (não usado pelo site; possível uso pelo app/dados antigos)
+      match /endereco/{enderecoId} {
+        allow read, write: if isOwner(uid) || isAdmin();
+      }
     }
 
-    // Coleção legada de clientes (fallback do painel/conta)
+    // Mantidas das regras anteriores (não usadas pelo site; possível uso pelo app/dados antigos)
+    match /ofertas/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /carrinhos/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Coleção legada de clientes (listagem/CRUD do painel): só admin, como nas regras anteriores
     match /clientes/{clienteId} {
-      function isClienteOwner() {
-        return signedIn()
-          && request.auth.token.get('email', null) != null
-          && resource.data.get('email', null) == request.auth.token.email;
-      }
-      allow read: if isAdmin() || isClienteOwner();
-      allow update: if isAdmin() || (isClienteOwner() && changedKeys().hasOnly(['addresses']));
-      allow create, delete: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
     // ===== Administração =====

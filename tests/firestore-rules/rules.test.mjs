@@ -288,12 +288,26 @@ describe('coleções de admin', () => {
 });
 
 describe('legado e padrão', () => {
-  test('clientes: dono (por e-mail) lê e altera só addresses', async () => {
+  test('clientes: só admin', async () => {
     await seed((fs) => setDoc(doc(fs, 'clientes', 'c1'), { email: 'alice@teste.com', addresses: [] }));
-    await assertSucceeds(getDocs(query(collection(db(ALICE), 'clientes'), where('email', '==', 'alice@teste.com'))));
-    await assertSucceeds(updateDoc(doc(db(ALICE), 'clientes', 'c1'), { addresses: [{ id: 'a1' }] }));
-    await assertFails(updateDoc(doc(db(ALICE), 'clientes', 'c1'), { role: 'admin' }));
-    await assertFails(getDoc(doc(db(BOB), 'clientes', 'c1')));
+    await assertFails(getDoc(doc(db(ALICE), 'clientes', 'c1')));
+    await assertFails(updateDoc(doc(db(ALICE), 'clientes', 'c1'), { addresses: [{ id: 'a1' }] }));
+    await assertSucceeds(getDocs(collection(adminDb(), 'clientes')));
+    await assertSucceeds(updateDoc(doc(adminDb(), 'clientes', 'c1'), { addresses: [] }));
+  });
+  test('ofertas: leitura pública, escrita admin', async () => {
+    await assertSucceeds(getDocs(collection(db(null), 'ofertas')));
+    await assertFails(setDoc(doc(db(ALICE), 'ofertas', 'o1'), { a: 1 }));
+    await assertSucceeds(setDoc(doc(adminDb(), 'ofertas', 'o1'), { a: 1 }));
+  });
+  test('carrinhos e endereco (singular): só o dono', async () => {
+    await assertSucceeds(setDoc(doc(db(ALICE), 'carrinhos', ALICE), { items: [] }));
+    await assertFails(getDoc(doc(db(BOB), 'carrinhos', ALICE)));
+    await assertSucceeds(setDoc(doc(db(ALICE), 'usuarios', ALICE, 'endereco', 'e1'), { street: 'A' }));
+    await assertFails(getDoc(doc(db(BOB), 'usuarios', ALICE, 'endereco', 'e1')));
+  });
+  test('meta/counters: cliente não adiciona campos novos junto com +1', async () => {
+    await assertFails(setDoc(doc(db(ALICE), 'meta', 'counters'), { orderSeq: 42, extra: 'x' }, { merge: true }));
   });
   test('orders (legado): dono por user.email lê; ninguém cria', async () => {
     await seed((fs) => setDoc(doc(fs, 'orders', 'o1'), { user: { email: 'alice@teste.com' }, status: 'pending' }));
