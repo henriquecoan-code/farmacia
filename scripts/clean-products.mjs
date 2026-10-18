@@ -6,6 +6,7 @@
 //   BATCH_SIZE: optional, default 400
 
 import admin from 'firebase-admin';
+import { buildCatalog } from './build-catalog.mjs';
 
 const { CLEAN_MODE, DRY_RUN, BATCH_SIZE } = process.env;
 const mode = (CLEAN_MODE || 'deactivate').toLowerCase();
@@ -82,6 +83,7 @@ async function main(){
       }, { merge: true });
     });
     console.log('[clean] productsVersion bumped.');
+    if (!dryRun) await buildCatalog(db);
   } catch (e) {
     console.warn('[clean] Failed to bump productsVersion', e && e.message ? e.message : e);
   }

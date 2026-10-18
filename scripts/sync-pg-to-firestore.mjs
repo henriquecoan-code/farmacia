@@ -6,6 +6,7 @@
 
 import pg from 'pg';
 import admin from 'firebase-admin';
+import { buildCatalog } from './build-catalog.mjs';
 import fs from 'fs/promises';
 
 process.on('unhandledRejection', (e) => {
@@ -322,6 +323,8 @@ async function main(){
     try {
       await bumpProductsVersion();
       console.log('[sync] productsVersion bumped.');
+      // Regenera o catálogo agregado lido pelo site
+      await buildCatalog(db, { log: (m) => console.log(m) });
     } catch (e) {
       console.error('[sync] bumpProductsVersion error:', e && e.message ? e.message : e);
       throw e;

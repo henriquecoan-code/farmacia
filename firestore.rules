@@ -4,6 +4,7 @@ rules_version = '2';
 //
 // Mapa de acessos (base para estas regras):
 //   produtos/{id}                 leitura pública (catálogo); escrita pelo admin (painel) e scripts/*.mjs (Admin SDK)
+//   catalogo/{parte}              catálogo agregado (parte-N); leitura pública; escrita só admin
 //   meta/counters                 leitura pública (productsVersion p/ cache); cliente só incrementa orderSeq (+1) no checkout;
 //                                 admin faz bump de productsVersion/productsUpdatedAt
 //   pedidos/{id}                  create pelo cliente (checkout, transação junto com meta/counters);
@@ -69,12 +70,36 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ===== Catálogo agregado (catalogo/parte-N) =====
+    // Leitura pública; escrita só admin (o gerador via Admin SDK ignora as regras).
+    match /catalogo/{parte} {
+      allow read: if true;
+      allow create, update: if isAdmin() && validCatalogPart(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    function validCatalogPart(d) {
+      return d.keys().hasAll(['v', 'parte', 'total', 'itens', 'geradoEm'])
+        && d.keys().hasOnly(['v', 'parte', 'total', 'itens', 'geradoEm'])
+        && d.v is int
+        && d.parte is int && d.parte >= 0
+        && d.total is int && d.total >= 0
+        && d.itens is list
+        && d.geradoEm is timestamp;
+    }
+
+    // Campos do catálogo em meta/counters, quando presentes
+    function validCatalogMeta(d) {
+      return (!('catalogParts' in d) || (d.catalogParts is int && d.catalogParts >= 0))
+        && (!('catalogVersion' in d) || d.catalogVersion is int);
+    }
+
     // ===== Meta =====
     match /meta/counters {
       allow read: if true;
 
-      // Admin: bump de productsVersion etc.
-      allow write: if isAdmin();
+      // Admin: bump de productsVersion e metadados do catálogo agregado (catalogParts/catalogVersion)
+      allow write: if isAdmin() && validCatalogMeta(request.resource.data);
 
       // Cliente autenticado: apenas orderSeq, sempre +1 (transação do checkout)
       allow create: if signedIn()

@@ -5,10 +5,14 @@ export class FirebaseService {
     this.auth = null;
     this.firestore = null;
     this.isInitialized = false;
-  // Lightweight client cache (localStorage)
-  this._productsCacheKey = 'products_cache_v2';
-  // TTL in ms (default 60 min)
-  this._productsCacheTTL = 60 * 60 * 1000;
+  // Cache do catálogo da vitrine (IndexedDB, fallback localStorage)
+  this._catalogCacheKey = 'catalog_cache_v1';
+  // Tempo em que o cache é usado sem consultar meta/counters
+  this._catalogFreshMs = 10 * 60 * 1000;
+  this._productsPromise = null;
+  this._cacheDbPromise = null;
+  this._allProducts = null;
+  this.catalogDirty = false;
   }
 
   async init() {
@@ -327,123 +331,124 @@ export class FirebaseService {
   }
 
   // Firestore methods
-  async getProducts() {
-    // Local cache
-    const cached = this._getLocalCache(this._productsCacheKey);
+  /**
+   * Catálogo da vitrine (só produtos visíveis, campos compactos).
+   * Lê as partes agregadas `catalogo/parte-N` (geradas por scripts/build-catalog.mjs ou pelo admin):
+   *  - cache local recente (< 10 min)              -> 0 leituras
+   *  - cache local + versão igual em meta/counters -> 1 leitura
+   *  - versão nova                                 -> 1 + N leituras (N ≈ 2)
+   * Antes, cada visitante novo lia a coleção inteira (~10 mil leituras).
+   */
+  getProducts() {
+    // Uma busca por página, mesmo que home/produtos chamem várias vezes
+    if (!this._productsPromise) {
+      this._productsPromise = this._loadCatalog().catch((e) => { this._productsPromise = null; throw e; });
+    }
+    return this._productsPromise;
+  }
+
+  async _loadCatalog() {
     const now = Date.now();
+    // Remove o cache antigo (~3,5 MB em localStorage) da versão anterior
+    try { localStorage.removeItem('products_cache_v2'); } catch {}
+    const nocache =typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache');
+    const cached = nocache ? null : await this._getCatalogCache();
 
-    // Query param para ignorar caches
-    const nocache = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache');
+    // 1) Cache recente: nenhuma leitura no Firestore
+    if (cached?.items?.length && (now - (cached.checkedAt || 0) < this._catalogFreshMs)) {
+      return cached.items;
+    }
 
-    // 1) Se não inicializado, tente cache local; senão erro
-      if (!this.isInitialized) {
-      if (cached?.items && cached.items.length) return cached.items;
-      // Como fallback extra, tente JSON estático
-      try {
-        const resp = await fetch(this._getProductsJsonUrl(), { cache: 'force-cache' });
-        if (resp.ok) return await resp.json();
-      } catch {}
-      throw new Error('Firebase not initialized');
+    if (!this.isInitialized) {
+      if (cached?.items?.length) return cached.items;
+      return this._loadStaticProductsJson();
     }
 
     try {
-      const { doc, getDoc, collection, getDocs, getDocsFromCache } =
-        await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
 
-      // 2) Versão remota barata (1 leitura) para invalidar cache quando possível
-      let remoteVersion = null;
-      try {
-        const metaRef = doc(this.firestore, 'meta', 'counters');
-        const metaSnap = await getDoc(metaRef);
-        if (metaSnap.exists()) {
-          const data = metaSnap.data();
-          remoteVersion = typeof data.productsVersion === 'number' ? data.productsVersion : null;
-        }
-      } catch {}
+      // 2) Versão do catálogo (1 leitura)
+      const metaSnap = await getDoc(doc(this.firestore, 'meta', 'counters'));
+      const meta = metaSnap.exists() ? metaSnap.data() : {};
+      const version = typeof meta.catalogVersion === 'number' ? meta.catalogVersion : null;
+      const partsCount = typeof meta.catalogParts === 'number' ? meta.catalogParts : 0;
 
-      // 3) Cache local (localStorage) válido?
-      if (!nocache && cached?.items && Array.isArray(cached.items)) {
-        const ageOk = (now - (cached.ts || 0) < this._productsCacheTTL);
-        if (remoteVersion !== null) {
-          if (cached.version === remoteVersion && ageOk) return cached.items;
-        } else if (ageOk) {
-          console.info('[FirebaseService] Using cached products (meta unavailable)');
-          return cached.items;
-        }
+      if (version !== null && cached?.items?.length && cached.version === version) {
+        this._setCatalogCache({ ...cached, checkedAt: now });
+        return cached.items;
       }
 
-      // 3.5) Se a versão remota mudou, priorize Firestore em vez do JSON estático
-      const versionChanged = (remoteVersion !== null) && (cached?.version !== remoteVersion);
-
-      // 4) Static-first: tente JSON estático antes de bater no Firestore (somente se versão não mudou)
-      if (!nocache && !versionChanged && typeof fetch === 'function') {
-        try {
-          const resp = await fetch(this._getProductsJsonUrl(), { cache: 'force-cache' });
-          if (resp.ok) {
-            const items = await resp.json();
-            if (Array.isArray(items) && items.length) {
-              this._setLocalCache(this._productsCacheKey, { items, version: remoteVersion ?? (cached?.version ?? 0), ts: now });
-              console.info('[FirebaseService] Loaded products from data/products.json');
-              return items;
-            }
-          }
-        } catch {}
-      }
-
-      // 5) Cache do Firestore (IndexedDB) primeiro
-      try {
-        const col = collection(this.firestore, 'produtos');
-        const snapCached = await getDocsFromCache(col);
-        if (!snapCached.empty) {
-          const items = [];
-          snapCached.forEach(d => items.push(Object.assign({ id: d.id }, d.data())));
-          this._setLocalCache(this._productsCacheKey, { items, version: remoteVersion ?? (cached?.version ?? 0), ts: now });
-          console.info('[FirebaseService] Loaded products from Firestore cache');
+      // 3) Versão nova: baixa as N partes do catálogo
+      if (version !== null && partsCount > 0) {
+        const snaps = await Promise.all(Array.from({ length: partsCount }, (_, i) =>
+          getDoc(doc(this.firestore, 'catalogo', `parte-${i + 1}`))));
+        if (snaps.every(sn => sn.exists() && sn.data().v === version)) {
+          const items = snaps.flatMap(sn => sn.data().itens || []);
+          this._setCatalogCache({ items, version, checkedAt: now });
           return items;
         }
-      } catch {
-        // Sem cache persistente ou primeira visita
+        console.warn('[FirebaseService] Catálogo incompleto ou em atualização; usando a coleção completa');
       }
 
-      // 6) Por fim, servidor Firestore
-      const querySnapshot = await getDocs(collection(this.firestore, 'produtos'));
-      let products = [];
-      querySnapshot.forEach((d) => {
-        const data = d.data();
-        if (data.criadoEm && data.criadoEm.toDate) {
-          data.criadoEm = data.criadoEm.toDate();
-        }
-        products.push(Object.assign({ id: d.id }, data));
-      });
-
-      // 7) Último fallback: JSON sem cache se Firestore vier vazio (ambiente travado)
-      if (!products.length) {
-        try {
-          const resp = await fetch(this._getProductsJsonUrl(), { cache: 'no-store' });
-          const items = await resp.json();
-          if (Array.isArray(items) && items.length) {
-            console.info('[FirebaseService] Fallback to data/products.json (no-store)');
-            products = items;
-          }
-        } catch {}
-      }
-
-      this._setLocalCache(this._productsCacheKey, {
-        items: products,
-        version: remoteVersion ?? (cached?.version ?? 0),
-        ts: now
-      });
-      return products;
+      // 4) Catálogo ainda não gerado: fluxo antigo (coleção inteira, caro)
+      const items = await this.getAllProducts();
+      this._setCatalogCache({ items, version: version ?? -1, checkedAt: now });
+      return items;
     } catch (error) {
       console.error('Error getting products:', error);
-      // Em erro, devolve o que tiver: cache local -> JSON -> []
-      if (cached?.items && cached.items.length) return cached.items;
-      try {
-        const resp = await fetch(this._getProductsJsonUrl(), { cache: 'force-cache' });
-        if (resp.ok) return await resp.json();
-      } catch {}
-      return [];
+      if (cached?.items?.length) return cached.items;
+      return this._loadStaticProductsJson();
     }
+  }
+
+  /** Coleção `produtos` completa (inclui inativos/sem estoque). Usada pelo admin: ~1 leitura por produto. */
+  async getAllProducts() {
+    if (!this.isInitialized) return this._loadStaticProductsJson();
+    const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+    const querySnapshot = await getDocs(collection(this.firestore, 'produtos'));
+    const products = [];
+    querySnapshot.forEach((d) => {
+      const data = d.data();
+      if (data.criadoEm && data.criadoEm.toDate) data.criadoEm = data.criadoEm.toDate();
+      products.push(Object.assign({ id: d.id }, data));
+    });
+    this._allProducts = products;
+    return products;
+  }
+
+  /** Regenera catalogo/parte-N a partir de produtos já carregados (admin): 1 leitura + N escritas. */
+  async publishCatalog(rawProducts = this._allProducts) {
+    if (!this.isInitialized) throw new Error('Firebase not initialized');
+    if (!Array.isArray(rawProducts) || !rawProducts.length) throw new Error('Produtos não carregados');
+    const { buildCatalogParts } = await import('./catalog-utils.mjs');
+    const { doc, getDoc, setDoc, deleteDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+    const parts = buildCatalogParts(rawProducts);
+    const metaRef = doc(this.firestore, 'meta', 'counters');
+    const metaSnap = await getDoc(metaRef);
+    const meta = metaSnap.exists() ? metaSnap.data() : {};
+    // Versão sempre maior que a anterior, para invalidar o cache dos visitantes
+    const version = Math.max(Number(meta.productsVersion) || 0, (Number(meta.catalogVersion) || 0) + 1);
+    const oldParts = Number(meta.catalogParts) || 0;
+    for (let i = 0; i < parts.length; i++) {
+      await setDoc(doc(this.firestore, 'catalogo', `parte-${i + 1}`),
+        { v: version, parte: i + 1, total: parts.length, itens: parts[i], geradoEm: serverTimestamp() });
+    }
+    await setDoc(metaRef, { catalogVersion: version, catalogParts: parts.length, catalogUpdatedAt: serverTimestamp() }, { merge: true });
+    for (let i = parts.length + 1; i <= oldParts; i++) {
+      await deleteDoc(doc(this.firestore, 'catalogo', `parte-${i}`)).catch(() => {});
+    }
+    this._productsPromise = null;
+    this.catalogDirty = false;
+    return { parts: parts.length, total: parts.reduce((n, p) => n + p.length, 0), version };
+  }
+
+  async _loadStaticProductsJson() {
+    // Último recurso offline (o arquivo estático pode estar desatualizado)
+    try {
+      const resp = await fetch(this._getProductsJsonUrl(), { cache: 'force-cache' });
+      if (resp.ok) return await resp.json();
+    } catch {}
+    return [];
   }
 
   async getProduct(id) {
@@ -471,6 +476,7 @@ export class FirebaseService {
     try {
   const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
   const docRef = await addDoc(collection(this.firestore, 'produtos'), product);
+  this._patchAllProducts(docRef.id, product);
   // Bump products version for cache invalidation
   this._bumpProductsVersion().catch(() => {});
       return docRef.id;
@@ -487,6 +493,7 @@ export class FirebaseService {
       const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
       const docRef = doc(this.firestore, 'produtos', id);
       await updateDoc(docRef, product);
+      this._patchAllProducts(id, product);
   // Bump products version for cache invalidation
   this._bumpProductsVersion().catch(() => {});
     } catch (error) {
@@ -502,6 +509,7 @@ export class FirebaseService {
       const { doc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
       const docRef = doc(this.firestore, 'produtos', id);
       await deleteDoc(docRef);
+      this._patchAllProducts(id, null);
   // Bump products version for cache invalidation
   this._bumpProductsVersion().catch(() => {});
     } catch (error) {
@@ -909,6 +917,51 @@ export class FirebaseService {
   }
 
   // ===== Client-side cache helpers =====
+  // Cache do catálogo em IndexedDB (sem o limite de ~5 MB do localStorage); fallback em localStorage
+  _openCacheDb() {
+    if (this._cacheDbPromise) return this._cacheDbPromise;
+    this._cacheDbPromise = new Promise((resolve) => {
+      try {
+        const req = indexedDB.open('farmacia-cache', 1);
+        req.onupgradeneeded = () => req.result.createObjectStore('kv');
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      } catch { resolve(null); }
+    });
+    return this._cacheDbPromise;
+  }
+
+  async _getCatalogCache() {
+    const db = await this._openCacheDb();
+    if (db) {
+      const value = await new Promise((resolve) => {
+        try {
+          const req = db.transaction('kv', 'readonly').objectStore('kv').get(this._catalogCacheKey);
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => resolve(null);
+        } catch { resolve(null); }
+      });
+      if (value) return value;
+    }
+    return this._getLocalCache(this._catalogCacheKey);
+  }
+
+  async _setCatalogCache(value) {
+    const db = await this._openCacheDb();
+    if (db) {
+      const ok = await new Promise((resolve) => {
+        try {
+          const tx = db.transaction('kv', 'readwrite');
+          tx.objectStore('kv').put(value, this._catalogCacheKey);
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => resolve(false);
+        } catch { resolve(false); }
+      });
+      if (ok) return;
+    }
+    this._setLocalCache(this._catalogCacheKey, value);
+  }
+
   _getLocalCache(key) {
     try {
       const raw = localStorage.getItem(key);
@@ -936,6 +989,16 @@ export class FirebaseService {
     } catch {}
     // Fallback to relative path
     return 'data/products.json';
+  }
+
+  // Mantém a cópia local da coleção (admin) igual ao Firestore e marca o catálogo como desatualizado
+  _patchAllProducts(id, data) {
+    this.catalogDirty = true;
+    if (!Array.isArray(this._allProducts)) return;
+    const idx = this._allProducts.findIndex(p => p.id === id);
+    if (data === null) { if (idx > -1) this._allProducts.splice(idx, 1); return; }
+    if (idx > -1) this._allProducts[idx] = Object.assign({}, this._allProducts[idx], data);
+    else this._allProducts.push(Object.assign({ id }, data));
   }
 
   async _bumpProductsVersion() {

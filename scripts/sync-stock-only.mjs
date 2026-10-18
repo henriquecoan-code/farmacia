@@ -6,6 +6,7 @@
 
 import pg from 'pg';
 import admin from 'firebase-admin';
+import { buildCatalog } from './build-catalog.mjs';
 
 process.on('unhandledRejection', (e) => {
   console.error('[stock-sync] UnhandledRejection:', e && e.stack ? e.stack : e);
@@ -198,6 +199,8 @@ async function main(){
     if (!DRY_RUN && changed > 0 && process.env.BUMP_VERSION !== '0') {
       console.log('[stock-sync] Bumping productsVersion...');
       await bumpProductsVersion();
+      // Regenera o catálogo agregado lido pelo site
+      await buildCatalog(db);
     }
 
   const dt = (Date.now() - t0) / 1000;

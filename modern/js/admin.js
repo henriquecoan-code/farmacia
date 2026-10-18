@@ -381,6 +381,7 @@ class AdminApp {
     }
   });
   document.getElementById('add-product-btn')?.addEventListener('click',()=> this.showProductModal());
+  document.getElementById('publish-catalog-btn')?.addEventListener('click',()=> this.publishCatalog());
   document.getElementById('product-form')?.addEventListener('submit',e=> this.handleProductSubmit(e));
   const debouncedProducts = this.debounce(()=>{ this.pagination.products.page=1; this.filterProducts(); }, 250);
   document.getElementById('products-search')?.addEventListener('input', debouncedProducts);
@@ -450,7 +451,8 @@ class AdminApp {
   // Data
   async loadFirestoreData(){
     if(!this.firebase.isInitialized) return;
-    const rawProducts = await this.firebase.getProducts();
+    // Admin precisa da coleção completa (inclusive inativos); a loja lê o catálogo agregado
+    const rawProducts = await this.firebase.getAllProducts();
     this.products = this.mapAdminProducts(rawProducts);
     this.clients = await this.firebase.getClients();
     // Se não carregou clientes, provavelmente falta login admin ou regras bloqueiam leitura
@@ -513,6 +515,27 @@ class AdminApp {
       this.resetProductForm(); this.renderProducts(); this.updateDashboard();
     }catch(err){ console.error(err); this.showNotification('Erro ao salvar produto','error'); }
   }
+  // Regenera catalogo/parte-N com os produtos já carregados no painel
+  async publishCatalog(){
+    const btn=document.getElementById('publish-catalog-btn');
+    if(btn) btn.disabled=true;
+    try {
+      const r=await this.firebase.publishCatalog();
+      this.showNotification(`Catálogo publicado: ${r.total} produtos em ${r.parts} parte(s)`,'success');
+    } catch(e){
+      console.error('[Admin] publishCatalog', e);
+      this.showNotification('Erro ao publicar catálogo','error');
+    } finally {
+      if(btn) btn.disabled=false;
+      this.updateCatalogButton();
+    }
+  }
+  updateCatalogButton(){
+    const btn=document.getElementById('publish-catalog-btn'); if(!btn) return;
+    const dirty=!!this.firebase?.catalogDirty;
+    btn.className = dirty ? 'btn btn--primary' : 'btn btn--secondary';
+    btn.textContent = dirty ? '📢 Publicar catálogo (alterações pendentes)' : '📢 Publicar catálogo';
+  }
   editProduct(id){ const p=this.products.find(x=>x.id===id); if(p) this.showProductModal(p); }
   async deleteProduct(id){ if(!confirm('Excluir produto?')) return; try { await this.firebase.deleteProduct(id); this.products=this.products.filter(p=>p.id!==id); this.renderProducts(); this.updateDashboard(); this.showNotification('Produto excluído','success'); } catch(e){ this.showNotification('Erro ao excluir','error'); } }
   async toggleProductStatus(id){ const p=this.products.find(pr=>pr.id===id); if(!p) return; const ns=p.status==='active'?'inactive':'active'; try { await this.firebase.updateProduct(id,{status:ns,updatedAt:new Date().toISOString()}); p.status=ns; this.renderProducts(); this.updateDashboard(); } catch(e){ this.showNotification('Erro status','error'); } }
@@ -527,6 +550,7 @@ class AdminApp {
     this.renderProducts(list);
   }
   renderProducts(list=null){
+    this.updateCatalogButton();
     const tbody=document.getElementById('products-table-body'); if(!tbody) return; const full=list||this.products;
     if(!full.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--gray-500);">Nenhum produto</td></tr>'; document.getElementById('products-pagination')?.replaceChildren(); return; }
     const pageData = this.paginate(full, this.pagination.products);

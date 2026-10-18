@@ -221,6 +221,47 @@ describe('meta/counters', () => {
   });
 });
 
+describe('catalogo (agregado)', () => {
+  const parte = (n, over = {}) => ({
+    v: 7, parte: n, total: 2, itens: [{ id: 'p1', nome: 'Dipirona' }], geradoEm: serverTimestamp(), ...over
+  });
+  test('leitura pública (get e list)', async () => {
+    await seed((fs) => setDoc(doc(fs, 'catalogo', 'parte-0'), { v: 7, parte: 0, total: 1, itens: [], geradoEm: new Date() }));
+    await assertSucceeds(getDoc(doc(db(null), 'catalogo', 'parte-0')));
+    await assertSucceeds(getDocs(collection(db(null), 'catalogo')));
+  });
+  test('cliente e anônimo não gravam', async () => {
+    await assertFails(setDoc(doc(db(ALICE), 'catalogo', 'parte-0'), parte(0)));
+    await assertFails(setDoc(doc(db(null), 'catalogo', 'parte-0'), parte(0)));
+    await seed((fs) => setDoc(doc(fs, 'catalogo', 'parte-1'), { v: 7, parte: 1, total: 2, itens: [], geradoEm: new Date() }));
+    await assertFails(updateDoc(doc(db(ALICE), 'catalogo', 'parte-1'), { itens: [] }));
+    await assertFails(deleteDoc(doc(db(ALICE), 'catalogo', 'parte-1')));
+  });
+  test('admin grava, atualiza e apaga partes no formato certo', async () => {
+    await assertSucceeds(setDoc(doc(adminDb(), 'catalogo', 'parte-0'), parte(0)));
+    await assertSucceeds(updateDoc(doc(adminDb(), 'catalogo', 'parte-0'), { v: 8, geradoEm: serverTimestamp() }));
+    await assertSucceeds(deleteDoc(doc(adminDb(), 'catalogo', 'parte-0')));
+  });
+  test('admin com formato inválido é rejeitado', async () => {
+    await assertFails(setDoc(doc(adminDb(), 'catalogo', 'parte-0'), parte(0, { v: '7' })));
+    await assertFails(setDoc(doc(adminDb(), 'catalogo', 'parte-0'), parte(0, { itens: 'x' })));
+    await assertFails(setDoc(doc(adminDb(), 'catalogo', 'parte-0'), parte(0, { geradoEm: '2026-10-18' })));
+    await assertFails(setDoc(doc(adminDb(), 'catalogo', 'parte-0'), parte(0, { extra: 1 })));
+  });
+  test('meta/counters: admin grava catalogParts/catalogVersion', async () => {
+    await assertSucceeds(setDoc(doc(adminDb(), 'meta', 'counters'), { catalogParts: 5, catalogVersion: 7 }, { merge: true }));
+    await assertSucceeds(setDoc(doc(adminDb(), 'meta', 'counters'), { catalogVersion: increment(1) }, { merge: true }));
+    await assertFails(setDoc(doc(adminDb(), 'meta', 'counters'), { catalogParts: -1 }, { merge: true }));
+    await assertFails(setDoc(doc(adminDb(), 'meta', 'counters'), { catalogVersion: 'v7' }, { merge: true }));
+  });
+  test('meta/counters: cliente não mexe em catalogParts/catalogVersion; leitura continua pública', async () => {
+    await assertFails(setDoc(doc(db(ALICE), 'meta', 'counters'), { catalogParts: 1 }, { merge: true }));
+    await assertFails(setDoc(doc(db(ALICE), 'meta', 'counters'), { orderSeq: 42, catalogVersion: 99 }, { merge: true }));
+    await assertSucceeds(setDoc(doc(db(ALICE), 'meta', 'counters'), { orderSeq: 42 }, { merge: true }));
+    await assertSucceeds(getDoc(doc(db(null), 'meta', 'counters')));
+  });
+});
+
 describe('usuarios', () => {
   test('dono lê e grava o próprio perfil', async () => {
     await assertSucceeds(getDoc(doc(db(ALICE), 'usuarios', ALICE)));

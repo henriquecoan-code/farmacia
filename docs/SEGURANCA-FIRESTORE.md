@@ -3,14 +3,15 @@
 Arquivos:
 - [`firestore.rules`](../firestore.rules): regras propostas (ainda **não** publicadas).
 - [`firebase.json`](../firebase.json): configuração mínima (só regras + emulador).
-- [`tests/firestore-rules/rules.test.mjs`](../tests/firestore-rules/rules.test.mjs): 46 testes no Emulator.
+- [`tests/firestore-rules/rules.test.mjs`](../tests/firestore-rules/rules.test.mjs): 52 testes no Emulator.
 
 ## 1. Mapa de acessos do front
 
 | Caminho | Quem lê | Quem grava | Onde no código |
 |---|---|---|---|
 | `produtos/{id}` | todos (catálogo, inclusive anônimo) | admin (painel); scripts `sync-*`, `clean-products` (Admin SDK) | `firebase-service.getProducts/getProduct/addProduct/updateProduct/deleteProduct` |
-| `meta/counters` | todos (`productsVersion` invalida o cache) | cliente: `orderSeq` +1 na transação do pedido; admin: `productsVersion`/`productsUpdatedAt`; scripts | `createOrder`, `_bumpProductsVersion` |
+| `catalogo/{parte-N}` | todos (catálogo agregado: `{ v, parte, total, itens, geradoEm }`) | admin (formato validado); gerador via Admin SDK | catálogo agregado (em implementação) |
+| `meta/counters` | todos (`productsVersion`/`catalogVersion`/`catalogParts`) | cliente: `orderSeq` +1 na transação do pedido; admin: `productsVersion`/`productsUpdatedAt`; scripts | `createOrder`, `_bumpProductsVersion` |
 | `pedidos/{id}` | dono (`where userId == uid`), admin (lista tudo) | cliente: create; admin: `status` + `history` | `createOrder`, `listOrders`, `listOrdersByUser`, `updateOrderStatus` |
 | `orders/{id}` (legado) | dono por `user.email`, admin | admin (status) | fallbacks de `listOrders*`/`updateOrderStatus` |
 | `usuarios/{uid}` | dono, admin (`getClients` lista tudo) | dono (perfil) | `getCurrentUserProfile`, `getUserByEmail`, `getClients`, `admin.js` (fallback de role) |
@@ -28,7 +29,8 @@ Arquivos:
   - create: autenticado, `userId == auth.uid`, `status == 'pending'`, `history` com 1 item `pending`, só as chaves que o checkout envia, tipos validados (`items` lista com 1–100 itens, `totals.*` números ≥ 0, `address` map, etc.).
   - `orderNumber` (= `id`) tem que ser o `orderSeq` gravado **na mesma transação** e exatamente +1 em relação ao anterior (`getAfter`). Isso impede números repetidos ou escolhidos pelo cliente.
   - leitura: dono ou admin. update: só admin, só `status`/`history`/`updatedAt`, status em `pending|processing|shipped|delivered|cancelled`. delete: ninguém.
-- **meta/counters**: leitura pública; cliente autenticado só altera `orderSeq` e só +1; admin grava o resto.
+- **catalogo/{parte}**: leitura pública; escrita só admin, com formato validado (`v`, `parte`, `total` int; `itens` lista; `geradoEm` timestamp).
+- **meta/counters**: leitura pública; cliente autenticado só altera `orderSeq` e só +1; admin grava o resto (`catalogParts` int ≥ 0, `catalogVersion` int).
 - **usuarios/{uid}**: dono lê/cria/atualiza, mas não pode definir/alterar `role`, `admin`, `roles`. Endereços: só o dono (e admin).
 - **adminRequests**: só admin cria/lê. Nas regras anteriores não havia regra (negado para todos); nunca abrir para não-admin, porque `process-admin-requests.mjs` concede a claim de admin para o e-mail pedido.
 - **admins / adminsByEmail / meta/admins**: nunca graváveis pelo cliente. Usuário só lê o próprio `admins/{uid}` / `adminsByEmail/{seu e-mail}`; `meta/admins` só admin lê.
@@ -118,7 +120,7 @@ cd tests/firestore-rules
 npm install
 npm test
 ```
-Usa o projeto local `demo-farmacia`: nada toca produção. Resultado atual: **46/46 passando**.
+Usa o projeto local `demo-farmacia`: nada toca produção. Resultado atual: **52/52 passando**.
 
 ### Sem emulador: Rules Playground (Console → Firestore → Regras → "Playground de regras")
 Cole o conteúdo de `firestore.rules` no editor **sem publicar** e simule:
