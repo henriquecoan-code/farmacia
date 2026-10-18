@@ -34,8 +34,8 @@ service cloud.firestore {
     // ou usuarios/{uid}.role == 'admin' (campo que o cliente não consegue alterar, ver regra de usuarios).
     function isAdmin() {
       return signedIn() && (
-        request.auth.token.admin == true ||
-        request.auth.token.role == 'admin' ||
+        request.auth.token.get('admin', false) == true ||
+        request.auth.token.get('role', '') == 'admin' ||
         (exists(userPath(request.auth.uid)) && get(userPath(request.auth.uid)).data.get('role', '') == 'admin')
       );
     }
@@ -156,7 +156,7 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isAdmin() || (signedIn() && (
         resource.data.get('userId', null) == request.auth.uid ||
-        (request.auth.token.email != null && resource.data.get('user', {}).get('email', null) == request.auth.token.email)
+        (request.auth.token.get('email', null) != null && resource.data.get('user', {}).get('email', null) == request.auth.token.email)
       ));
       allow update: if isAdmin()
         && changedKeys().hasOnly(['status', 'history', 'updatedAt'])
@@ -182,7 +182,7 @@ service cloud.firestore {
     match /clientes/{clienteId} {
       function isClienteOwner() {
         return signedIn()
-          && request.auth.token.email != null
+          && request.auth.token.get('email', null) != null
           && resource.data.get('email', null) == request.auth.token.email;
       }
       allow read: if isAdmin() || isClienteOwner();
@@ -211,7 +211,7 @@ service cloud.firestore {
     }
 
     match /adminsByEmail/{email} {
-      allow read: if isAdmin() || (signedIn() && request.auth.token.email != null
+      allow read: if isAdmin() || (signedIn() && request.auth.token.get('email', null) != null
                                    && request.auth.token.email.lower() == email);
       allow write: if false;
     }
