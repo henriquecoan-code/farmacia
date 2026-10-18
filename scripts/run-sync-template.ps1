@@ -6,7 +6,11 @@ $env:PGPORT = "5432"
 $env:PGDATABASE = "sgfpod1"
 $env:PGUSER = "consulta"
 # Habilitar SSL (recomendado em acesso externo)
-$env:PGPASSWORD = "farmacia"
+# Senha: defina $env:PGPASSWORD antes de rodar, ou ela sera solicitada (nunca versionar)
+if (-not $env:PGPASSWORD) {
+  $sec = Read-Host "Senha do Postgres ($env:PGUSER)" -AsSecureString
+  $env:PGPASSWORD = [System.Net.NetworkCredential]::new("", $sec).Password
+}
 # Sete para "1" se precisar SSL (ex.: Cloud PG):
 # $env:PGSSL = "1"
 

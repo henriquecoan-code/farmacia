@@ -28,7 +28,7 @@ export class FirebaseService {
       // Dynamic import Firebase modules
       const { initializeApp } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js');
       const { getAuth } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js');
-      const { getFirestore, enableIndexedDbPersistence } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      const { getFirestore, enableMultiTabIndexedDbPersistence } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
 
       this.app = initializeApp(firebaseConfig);
       this.auth = getAuth(this.app);
@@ -36,7 +36,7 @@ export class FirebaseService {
 
       // Habilita cache persistente (IndexedDB) para reduzir leituras repetidas
       try {
-        await enableIndexedDbPersistence(this.firestore);
+        await enableMultiTabIndexedDbPersistence(this.firestore);
         console.log('[FirebaseService] IndexedDB persistence enabled');
       } catch (e) {
         // Conflito multi-aba ou navegador não suporta: segue sem persistência

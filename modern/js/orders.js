@@ -52,7 +52,7 @@ function renderLoggedOut(root){
         <p class="card__text">Entre para acompanhar o status e detalhes de seus pedidos.</p>
         <div class="card__actions">
           <button id="btn-open-login" class="btn btn--primary"><i class="fas fa-sign-in-alt"></i> Entrar</button>
-          <a href="modern-index.html" class="btn btn--secondary">Voltar à página inicial</a>
+          <a href="index.html" class="btn btn--secondary">Voltar à página inicial</a>
         </div>
       </div>
     </div>`;

@@ -14,3 +14,9 @@ keys/
 
 # (OBS) Não ignore arquivos de config legítimos do projeto
 !config/product-filters.json
+
+# === Dependências, logs e arquivos do sistema ===
+node_modules/
+*.log
+desktop.ini
+Thumbs.db

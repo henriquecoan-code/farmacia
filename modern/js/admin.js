@@ -1,6 +1,10 @@
 // Clean rebuilt Admin Panel (products + orders)
 import { bootstrap } from './bootstrap.js';
 import { eventBus } from './services/event-bus.js';
+import { escapeHTML } from './services/product-utils.js';
+
+// Escapa qualquer valor vindo do Firestore antes de interpolar em HTML
+const esc = (v) => escapeHTML(String(v ?? ''));
 
 class AdminApp {
   constructor(){
@@ -74,10 +78,11 @@ class AdminApp {
   }
 
   async enforceAdminAuth(){
-    // Dev bypass: enable by adding ?adminDev=1 or localStorage.setItem('adminDev','1')
+    // Dev bypass (apenas em localhost): ?adminDev=1 ou localStorage.setItem('adminDev','1')
     try {
       const qs = new URLSearchParams(window.location.search);
-      const devBypass = qs.has('adminDev') || localStorage.getItem('adminDev') === '1';
+      const isLocalHost = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+      const devBypass = isLocalHost && (qs.has('adminDev') || localStorage.getItem('adminDev') === '1');
       if (devBypass) {
         this.showNotification('Admin (DEV bypass): autenticação desabilitada nesta sessão.', 'warning');
         if (this.firebase.isInitialized) {
@@ -529,7 +534,7 @@ class AdminApp {
     const data = pageData.slice;
     tbody.innerHTML=data.map(p=>`<tr>
       <td><div class="product-image">${this.getCategoryIcon(p.category)}</div></td>
-      <td><strong>${p.name||'Produto'}</strong><br><small style="color:var(--gray-500);">${p.description||'—'}</small></td>
+      <td><strong>${esc(p.name||'Produto')}</strong><br><small style="color:var(--gray-500);">${esc(p.description||'—')}</small></td>
       <td>${this.getCategoryName(p.category)}</td>
       <td>R$ ${(Number(p.price)||0).toFixed(2).replace('.',',')}</td>
       <td>${Number(p.stock)||0}</td>
@@ -571,11 +576,11 @@ class AdminApp {
     if (this.pagination.moderation.page !== pageData.current) this.pagination.moderation.page = pageData.current;
     const data = pageData.slice;
     tbody.innerHTML = data.map(p=>`<tr>
-      <td>${p.codRed||p.id}</td>
-      <td><strong>${p.name||'-'}</strong>${p.pendente? ' <span class="status status--inactive">pendente</span>':''}${p.publicado===false? ' <span class="status status--inactive">não publicado</span>':''}</td>
+      <td>${esc(p.codRed||p.id)}</td>
+      <td><strong>${esc(p.name||'-')}</strong>${p.pendente? ' <span class="status status--inactive">pendente</span>':''}${p.publicado===false? ' <span class="status status--inactive">não publicado</span>':''}</td>
       <td>R$ ${(Number(p.price)||0).toFixed(2).replace('.',',')}</td>
       <td>${Number(p.stock)||0}</td>
-      <td>${(p.motivos||[]).join(', ')||'—'}</td>
+      <td>${esc((p.motivos||[]).join(', ')||'—')}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn--primary" data-action="approve" data-id="${p.id}">Publicar</button>
         <button class="btn btn--secondary" data-action="keepblocked" data-id="${p.id}">Manter bloqueado</button>
@@ -666,15 +671,15 @@ class AdminApp {
     if(this.pagination.orders.page!==pageData.current) this.pagination.orders.page=pageData.current;
     const list=pageData.slice;
     tbody.innerHTML=list.map(o=>`<tr>
-      <td>#${o.id}</td>
-      <td>${o.user||'-'}</td>
+      <td>#${esc(o.id)}</td>
+      <td>${esc(o.user||'-')}</td>
       <td>${this.formatDate(o.createdAt)}</td>
       <td>R$ ${(o.totals?.total||0).toFixed(2).replace('.',',')}</td>
-      <td><span class="status status--${o.status}">${this.getOrderStatusLabel(o.status)}</span></td>
+      <td><span class="status status--${esc(o.status)}">${this.getOrderStatusLabel(o.status)}</span></td>
       <td style="display:flex;gap:.35rem;">
-        <button class="btn-icon" data-action="view" data-id="${o._docId}">👁️</button>
-        <button class="btn-icon" data-action="advance" data-id="${o._docId}">⏭️</button>
-        <button class="btn-icon" title="WhatsApp" data-action="whatsapp" data-id="${o._docId}">💬</button>
+        <button class="btn-icon" data-action="view" data-id="${esc(o._docId)}">👁️</button>
+        <button class="btn-icon" data-action="advance" data-id="${esc(o._docId)}">⏭️</button>
+        <button class="btn-icon" title="WhatsApp" data-action="whatsapp" data-id="${esc(o._docId)}">💬</button>
       </td>
     </tr>`).join('');
     tbody.querySelectorAll('button[data-action]')
@@ -698,12 +703,12 @@ class AdminApp {
         </div>
         <div id="od-body" style="margin-top:.75rem;font-size:.85rem;line-height:1.4;"></div>
       </div>`; document.body.appendChild(modal); modal.addEventListener('click',e=>{ if(e.target===modal) modal.remove(); }); modal.querySelector('#od-close').addEventListener('click',()=> modal.remove()); }
-    modal.querySelector('#od-id').textContent=order.id; const body=modal.querySelector('#od-body'); const itemsHTML=(order.items||[]).map(i=>`<li>${i.quantity}x ${i.name} <small>R$ ${(i.price||0).toFixed(2).replace('.',',')}</small></li>`).join(''); const histHTML=(order.history||[]).map(h=>`<li>${this.getOrderStatusLabel(h.status)} - <small>${this.formatDate(h.at)}</small> ${h.note?`<em>${h.note}</em>`:''}</li>`).join(''); body.innerHTML=`<p><strong>Status:</strong> ${this.getOrderStatusLabel(order.status)}</p>
-      <p><strong>Cliente:</strong> ${order.user||'-'}</p>
+    modal.querySelector('#od-id').textContent=order.id; const body=modal.querySelector('#od-body'); const itemsHTML=(order.items||[]).map(i=>`<li>${esc(i.quantity)}x ${esc(i.name)} <small>R$ ${(i.price||0).toFixed(2).replace('.',',')}</small></li>`).join(''); const histHTML=(order.history||[]).map(h=>`<li>${this.getOrderStatusLabel(h.status)} - <small>${this.formatDate(h.at)}</small> ${h.note?`<em>${esc(h.note)}</em>`:''}</li>`).join(''); body.innerHTML=`<p><strong>Status:</strong> ${this.getOrderStatusLabel(order.status)}</p>
+      <p><strong>Cliente:</strong> ${esc(order.user||'-')}</p>
       <p><strong>Data:</strong> ${this.formatDate(order.createdAt)}</p>
       <p><strong>Total:</strong> R$ ${(order.totals?.total||0).toFixed(2).replace('.',',')}</p>
-      <p><strong>Pagamento:</strong> ${order.paymentMethod}${order.installments?` (${order.installments.count}x)`:''}</p>
-      <p><strong>Endereço:</strong> ${order.address?.street||''}, ${order.address?.number||''} - ${order.address?.city||''}/${order.address?.state||''}</p>
+      <p><strong>Pagamento:</strong> ${esc(order.paymentMethod)}${order.installments?` (${esc(order.installments.count)}x)`:''}</p>
+      <p><strong>Endereço:</strong> ${esc(order.address?.street)}, ${esc(order.address?.number)} - ${esc(order.address?.city)}/${esc(order.address?.state)}</p>
       <div style="margin:.5rem 0;"><strong>Itens:</strong><ul style="margin:.25rem 0 .5rem 1.1rem;">${itemsHTML}</ul></div>
       <div style="margin:.5rem 0;"><strong>Histórico:</strong><ul style="margin:.25rem 0 .5rem 1.1rem;">${histHTML}</ul></div>
       ${this.nextStatus(order.status)?`<button id="od-advance" class="btn btn--primary">Avançar para ${this.getOrderStatusLabel(this.nextStatus(order.status))}</button>`:''}
@@ -794,7 +799,7 @@ class AdminApp {
             <button class="btn btn--primary" data-wa="send" data-key="${key}" style="font-size:.65rem;padding:.35rem .5rem;">Abrir WhatsApp</button>
           </div>
         </div>
-        <textarea readonly style="width:100%;min-height:70px;font-size:.75rem;border:1px solid var(--gray-300);border-radius:6px;padding:.4rem;background:#fff;resize:vertical;">${text}</textarea>
+        <textarea readonly style="width:100%;min-height:70px;font-size:.75rem;border:1px solid var(--gray-300);border-radius:6px;padding:.4rem;background:#fff;resize:vertical;">${esc(text)}</textarea>
       </div>`;
     const statusLabelMap = { pending:'Confirmação', processing:'Separação', shipped:'Saiu para Entrega', delivered:'Recebido'};
     // Decide which templates to show: current + next stage proactive
@@ -805,7 +810,7 @@ class AdminApp {
     body.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:.5rem;">
         <label style="font-size:.75rem;color:var(--gray-600);">Telefone do cliente (ajuste se necessário)</label>
-        <input id="wa-phone" value="${phone}" style="width:100%;padding:.45rem .6rem;border:1px solid var(--gray-300);border-radius:8px;font-size:.85rem;" />
+        <input id="wa-phone" value="${esc(phone)}" style="width:100%;padding:.45rem .6rem;border:1px solid var(--gray-300);border-radius:8px;font-size:.85rem;" />
         <small style="color:var(--gray-500);">Usar formato internacional sem símbolos. Ex: 55DDDNÚMERO</small>
       </div>
       <div style="display:flex;flex-direction:column;gap:.75rem;">${keys.map(k=> renderTemplateRow(k,statusLabelMap[k]||k, templates[k])).join('')}</div>
@@ -873,14 +878,14 @@ class AdminApp {
     const ordersCountFor = (c)=> this.orders.filter(o => (o.userId && c.id && o.userId===c.id) || (o.user && getEmail(c) && String(o.user).toLowerCase()===String(getEmail(c)).toLowerCase())).length;
     tbody.innerHTML = data.map(c=>`
       <tr>
-        <td>${getName(c)}</td>
-        <td>${getEmail(c)}</td>
-        <td>${getPhone(c)}</td>
+        <td>${esc(getName(c))}</td>
+        <td>${esc(getEmail(c))}</td>
+        <td>${esc(getPhone(c))}</td>
         <td>${getCreated(c)}</td>
         <td>${ordersCountFor(c)}</td>
         <td>
-          <button class="btn-icon" title="Ver perfil" data-action="view" data-id="${c.id}">👁️</button>
-          <button class="btn-icon" title="Editar" data-action="edit" data-id="${c.id}">✏️</button>
+          <button class="btn-icon" title="Ver perfil" data-action="view" data-id="${esc(c.id)}">👁️</button>
+          <button class="btn-icon" title="Editar" data-action="edit" data-id="${esc(c.id)}">✏️</button>
         </td>
       </tr>`).join('');
     // Minimal actions wiring (placeholder)
@@ -950,13 +955,13 @@ class AdminApp {
       const st = String(r.status||'pending');
       const statusCls = st==='done'?'status--active':(st==='failed'?'status--cancelled':'status--pending');
       return `<tr>
-        <td><span class="status ${statusCls}">${st}</span></td>
-        <td>${r.action||'-'}</td>
-        <td>${r.email||'-'}</td>
-        <td>${r.requestedByEmail||r.requestedBy||'-'}</td>
-        <td>${created}</td>
-        <td>${processed}</td>
-        <td>${result}</td>
+        <td><span class="status ${statusCls}">${esc(st)}</span></td>
+        <td>${esc(r.action||'-')}</td>
+        <td>${esc(r.email||'-')}</td>
+        <td>${esc(r.requestedByEmail||r.requestedBy||'-')}</td>
+        <td>${esc(created)}</td>
+        <td>${esc(processed)}</td>
+        <td>${esc(result)}</td>
       </tr>`;
     }).join('');
   }
@@ -967,7 +972,7 @@ class AdminApp {
     if(!confirm('Sair do painel?')) return;
     try { if (this.firebase?.isInitialized) await this.firebase.signOut(); } catch {}
     this.showNotification('Logout efetuado','success');
-    setTimeout(()=>{ window.location='modern-index.html'; },800);
+    setTimeout(()=>{ window.location='index.html'; },800);
   }
 
   // Notifications

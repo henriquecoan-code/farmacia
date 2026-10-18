@@ -147,7 +147,7 @@ class ComponentLoader {
      * Set active navigation link based on current page
      */
     setActiveNavigation() {
-        const currentPage = window.location.pathname.split('/').pop() || 'modern-index.html';
+        const currentPage = window.location.pathname.split('/').pop() || 'index.html';
         const navLinks = document.querySelectorAll('.nav__link');
         
         navLinks.forEach(link => {
@@ -155,7 +155,7 @@ class ComponentLoader {
             const href = link.getAttribute('href');
             
             if (href === currentPage || 
-                (currentPage === 'modern-index.html' && href === '#') ||
+                (currentPage === 'index.html' && href === '#') ||
                 (currentPage === '' && href === '#')) {
                 link.classList.add('nav__link--active');
             }

@@ -25,7 +25,7 @@ Este é uma implementação completamente nova do site da farmácia, criada do z
 
 ### 📱 Funcionalidades
 
-#### Site Principal (`modern-index.html`)
+#### Site Principal (`index.html`)
 - **Header moderno** com logo, busca e ações do usuário
 - **Navegação intuitiva** com categorias de produtos
 - **Hero section** com call-to-action
@@ -109,7 +109,7 @@ modern/
    python3 -m http.server 8000
    
    # Acessar no navegador
-   http://localhost:8000/modern-index.html
+   http://localhost:8000/index.html
    ```
 
 2. **Painel Administrativo**:

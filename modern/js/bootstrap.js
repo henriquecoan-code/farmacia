@@ -17,8 +17,13 @@ class Bootstrap {
     this.initialized = false;
   }
 
-  async init() {
-    if (this.initialized) return;
+  init() {
+    // Reutiliza a mesma promise: chamadas concorrentes (auto-init + páginas) não reinicializam
+    if (!this._initPromise) this._initPromise = this._doInit();
+    return this._initPromise;
+  }
+
+  async _doInit() {
     // init firebase (soft fail)
     try { await this.firebase.init(); } catch(e) { console.warn('Firebase init falhou (modo offline)', e); }
     this.cart.init();

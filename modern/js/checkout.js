@@ -806,7 +806,7 @@ class CheckoutPage {
       <p>Total: <strong>${this.format(order.totals.total)}</strong></p>
       <div style="display:flex; flex-direction:column; gap:.75rem; max-width:320px; margin:1rem auto;">
     <button class="btn-primary" onclick="window.open('${waLink}','_blank')">Enviar para WhatsApp da Loja</button>
-        <button class="btn-primary" style="background:var(--gray-700);" onclick="window.location='modern-index.html'">Voltar à Loja</button>
+        <button class="btn-primary" style="background:var(--gray-700);" onclick="window.location='index.html'">Voltar à Loja</button>
       </div>
     </div>`;
   }

@@ -200,7 +200,7 @@ class PharmacyApp {
         if (window.authService?.signOut) await window.authService.signOut();
         // Close mobile menu if open and redirect home
         this.closeMobileSidebar();
-        setTimeout(() => { window.location.href = 'modern-index.html'; }, 400);
+        setTimeout(() => { window.location.href = 'index.html'; }, 400);
       } catch (e) {
         console.error('Logout failed', e);
       }

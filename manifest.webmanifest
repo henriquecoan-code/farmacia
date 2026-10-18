@@ -3,7 +3,7 @@
   "short_name": "São Benedito",
   "description": "Compre medicamentos e produtos de saúde com entrega rápida.",
   "lang": "pt-BR",
-  "start_url": "./modern-index.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -11,7 +11,7 @@
   "icons": [
     {
       "src": "img/logo.png",
-      "sizes": "2160x2160",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },

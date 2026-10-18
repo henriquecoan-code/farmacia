@@ -6,7 +6,11 @@ $env:PGHOST = "192.168.1.220"
 $env:PGPORT = "5432"
 $env:PGDATABASE = "sgfpod1"
 $env:PGUSER = "consulta"
-$env:PGPASSWORD = "farmacia"
+# Senha: defina $env:PGPASSWORD antes de rodar, ou ela sera solicitada (nunca versionar)
+if (-not $env:PGPASSWORD) {
+  $sec = Read-Host "Senha do Postgres ($env:PGUSER)" -AsSecureString
+  $env:PGPASSWORD = [System.Net.NetworkCredential]::new("", $sec).Password
+}
 
 $env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Keys\farmacia-service-account.json"
 

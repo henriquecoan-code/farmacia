@@ -1,7 +1,7 @@
-const CACHE_NAME = 'farmacia-shell-v1';
+const CACHE_NAME = 'farmacia-shell-v2';
 const APP_SHELL = [
   './',
-  './modern-index.html',
+  './index.html',
   './produtos.html',
   './checkout.html',
   './conta.html',
@@ -9,7 +9,7 @@ const APP_SHELL = [
   './instrucoes.html',
   './manifest.webmanifest',
   './modern/css/modern-styles.css',
-  './img/logo.png',
+  './img/logo-192.png',
   './img/pwa-icon.svg'
 ];
 
@@ -46,7 +46,7 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() =>
-          caches.match(event.request).then((response) => response || caches.match('./modern-index.html'))
+          caches.match(event.request).then((response) => response || caches.match('./index.html'))
         )
     );
     return;

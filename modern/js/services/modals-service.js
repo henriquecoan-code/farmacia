@@ -15,14 +15,17 @@ export class ModalsManager {
   this._lastCepLookup = '';
   }
 
-  async init() {
-    if (this.isInitialized) return;
-    
-    await this.loadModalHTML();
-    this.setupEventListeners();
-    this.isInitialized = true;
-    
-    console.log('Modals initialized successfully');
+  init() {
+    // Reutiliza a mesma promise para evitar injetar os modais duas vezes
+    if (!this._initPromise) {
+      this._initPromise = (async () => {
+        await this.loadModalHTML();
+        this.setupEventListeners();
+        this.isInitialized = true;
+        console.log('Modals initialized successfully');
+      })();
+    }
+    return this._initPromise;
   }
 
   async loadModalHTML() {

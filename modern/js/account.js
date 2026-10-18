@@ -12,7 +12,7 @@ function renderLoggedOut(root){
         <p class="card__text">Entre para ver seus dados e acompanhar seus pedidos.</p>
         <div class="card__actions">
           <button id="btn-open-login" class="btn btn--primary"><i class="fas fa-sign-in-alt"></i> Entrar</button>
-          <a href="modern-index.html" class="btn btn--secondary">Voltar à página inicial</a>
+          <a href="index.html" class="btn btn--secondary">Voltar à página inicial</a>
         </div>
       </div>
     </div>`;
@@ -200,7 +200,7 @@ function renderAccount(root, user, client){
   root.querySelector('#btn-logout')?.addEventListener('click', ()=>{ 
     window.authService?.signOut(); 
     // Opcional: redirecionar para página inicial após logout
-    setTimeout(()=>{ window.location.href = 'modern-index.html'; }, 600);
+    setTimeout(()=>{ window.location.href = 'index.html'; }, 600);
   });
 
   // addresses
