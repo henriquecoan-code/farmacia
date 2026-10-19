@@ -339,28 +339,38 @@ export class FirebaseService {
    *  - versão nova                                 -> 1 + N leituras (N ≈ 2)
    * Antes, cada visitante novo lia a coleção inteira (~10 mil leituras).
    */
-  getProducts() {
+  getProducts({ revalidate = false } = {}) {
+    // revalidate: ignora o cache "recente" e confere a versão no Firestore (1 leitura);
+    // usado pelo carrinho/checkout para garantir preço e estoque atuais. No máx. 1x por minuto.
+    if (revalidate && Date.now() - (this._lastRevalidateAt || 0) > 60 * 1000) {
+      this._lastRevalidateAt = Date.now();
+      this._productsPromise = null;
+    }
     // Uma busca por página, mesmo que home/produtos chamem várias vezes
     if (!this._productsPromise) {
-      this._productsPromise = this._loadCatalog().catch((e) => { this._productsPromise = null; throw e; });
+      this._productsPromise = this._loadCatalog({ skipFresh: revalidate }).catch((e) => { this._productsPromise = null; throw e; });
     }
     return this._productsPromise;
   }
 
-  async _loadCatalog() {
+  async _loadCatalog({ skipFresh = false } = {}) {
     const now = Date.now();
+    // Origem dos dados: 'catalog' | 'collection' | 'cache' (versão conferida/recente) | 'stale' | 'static'
+    this.productsSource = 'stale';
     // Remove o cache antigo (~3,5 MB em localStorage) da versão anterior
     try { localStorage.removeItem('products_cache_v2'); } catch {}
     const nocache =typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache');
     const cached = nocache ? null : await this._getCatalogCache();
 
     // 1) Cache recente: nenhuma leitura no Firestore
-    if (cached?.items?.length && (now - (cached.checkedAt || 0) < this._catalogFreshMs)) {
+    if (!skipFresh && cached?.items?.length && (now - (cached.checkedAt || 0) < this._catalogFreshMs)) {
+      this.productsSource = 'cache';
       return cached.items;
     }
 
     if (!this.isInitialized) {
       if (cached?.items?.length) return cached.items;
+      this.productsSource = 'static';
       return this._loadStaticProductsJson();
     }
 
@@ -375,6 +385,7 @@ export class FirebaseService {
 
       if (version !== null && cached?.items?.length && cached.version === version) {
         this._setCatalogCache({ ...cached, checkedAt: now });
+        this.productsSource = 'cache';
         return cached.items;
       }
 
@@ -389,6 +400,7 @@ export class FirebaseService {
         if (snaps.length && snaps.every(sn => sn.exists() && sn.data().v === version)) {
           const items = snaps.flatMap(sn => sn.data().itens || []);
           this._setCatalogCache({ items, version, checkedAt: now });
+          this.productsSource = 'catalog';
           return items;
         }
         console.warn('[FirebaseService] Catálogo incompleto ou em atualização; usando a coleção completa');
@@ -397,10 +409,12 @@ export class FirebaseService {
       // 4) Catálogo ainda não gerado: fluxo antigo (coleção inteira, caro)
       const items = await this.getAllProducts();
       this._setCatalogCache({ items, version: version ?? -1, checkedAt: now });
+      this.productsSource = 'collection';
       return items;
     } catch (error) {
       console.error('Error getting products:', error);
       if (cached?.items?.length) return cached.items;
+      this.productsSource = 'static';
       return this._loadStaticProductsJson();
     }
   }

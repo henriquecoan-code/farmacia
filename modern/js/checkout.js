@@ -2,6 +2,8 @@ import { bootstrap } from './bootstrap.js';
 import { eventBus } from './services/event-bus.js';
 import { analytics } from './services/analytics-service.js';
 import ComponentLoader from './services/component-loader.js';
+import { cartItemNotice, ensureCartStatusStyles } from './services/cart-service.js';
+import { escapeHTML } from './services/product-utils.js';
 
 class CheckoutPage {
   constructor() {
@@ -38,6 +40,8 @@ class CheckoutPage {
     this.bindEvents();
   this.setupMasks();
     this.updateAll();
+    // Confere preço/estoque atuais no Firestore e redesenha se algo mudou
+    window.cartService?.refreshFromCatalog().then((changed) => { if (changed) this.syncFromCart(); }).catch(() => {});
     this.checkAuth();
     analytics.track('checkout_page_view');
     this.ready = true;
@@ -61,10 +65,11 @@ class CheckoutPage {
       return;
     }
     emptyMsg.style.display = 'none';
+    ensureCartStatusStyles();
     listEl.innerHTML = this.items.map(it => {
-      const lineTotal = (it.price * it.quantity).toFixed(2).replace('.', ',');
-      return `<div class="checkout-item" data-id="${it.id}">
-        <div class="checkout-item__title">${it.name}</div>
+      const lineTotal = (it.unavailable ? 0 : it.price * it.quantity).toFixed(2).replace('.', ',');
+      return `<div class="checkout-item${it.unavailable ? ' checkout-item--unavailable' : ''}" data-id="${escapeHTML(String(it.id))}">
+        <div class="checkout-item__title">${escapeHTML(String(it.name || ''))}${cartItemNotice(it)}</div>
         <div class="qty-control">
           <button data-action="minus" aria-label="Diminuir">-</button>
           <span class="qty" aria-live="polite">${it.quantity}</span>
@@ -103,7 +108,7 @@ class CheckoutPage {
         const item = this.items.find(i => i.id === id);
         if (!item) return;
         if (btn.dataset.action === 'minus') item.quantity = Math.max(1, item.quantity - 1);
-        if (btn.dataset.action === 'plus') item.quantity += 1;
+        if (btn.dataset.action === 'plus') item.quantity = item.stock > 0 ? Math.min(item.stock, item.quantity + 1) : item.quantity + 1;
         if (window.cartService) window.cartService.updateQuantity(id, item.quantity); else this.persistLocal();
         this.loadItems();
         this.updateAll();
@@ -165,7 +170,7 @@ class CheckoutPage {
 
   format(v){ return 'R$ ' + v.toFixed(2).replace('.', ','); }
 
-  getSubtotal(){ return this.items.reduce((s,i)=> s + i.price * i.quantity, 0); }
+  getSubtotal(){ return this.items.reduce((s,i)=> s + (i.unavailable ? 0 : i.price * i.quantity), 0); }
 
   getShippingValue(){ return this.shipping === 'express' ? 24.90 : (this.items.length ? 9.90 : 0); }
 
@@ -712,6 +717,7 @@ class CheckoutPage {
 
   validateBeforeOrder(){
     if (!this.items.length) { this.setStatus('checkout-status','Carrinho vazio.', 'error'); return false; }
+    if (this.items.some(i => i.unavailable)) { this.setStatus('checkout-status','Há itens sem estoque no carrinho. Remova-os para continuar.', 'error'); return false; }
     if (!this.isAuth()) { this.setStatus('checkout-status','Faça login para continuar.', 'error'); return false; }
     if (!this.isAddressValid()) { this.setStatus('checkout-status','Preencha endereço completo.', 'error'); return false; }
     if (this.payment === 'card') {
@@ -733,6 +739,18 @@ class CheckoutPage {
   }
 
   async placeOrder(){
+    // Confere preço/estoque uma última vez antes de gravar o pedido
+    if (window.cartService) {
+      const before = this.calcTotals().total;
+      const changed = await window.cartService.refreshFromCatalog().catch(() => false);
+      if (changed) {
+        this.syncFromCart();
+        if (this.items.some(i => i.unavailable) || Math.abs(this.calcTotals().total - before) > 0.004) {
+          this.setStatus('checkout-status','Preços ou estoque foram atualizados. Confira o carrinho e confirme novamente.', 'error');
+          return;
+        }
+      }
+    }
     if (!this.validateBeforeOrder()) return;
     const btn = document.getElementById('place-order');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';

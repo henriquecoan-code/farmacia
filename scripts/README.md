@@ -2,6 +2,43 @@
 
 Este diretório reúne os utilitários para integrar o PostgreSQL da farmácia ao site (Firestore) e para exportar um fallback em JSON.
 
+## Como rodar (passo a passo)
+1. **VPN ligada** para os scripts que leem o Postgres (`run-sync-*`, `run-verify-stock`, `run-export-template`); o servidor é `192.168.1.220`. `build-catalog`, `clean-products` e os scripts de admin só precisam da chave do Firebase.
+2. Abra o PowerShell na **raiz do projeto** (não dentro de `scripts`): os `.ps1` chamam `node .\scripts\...` com caminho relativo à raiz.
+   ```powershell
+   cd C:\Users\henri\OneDrive\Documentos\GitHub\farmacia
+   ```
+3. Rode o runner desejado (não é `npm run`; são scripts do PowerShell):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\scripts\run-sync-stock.ps1      # só estoque (dia a dia)
+   powershell -ExecutionPolicy Bypass -File .\scripts\run-sync-template.ps1   # sync completo (preços/cadastro)
+   powershell -ExecutionPolicy Bypass -File .\scripts\run-verify-stock.ps1    # só confere, não grava
+   ```
+4. Quando pedir, digite a **senha do Postgres** (usuário `consulta`). Ela não fica gravada nos scripts. Para não ser perguntado, defina antes na mesma janela:
+   ```powershell
+   $env:PGPASSWORD = Read-Host "Senha do Postgres" -AsSecureString | ForEach-Object { [System.Net.NetworkCredential]::new("", $_).Password }
+   ```
+5. A chave do Firebase Admin fica em `C:\Keys\` (fora do OneDrive e do repositório); o caminho está em `GOOGLE_APPLICATION_CREDENTIALS` dentro de cada `.ps1`.
+6. Se aparecer `Cannot find module`, rode `npm install` na raiz do projeto.
+
+Ao terminar com alterações, os syncs aumentam `productsVersion` **e regeneram o catálogo agregado** (`build-catalog.mjs`) automaticamente.
+
+### Cota do Firestore (plano grátis: 50 mil leituras e 20 mil gravações por dia)
+- `run-sync-stock.ps1`: ~1 leitura por produto (~10 mil) + ~10 mil do catálogo se algo mudou → até ~20 mil leituras. Rode no máximo 1–2× por dia.
+- `run-sync-template.ps1`: grava todos os ~10 mil produtos → no máximo 1× por dia.
+- Se der `RESOURCE_EXHAUSTED: Quota exceeded`, a cota acabou: não insista, ela renova à 0h do Pacífico (~4h em Brasília).
+
+## Catálogo agregado (o que o site lê)
+- O site **não** lê mais a coleção `produtos` inteira: lê `meta/counters` (versão) + `catalogo/parte-1..N` (~2 documentos), só com produtos visíveis (ativos, publicados, não pendentes, com estoque).
+- Gerado por `scripts/build-catalog.mjs` (chamado no fim dos syncs e do `clean-products`) ou pelo botão **📢 Publicar catálogo** no painel admin (use após editar produtos lá).
+- Rodar manualmente:
+  ```powershell
+  $env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Keys\<sua-chave>.json"
+  $env:DRY_RUN = "1"; node .\scripts\build-catalog.mjs   # simula
+  $env:DRY_RUN = "0"; node .\scripts\build-catalog.mjs   # publica
+  ```
+- As regras do Firestore precisam liberar leitura de `catalogo/*` (ver `firestore.rules`).
+
 ## O que já está implementado
 - Sincronização completa PG → Firestore com moderação por regras configuráveis.
 - Atualização de estoque (apenas quantidade) sem afetar outros campos.
@@ -63,7 +100,7 @@ $env:PGDATABASE = "sgfpod1";   $env:PGUSER = "consulta"; $env:PGPASSWORD = "***"
 # Timeouts (ms)
 $env:PG_CONNECT_TIMEOUT = "10000"; $env:PG_STATEMENT_TIMEOUT = "60000";
 # Firestore
-$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\\Keys\\farmacia-service-account.json";
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\\Keys\\<sua-chave>.json";
 # Filial do estoque (default 3)
 $env:ESTOQUE_COD_FILIAL = "3";
 ```
@@ -112,7 +149,7 @@ Use o runner `run-export-template.ps1` para executar.
 ## Agendar no Windows (Task Scheduler)
 Sugestões:
 - Sync completo: 1× por madrugada.
-- Estoque: a cada 10–30 minutos, com `ONLY_EXISTING=1` e `SKIP_UNCHANGED=1` para minimizar escritas.
+- Estoque: 1–2× por dia, com `ONLY_EXISTING=1` e `SKIP_UNCHANGED=1` (cada execução lê ~10 mil documentos + o catálogo; mais que isso estoura a cota grátis de leituras).
 
 Passos:
 1) Agendador de Tarefas → Criar Tarefa (não básica) → Aba Geral: marcar "Executar com privilégios mais altos".
@@ -139,7 +176,7 @@ Passos:
 - Sem produtos retornados: verifique filtros (ativo, classe terapêutica vazia) e amostra (`SYNC_LIMIT`/`SYNC_SAMPLE_IDS`).
 - Estoque não aparece: revise `ESTOQUE_COD_FILIAL` e lembre que ausência de linha vira `0` (COALESCE).
 - Muitos itens pendentes: ajuste `config/product-filters.json` (minPrice, keywords, regex, etc.) ou use `allowListIds` para exceções.
-- Front não atualiza de imediato: confirme o bump de `productsVersion` nos logs e aguarde cache/refresh do app.
+- Front não atualiza de imediato: confirme nos logs `[catalog] Catálogo v... publicado`. O site reconsulta a versão a cada 10 min (ou na hora com `?nocache` na URL).
 
 ---
 

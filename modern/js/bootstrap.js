@@ -27,6 +27,7 @@ class Bootstrap {
     // init firebase (soft fail)
     try { await this.firebase.init(); } catch(e) { console.warn('Firebase init falhou (modo offline)', e); }
     this.cart.init();
+    this.cart.setFirebaseService(this.firebase);
     this.auth.init();
     this.auth.setFirebaseService(this.firebase);
     await this.modals.init();

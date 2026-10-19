@@ -1,4 +1,6 @@
 // Modals Manager - Handles all modal components
+import { cartItemNotice, ensureCartStatusStyles } from './cart-service.js';
+import { escapeHTML } from './product-utils.js';
 export class ModalsManager {
   constructor() {
     this.cartModal = null;
@@ -150,8 +152,11 @@ export class ModalsManager {
     this.cartModal.classList.add('modal--active');
     document.body.classList.add('modal-open');
     
-    // Load cart items
+    // Load cart items (mostra na hora e depois confere preço/estoque no Firestore)
     this.updateCartDisplay();
+    window.cartService?.refreshFromCatalog()
+      .then((changed) => { if (changed && this.cartModal.classList.contains('modal--active')) this.updateCartDisplay(); })
+      .catch(() => {});
 
     // focus first focusable element
     const focusTarget = this.cartModal.querySelector('.modal__close, button, [href], input');
@@ -192,10 +197,11 @@ export class ModalsManager {
     cartItemsContainer.innerHTML = cart.map(item => {
       const total = (item.price * item.quantity).toFixed(2);
       return `
-      <div class="cart-item" data-id="${item.id}">
+      <div class="cart-item${item.unavailable ? ' cart-item--unavailable' : ''}" data-id="${escapeHTML(String(item.id))}">
         <div class="cart-item__info">
-          <h4>${item.name}</h4>
-          <p class="cart-item__price">R$ ${item.price.toFixed(2)} <span class="cart-item__mult">x${item.quantity}</span> <span class="cart-item__total">= R$ ${total}</span></p>
+          <h4>${escapeHTML(String(item.name || ''))}</h4>
+          <p class="cart-item__price">R$ ${Number(item.price).toFixed(2)} <span class="cart-item__mult">x${item.quantity}</span> <span class="cart-item__total">${item.unavailable ? '' : `= R$ ${total}`}</span></p>
+          ${cartItemNotice(item)}
         </div>
         <div class="cart-item__controls">
           <button class="btn-qty" onclick="window.modalsManager.updateCartItemQuantity('${item.id}', ${item.quantity - 1})">-</button>
@@ -209,9 +215,11 @@ export class ModalsManager {
     }).join('');
 
     this.ensureCartPriceStyles();
+    ensureCartStatusStyles();
+    window.cartService?.markPriceNoticesShown();
 
-    // Calculate total
-    const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    // Calculate total (itens sem estoque não entram)
+    const total = cart.reduce((sum, item) => sum + (item.unavailable ? 0 : item.price * item.quantity), 0);
     cartTotalElement.textContent = `Total: R$ ${total.toFixed(2)}`;
   }
 
