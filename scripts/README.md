@@ -23,9 +23,28 @@ Este diretório reúne os utilitários para integrar o PostgreSQL da farmácia a
 
 Ao terminar com alterações, os syncs aumentam `productsVersion` **e regeneram o catálogo agregado** (`build-catalog.mjs`) automaticamente.
 
+## Estado local da sincronização (só grava o que mudou)
+- Os syncs guardam em `scripts/.state/produtos-sync.json` (fora do Git) o que gravaram por último em cada produto (um hash dos dados + a quantidade).
+- Em cada execução eles comparam o Postgres com esse arquivo, **sem ler o Firestore**, e gravam só os produtos alterados. O catálogo do site é atualizado só com esses produtos (incremental).
+- Na primeira vez (ou se o arquivo sumir) o estado é reconstruído sozinho a partir do Firestore (~10 mil leituras, uma vez).
+- Reconstruir manualmente (recomendado 1× por mês, ou se apagarem/editarem produtos direto no Firestore):
+  ```powershell
+  $env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Keys\<sua-chave>.json"
+  node .\scripts\sync-state.mjs --rebuild
+  node .\scripts\sync-state.mjs            # só mostra quantos produtos e a data do estado
+  ```
+- Rode os syncs sempre no **mesmo computador** (cada máquina tem o próprio arquivo de estado).
+- Opções: `DRY_RUN=1` (simula, nos dois syncs), `FORCE_WRITE=1` (sync completo grava todos), `FORCE_READ=1` (sync de estoque lê cada produto no Firestore, como antes).
+- Aprovações feitas no admin (moderação) continuam valendo até os dados daquele produto mudarem no Postgres.
+
 ### Cota do Firestore (plano grátis: 50 mil leituras e 20 mil gravações por dia)
-- `run-sync-stock.ps1`: ~1 leitura por produto (~10 mil) + ~10 mil do catálogo se algo mudou → até ~20 mil leituras. Rode no máximo 1–2× por dia.
-- `run-sync-template.ps1`: grava todos os ~10 mil produtos → no máximo 1× por dia.
+| Execução | Leituras | Gravações |
+|---|---|---|
+| `run-sync-stock.ps1` | ~3 + nº de produtos alterados | só os alterados |
+| `run-sync-template.ps1` | ~3 + nº de produtos alterados | só os alterados |
+| Reconstruir o estado / catálogo completo | ~10 mil | — |
+
+- Com o estado local, o sync de estoque pode rodar várias vezes ao dia.
 - Se der `RESOURCE_EXHAUSTED: Quota exceeded`, a cota acabou: não insista, ela renova à 0h do Pacífico (~4h em Brasília).
 
 ## Catálogo agregado (o que o site lê)
@@ -149,7 +168,7 @@ Use o runner `run-export-template.ps1` para executar.
 ## Agendar no Windows (Task Scheduler)
 Sugestões:
 - Sync completo: 1× por madrugada.
-- Estoque: 1–2× por dia, com `ONLY_EXISTING=1` e `SKIP_UNCHANGED=1` (cada execução lê ~10 mil documentos + o catálogo; mais que isso estoura a cota grátis de leituras).
+- Estoque: a cada 1–2 horas no horário comercial (com o estado local cada execução custa só ~3 leituras + os produtos alterados).
 
 Passos:
 1) Agendador de Tarefas → Criar Tarefa (não básica) → Aba Geral: marcar "Executar com privilégios mais altos".

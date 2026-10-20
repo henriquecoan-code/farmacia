@@ -3,10 +3,13 @@
 //   $env:PGHOST="host"; $env:PGPORT="5432"; $env:PGDATABASE="db"; $env:PGUSER="user"; $env:PGPASSWORD="pass"; \
 //   $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\serviceAccount.json"; \
 //   node ./scripts/sync-pg-to-firestore.mjs
+// Compara com o estado local (scripts/.state/produtos-sync.json) e grava só produtos com dados
+// ou estoque alterados. DRY_RUN=1 só simula; FORCE_WRITE=1 grava todos.
 
 import pg from 'pg';
 import admin from 'firebase-admin';
-import { buildCatalog } from './build-catalog.mjs';
+import { updateCatalogIncremental } from './build-catalog.mjs';
+import { loadOrRebuildState, saveState, hashPayload } from './sync-state.mjs';
 import fs from 'fs/promises';
 
 process.on('unhandledRejection', (e) => {
@@ -248,9 +251,15 @@ async function main(){
     }
 
     const col = db.collection('produtos');
-    let batch = db.batch();
-    let ops = 0;
+    const DRY_RUN = process.env.DRY_RUN === '1';
+    // FORCE_WRITE=1 grava todos (comportamento antigo), ignorando o estado local
+    const FORCE_WRITE = process.env.FORCE_WRITE === '1';
+    const state = await loadOrRebuildState(db, { log: (m) => console.log(m) });
 
+    // 1) Monta os payloads e compara com o estado local (0 leituras no Firestore)
+    const toWrite = [];
+    let unchanged = 0;
+    let created = 0;
     for (const r of rows) {
       const { precoMaximo, precoComDesconto } = calcularPreco(r.vlr_venda, r.prc_desconto);
       const id = String(r.cod_red);
@@ -292,45 +301,49 @@ async function main(){
       });
       // Only set publicado=false when blocked to avoid overriding manual approvals
       if (isBlocked) payload.publicado = false;
-      batch.set(col.doc(id), payload, { merge: true });
-      ops++;
 
-      // Commit em lotes de 400 para não estourar limites
-      if (ops % 400 === 0) {
-        console.log(`[sync] Committing batch at ${ops} ops...`);
+      const h = hashPayload(payload);
+      const st = state.itens[id];
+      if (!FORCE_WRITE && st && st.h === h && st.q === payload.quantidade) { unchanged++; continue; }
+      if (!st) created++;
+      toWrite.push({ id, payload, h });
+    }
+    console.log(`[sync] A gravar: ${toWrite.length} (novos: ${created}); sem mudança: ${unchanged}${DRY_RUN ? ' [DRY_RUN]' : ''}`);
+
+    // 2) Grava só os alterados, em lotes de 400; atualiza o estado após cada lote confirmado
+    let ops = 0;
+    if (!DRY_RUN) {
+      for (let i = 0; i < toWrite.length; i += 400) {
+        const chunk = toWrite.slice(i, i + 400);
+        const batch = db.batch();
+        chunk.forEach(it => batch.set(col.doc(it.id), it.payload, { merge: true }));
+        console.log(`[sync] Committing batch (${ops + chunk.length}/${toWrite.length})...`);
         try {
           await batch.commit();
-          console.log('[sync] Batch committed.');
         } catch (e) {
           console.error('[sync] Batch commit error:', e && e.message ? e.message : e);
           throw e;
         }
-        batch = db.batch();
+        ops += chunk.length;
+        chunk.forEach(it => { state.itens[it.id] = { h: it.h, q: it.payload.quantidade }; });
+        await saveState(state);
       }
     }
 
-    if (ops % 400 !== 0) {
-      console.log(`[sync] Committing final batch (${ops % 400} ops)...`);
+    if (!DRY_RUN && ops > 0) {
+      console.log('[sync] Bumping productsVersion...');
       try {
-        await batch.commit();
-        console.log('[sync] Final batch committed.');
+        await bumpProductsVersion();
+        console.log('[sync] productsVersion bumped.');
+        // Atualiza o catálogo agregado lido pelo site só com os produtos alterados
+        await updateCatalogIncremental(db, toWrite.map(it => it.id), { log: (m) => console.log(m) });
       } catch (e) {
-        console.error('[sync] Final batch commit error:', e && e.message ? e.message : e);
+        console.error('[sync] bumpProductsVersion error:', e && e.message ? e.message : e);
         throw e;
       }
     }
-    console.log('[sync] Bumping productsVersion...');
-    try {
-      await bumpProductsVersion();
-      console.log('[sync] productsVersion bumped.');
-      // Regenera o catálogo agregado lido pelo site
-      await buildCatalog(db, { log: (m) => console.log(m) });
-    } catch (e) {
-      console.error('[sync] bumpProductsVersion error:', e && e.message ? e.message : e);
-      throw e;
-    }
 
-    console.log(`[sync] Sincronizados ${ops} produtos.`);
+    console.log(`[sync] Sincronizados ${ops} produtos (sem mudança: ${unchanged}).${DRY_RUN ? ` [DRY_RUN: gravaria ${toWrite.length}]` : ''}`);
   } finally {
     await pool.end();
   }

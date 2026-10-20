@@ -6,7 +6,8 @@
 //   BATCH_SIZE: optional, default 400
 
 import admin from 'firebase-admin';
-import { buildCatalog } from './build-catalog.mjs';
+import { updateCatalogIncremental } from './build-catalog.mjs';
+import { loadState, saveState } from './sync-state.mjs';
 
 const { CLEAN_MODE, DRY_RUN, BATCH_SIZE } = process.env;
 const mode = (CLEAN_MODE || 'deactivate').toLowerCase();
@@ -83,7 +84,14 @@ async function main(){
       }, { merge: true });
     });
     console.log('[clean] productsVersion bumped.');
-    if (!dryRun) await buildCatalog(db);
+    if (!dryRun) {
+      // Produtos apagados saem do estado local do sync
+      if (mode === 'delete') {
+        const st = await loadState();
+        if (st) { toProcess.forEach(p => { delete st.itens[p.id]; }); await saveState(st); }
+      }
+      await updateCatalogIncremental(db, toProcess.map(p => p.id));
+    }
   } catch (e) {
     console.warn('[clean] Failed to bump productsVersion', e && e.message ? e.message : e);
   }
