@@ -1,4 +1,4 @@
-const CACHE_NAME = 'farmacia-shell-v4';
+const CACHE_NAME = 'farmacia-shell-v5';
 const APP_SHELL = [
   './',
   './index.html',

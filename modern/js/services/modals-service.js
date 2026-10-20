@@ -1,5 +1,5 @@
 // Modals Manager - Handles all modal components
-import { cartItemNotice, ensureCartStatusStyles } from './cart-service.js';
+import { cartItemNotice, cartItemSelectBox, ensureCartStatusStyles, isCheckoutItem } from './cart-service.js';
 import { escapeHTML } from './product-utils.js';
 export class ModalsManager {
   constructor() {
@@ -64,6 +64,10 @@ export class ModalsManager {
     }
     if (goCheckoutBtn) {
       goCheckoutBtn.addEventListener('click', () => {
+        if (window.cartService && window.cartService.getItems().length && !window.cartService.getSelectedItems().length) {
+          window.toast?.warn('Selecione ao menos um item com estoque para finalizar.');
+          return;
+        }
         this.closeCartModal();
         window.location.href = 'checkout.html';
       });
@@ -197,7 +201,8 @@ export class ModalsManager {
     cartItemsContainer.innerHTML = cart.map(item => {
       const total = (item.price * item.quantity).toFixed(2);
       return `
-      <div class="cart-item${item.unavailable ? ' cart-item--unavailable' : ''}" data-id="${escapeHTML(String(item.id))}">
+      <div class="cart-item${item.unavailable ? ' cart-item--unavailable' : ''}${item.selected === false ? ' cart-item--unselected' : ''}" data-id="${escapeHTML(String(item.id))}">
+        ${cartItemSelectBox(item)}
         <div class="cart-item__info">
           <h4>${escapeHTML(String(item.name || ''))}</h4>
           <p class="cart-item__price">R$ ${Number(item.price).toFixed(2)} <span class="cart-item__mult">x${item.quantity}</span> <span class="cart-item__total">${item.unavailable ? '' : `= R$ ${total}`}</span></p>
@@ -218,9 +223,22 @@ export class ModalsManager {
     ensureCartStatusStyles();
     window.cartService?.markPriceNoticesShown();
 
-    // Calculate total (itens sem estoque não entram)
-    const total = cart.reduce((sum, item) => sum + (item.unavailable ? 0 : item.price * item.quantity), 0);
-    cartTotalElement.textContent = `Total: R$ ${total.toFixed(2)}`;
+    // Seleção do item (delegado, registrado uma vez): só os marcados vão para o pedido
+    if (!cartItemsContainer.dataset.selectBound) {
+      cartItemsContainer.dataset.selectBound = '1';
+      cartItemsContainer.addEventListener('change', (e) => {
+        const cb = e.target.closest('input[data-select-id]');
+        if (!cb) return;
+        window.cartService?.setSelected(cb.dataset.selectId, cb.checked);
+        this.updateCartDisplay();
+      });
+    }
+
+    // Total: só itens selecionados e com estoque
+    const chosen = cart.filter(isCheckoutItem);
+    const total = chosen.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const label = chosen.length === cart.length ? 'Total' : `Total (${chosen.length} de ${cart.length} itens)`;
+    cartTotalElement.textContent = `${label}: R$ ${total.toFixed(2)}`;
   }
 
   // Auth Modal Methods

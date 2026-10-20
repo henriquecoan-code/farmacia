@@ -2,7 +2,7 @@ import { bootstrap } from './bootstrap.js';
 import { eventBus } from './services/event-bus.js';
 import { analytics } from './services/analytics-service.js';
 import ComponentLoader from './services/component-loader.js';
-import { cartItemNotice, ensureCartStatusStyles } from './services/cart-service.js';
+import { cartItemNotice, cartItemSelectBox, ensureCartStatusStyles, isCheckoutItem } from './services/cart-service.js';
 import { escapeHTML } from './services/product-utils.js';
 
 class CheckoutPage {
@@ -67,8 +67,9 @@ class CheckoutPage {
     emptyMsg.style.display = 'none';
     ensureCartStatusStyles();
     listEl.innerHTML = this.items.map(it => {
-      const lineTotal = (it.unavailable ? 0 : it.price * it.quantity).toFixed(2).replace('.', ',');
-      return `<div class="checkout-item${it.unavailable ? ' checkout-item--unavailable' : ''}" data-id="${escapeHTML(String(it.id))}">
+      const lineTotal = (isCheckoutItem(it) ? it.price * it.quantity : 0).toFixed(2).replace('.', ',');
+      return `<div class="checkout-item${it.unavailable ? ' checkout-item--unavailable' : ''}${it.selected === false ? ' checkout-item--unselected' : ''}" data-id="${escapeHTML(String(it.id))}">
+        ${cartItemSelectBox(it)}
         <div class="checkout-item__title">${escapeHTML(String(it.name || ''))}${cartItemNotice(it)}</div>
         <div class="qty-control">
           <button data-action="minus" aria-label="Diminuir">-</button>
@@ -76,6 +77,7 @@ class CheckoutPage {
           <button data-action="plus" aria-label="Aumentar">+</button>
         </div>
         <div class="line-total">R$ ${lineTotal}</div>
+        <button type="button" class="checkout-item__remove" data-action="remove" aria-label="Remover do carrinho" title="Remover do carrinho"><i class="fas fa-trash" aria-hidden="true"></i></button>
       </div>`;
     }).join('');
   // Remove cart skeleton if present (first render cleanup for modal)
@@ -99,6 +101,18 @@ class CheckoutPage {
     });
     const listEl = document.getElementById('checkout-items');
     if (listEl) {
+      // Seleção: só os itens marcados vão para este pedido; os demais ficam no carrinho
+      listEl.addEventListener('change', (e) => {
+        const cb = e.target.closest('input[data-select-id]');
+        if (!cb) return;
+        const id = cb.dataset.selectId;
+        if (window.cartService) window.cartService.setSelected(id, cb.checked);
+        else { const it = this.items.find(i => String(i.id) === id); if (it) it.selected = cb.checked; this.persistLocal(); }
+        this.items = window.cartService ? window.cartService.getItems() : this.items;
+        this.loadItems();
+        this.updateAll();
+        analytics.track('checkout_item_selection', { id, selected: cb.checked });
+      });
       listEl.addEventListener('click', (e) => {
         const btn = e.target.closest('button[data-action]');
         if (!btn) return;
@@ -107,6 +121,15 @@ class CheckoutPage {
         const id = row.getAttribute('data-id');
         const item = this.items.find(i => i.id === id);
         if (!item) return;
+        if (btn.dataset.action === 'remove') {
+          if (window.cartService) window.cartService.removeItem(id);
+          else { this.items = this.items.filter(i => i.id !== id); this.persistLocal(); }
+          this.items = window.cartService ? window.cartService.getItems() : this.items;
+          this.loadItems();
+          this.updateAll();
+          analytics.track('checkout_item_removed', { id });
+          return;
+        }
         if (btn.dataset.action === 'minus') item.quantity = Math.max(1, item.quantity - 1);
         if (btn.dataset.action === 'plus') item.quantity = item.stock > 0 ? Math.min(item.stock, item.quantity + 1) : item.quantity + 1;
         if (window.cartService) window.cartService.updateQuantity(id, item.quantity); else this.persistLocal();
@@ -170,9 +193,11 @@ class CheckoutPage {
 
   format(v){ return 'R$ ' + v.toFixed(2).replace('.', ','); }
 
-  getSubtotal(){ return this.items.reduce((s,i)=> s + (i.unavailable ? 0 : i.price * i.quantity), 0); }
+  // Itens que vão para este pedido (selecionados e com estoque)
+  getOrderItems(){ return this.items.filter(isCheckoutItem); }
+  getSubtotal(){ return this.getOrderItems().reduce((s,i)=> s + i.price * i.quantity, 0); }
 
-  getShippingValue(){ return this.shipping === 'express' ? 24.90 : (this.items.length ? 9.90 : 0); }
+  getShippingValue(){ return this.shipping === 'express' ? 24.90 : (this.getOrderItems().length ? 9.90 : 0); }
 
   applyCoupon(){
     const input = document.getElementById('coupon-input');
@@ -226,7 +251,7 @@ class CheckoutPage {
       } else instRow.style.display = 'none';
     }
     const btn = document.getElementById('place-order');
-    if (btn) btn.disabled = !(this.items.length && this.isAddressValid() && this.isAuth());
+    if (btn) btn.disabled = !(this.getOrderItems().length && this.isAddressValid() && this.isAuth());
     this.saveAddressDraft();
     this.renderSelectedAddressSummary();
     if (!this.funnel.addressValidAt && this.isAddressValid()) {
@@ -717,7 +742,7 @@ class CheckoutPage {
 
   validateBeforeOrder(){
     if (!this.items.length) { this.setStatus('checkout-status','Carrinho vazio.', 'error'); return false; }
-    if (this.items.some(i => i.unavailable)) { this.setStatus('checkout-status','Há itens sem estoque no carrinho. Remova-os para continuar.', 'error'); return false; }
+    if (!this.getOrderItems().length) { this.setStatus('checkout-status','Selecione ao menos um item com estoque.', 'error'); return false; }
     if (!this.isAuth()) { this.setStatus('checkout-status','Faça login para continuar.', 'error'); return false; }
     if (!this.isAddressValid()) { this.setStatus('checkout-status','Preencha endereço completo.', 'error'); return false; }
     if (this.payment === 'card') {
@@ -745,7 +770,7 @@ class CheckoutPage {
       const changed = await window.cartService.refreshFromCatalog().catch(() => false);
       if (changed) {
         this.syncFromCart();
-        if (this.items.some(i => i.unavailable) || Math.abs(this.calcTotals().total - before) > 0.004) {
+        if (Math.abs(this.calcTotals().total - before) > 0.004) {
           this.setStatus('checkout-status','Preços ou estoque foram atualizados. Confira o carrinho e confirme novamente.', 'error');
           return;
         }
@@ -757,7 +782,7 @@ class CheckoutPage {
     // Build initial order (id/orderNumber will be assigned by backend if available)
     const order = {
       createdAt: new Date().toISOString(),
-      items: this.items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+      items: this.getOrderItems().map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
       totals: this.calcTotals(),
       shippingMethod: this.shipping,
       paymentMethod: this.payment,
@@ -805,8 +830,10 @@ class CheckoutPage {
       });
     }
     try { localStorage.setItem('last_order', JSON.stringify(order)); } catch {}
-    // Limpa carrinho
-    if (window.cartService) window.cartService.clear(); else localStorage.removeItem('modern_pharmacy_cart');
+    // Tira do carrinho só o que foi comprado; itens não selecionados (ou sem estoque) continuam lá
+    const purchasedIds = order.items.map(i => i.id);
+    if (window.cartService) window.cartService.removeItems(purchasedIds);
+    else { this.items = this.items.filter(i => !purchasedIds.includes(i.id)); this.persistLocal(); }
     this.showSuccess(order);
   }
 

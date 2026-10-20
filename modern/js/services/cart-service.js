@@ -80,6 +80,31 @@ export class CartService {
     return this.items.some(i => i.unavailable);
   }
 
+  // ===== Seleção: o cliente escolhe quais itens vão para este pedido; os demais ficam no carrinho =====
+  setSelected(productId, selected) {
+    const item = this.items.find(i => String(i.id) === String(productId));
+    if (!item) return;
+    item.selected = !!selected;
+    this.saveToStorage();
+    this.notifyListeners();
+    eventBus.emit('cart:selection', { productId, selected: item.selected, items: this.getItems(), total: this.getTotal() });
+  }
+
+  // Itens que entram no pedido: selecionados e com estoque
+  getSelectedItems() {
+    return this.items.filter(isCheckoutItem);
+  }
+
+  // Remove só os itens informados (após o pedido, os não selecionados continuam no carrinho)
+  removeItems(productIds) {
+    const ids = new Set((productIds || []).map(String));
+    this.items = this.items.filter(i => !ids.has(String(i.id)));
+    this.saveToStorage();
+    this.updateCartCounter();
+    this.notifyListeners();
+    eventBus.emit('cart:removed', { productIds: [...ids], items: this.getItems(), total: this.getTotal() });
+  }
+
   init() {
     this.loadFromStorage();
     this.updateCartCounter();
@@ -92,6 +117,7 @@ export class CartService {
     if (existingItem) {
       if (existingItem.stock > 0 && existingItem.quantity >= existingItem.stock) return;
       existingItem.quantity += 1;
+      existingItem.selected = true;
     } else {
       this.items.push({
         ...product,
@@ -146,8 +172,8 @@ export class CartService {
 
   // Get cart total
   getTotal() {
-    // Itens sem estoque continuam no carrinho, mas não entram no total
-    return this.items.reduce((total, item) => total + (item.unavailable ? 0 : item.price * item.quantity), 0);
+    // Só itens selecionados e com estoque entram no total
+    return this.items.reduce((total, item) => total + (isCheckoutItem(item) ? item.price * item.quantity : 0), 0);
   }
 
   // Clear cart
@@ -239,7 +265,8 @@ export class CartService {
     }
 
     cartItemsContainer.innerHTML = this.items.map(item => `
-      <div class="cart-item${item.unavailable ? ' cart-item--unavailable' : ''}" data-product-id="${escapeHTML(String(item.id))}">
+      <div class="cart-item${item.unavailable ? ' cart-item--unavailable' : ''}${item.selected === false ? ' cart-item--unselected' : ''}" data-product-id="${escapeHTML(String(item.id))}">
+        ${cartItemSelectBox(item)}
         <div class="cart-item__info">
           <h4 class="cart-item__name">${escapeHTML(String(item.name || ''))}</h4>
           <p class="cart-item__price">R$ ${Number(item.price).toFixed(2).replace('.', ',')}</p>
@@ -261,6 +288,9 @@ export class CartService {
     `).join('');
 
     // Add event listeners to cart item controls
+    cartItemsContainer.querySelectorAll('input[data-select-id]').forEach(cb => {
+      cb.addEventListener('change', () => { this.setSelected(cb.dataset.selectId, cb.checked); this.renderCartItems(); });
+    });
     cartItemsContainer.querySelectorAll('.quantity-btn--minus').forEach(btn => {
       btn.addEventListener('click', () => {
         const productId = btn.dataset.productId;
@@ -410,6 +440,18 @@ export class CartService {
   }
 }
 
+// Item entra no pedido/total? (selecionado — padrão sim — e com estoque)
+export function isCheckoutItem(item) {
+  return item.selected !== false && !item.unavailable;
+}
+
+// Caixa de seleção do item (modal e checkout); a mudança é tratada por quem renderiza
+export function cartItemSelectBox(item) {
+  const id = escapeHTML(String(item.id));
+  const label = item.unavailable ? 'Sem estoque' : 'Incluir na compra';
+  return `<label class="cart-item__select" title="${label}"><input type="checkbox" data-select-id="${id}" aria-label="${label}"${isCheckoutItem(item) ? ' checked' : ''}${item.unavailable ? ' disabled' : ''}></label>`;
+}
+
 // Aviso exibido no item: preço atualizado ou sem estoque (usado pelo modal e pelo checkout)
 export function cartItemNotice(item) {
   const fmt = (v) => 'R$ ' + Number(v).toFixed(2).replace('.', ',');
@@ -429,10 +471,17 @@ export function ensureCartStatusStyles() {
   const style = document.createElement('style');
   style.id = 'cart-status-styles';
   style.textContent = `
-    .cart-item--unavailable, .checkout-item--unavailable { opacity: .45; }
+    /* Item sem estoque fica translúcido, mas o botão de remover continua bem visível */
+    .cart-item--unavailable .cart-item__info, .cart-item--unavailable .btn-qty, .cart-item--unavailable .cart-item__qty,
+    .cart-item--unavailable .quantity-btn, .cart-item--unavailable .quantity-display,
+    .checkout-item--unavailable .checkout-item__title, .checkout-item--unavailable .qty-control, .checkout-item--unavailable .line-total { opacity: .45; }
     p.cart-item__notice { margin: .2rem 0 0; font-size: .75rem; font-weight: 400; color: var(--gray-600, #4b5563); }
     p.cart-item__notice--price { color: #b45309; }
     p.cart-item__notice--out { color: var(--error-color, #dc2626); font-weight: 600; }
+    .cart-item__select { display: flex; align-items: center; margin: 0 .6rem 0 0; cursor: pointer; text-transform: none; letter-spacing: 0; }
+    .cart-item__select input { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--primary-color, #1e40af); }
+    .cart-item__select input:disabled { cursor: not-allowed; }
+    .cart-item--unselected .cart-item__info, .checkout-item--unselected .checkout-item__title, .checkout-item--unselected .line-total { opacity: .6; }
   `;
   document.head.appendChild(style);
 }
