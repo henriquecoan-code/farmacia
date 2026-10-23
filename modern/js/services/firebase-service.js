@@ -1,4 +1,18 @@
 // Firebase Service - Handles all Firebase operations
+
+// Converte Timestamps do Firestore em ISO e remove tipos não serializáveis (exportação LGPD)
+function toPlainData(value) {
+  if (value == null) return value;
+  if (typeof value.toDate === 'function') return value.toDate().toISOString();
+  if (Array.isArray(value)) return value.map(toPlainData);
+  if (typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = toPlainData(v);
+    return out;
+  }
+  return value;
+}
+
 export class FirebaseService {
   constructor() {
     this.app = null;
@@ -37,6 +51,16 @@ export class FirebaseService {
       this.app = initializeApp(firebaseConfig);
       this.auth = getAuth(this.app);
       this.firestore = getFirestore(this.app);
+
+      // Desenvolvimento: emuladores locais (firebase emulators:start --only auth,firestore).
+      // Só em localhost e com localStorage.firebase_emulators = '1'; produção nunca entra aqui.
+      if (['localhost', '127.0.0.1'].includes(location.hostname) && localStorage.getItem('firebase_emulators') === '1') {
+        const { connectAuthEmulator } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js');
+        const { connectFirestoreEmulator } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+        connectAuthEmulator(this.auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+        connectFirestoreEmulator(this.firestore, '127.0.0.1', 8080);
+        console.warn('[FirebaseService] Usando emuladores locais (Auth 9099, Firestore 8080)');
+      }
 
       // Habilita cache persistente (IndexedDB) para reduzir leituras repetidas
       try {
@@ -315,6 +339,102 @@ export class FirebaseService {
     
     const { createUserWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js');
     return createUserWithEmailAndPassword(this.auth, email, password);
+  }
+
+  // Perfil criado no cadastro, com o registro do aceite (LGPD): consentimento { versao, aceitoEm }
+  async createUserProfile(uid, { nome, email, consentVersion }) {
+    if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const { doc, setDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+    await setDoc(doc(this.firestore, 'usuarios', uid), {
+      nome,
+      name: nome,
+      email,
+      createdAt: serverTimestamp(),
+      consentimento: { versao: consentVersion, aceitoEm: serverTimestamp() }
+    }, { merge: true });
+  }
+
+  // ===== LGPD: portabilidade e exclusão (conta.html) =====
+  // Exporta os dados do usuário logado: perfil, endereços e pedidos
+  async exportMyData() {
+    if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const user = this.auth?.currentUser;
+    if (!user) throw new Error('Not signed in');
+    const { doc, getDoc, collection, getDocs, query, where } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+    const listDocs = async (q) => {
+      const out = [];
+      (await getDocs(q)).forEach(d => out.push(Object.assign({ _id: d.id }, d.data())));
+      return out;
+    };
+    const profileSnap = await getDoc(doc(this.firestore, 'usuarios', user.uid));
+    const enderecos = await listDocs(collection(this.firestore, 'usuarios', user.uid, 'enderecos'));
+    const pedidos = await listDocs(query(collection(this.firestore, 'pedidos'), where('userId', '==', user.uid)));
+    // Coleção legada 'orders' (por e-mail); ignora se as regras negarem
+    let pedidosLegados = [];
+    if (user.email) {
+      try { pedidosLegados = await listDocs(query(collection(this.firestore, 'orders'), where('user.email', '==', user.email))); } catch {}
+    }
+    return toPlainData({
+      geradoEm: new Date().toISOString(),
+      conta: {
+        uid: user.uid,
+        email: user.email,
+        criadaEm: user.metadata?.creationTime || null,
+        ultimoLogin: user.metadata?.lastSignInTime || null
+      },
+      perfil: profileSnap.exists() ? profileSnap.data() : null,
+      enderecos,
+      pedidos,
+      pedidosLegados
+    });
+  }
+
+  // Exclui a conta do usuário logado. Pedidos são anonimizados (guarda fiscal/sanitária), não apagados.
+  // A senha é pedida antes: o Firebase exige login recente para deleteUser (auth/requires-recent-login).
+  async deleteMyAccount(password) {
+    if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const user = this.auth?.currentUser;
+    if (!user) throw new Error('Not signed in');
+    const { EmailAuthProvider, reauthenticateWithCredential, deleteUser } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js');
+    const { doc, collection, getDocs, query, where, writeBatch, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+
+    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+
+    // Lotes de até 400 operações (limite do Firestore é 500)
+    const ops = [];
+    const pedidosSnap = await getDocs(query(collection(this.firestore, 'pedidos'), where('userId', '==', user.uid)));
+    pedidosSnap.forEach(d => {
+      const a = d.data().address || {};
+      ops.push(b => b.update(d.ref, {
+        userId: null,
+        user: null,
+        address: { city: String(a.city || a.cidade || ''), state: String(a.state || a.estado || '') },
+        anonimizadoEm: serverTimestamp()
+      }));
+    });
+    for (const sub of ['enderecos', 'endereco']) {
+      const snap = await getDocs(collection(this.firestore, 'usuarios', user.uid, sub));
+      snap.forEach(d => ops.push(b => b.delete(d.ref)));
+    }
+    ops.push(b => b.delete(doc(this.firestore, 'carrinhos', user.uid)));
+    ops.push(b => b.delete(doc(this.firestore, 'usuarios', user.uid)));
+    for (let i = 0; i < ops.length; i += 400) {
+      const batch = writeBatch(this.firestore);
+      ops.slice(i, i + 400).forEach(op => op(batch));
+      await batch.commit();
+    }
+
+    await deleteUser(user);
+
+    // Remove a cópia local (IndexedDB) do Firestore; a página recarrega em seguida
+    try {
+      const { terminate, clearIndexedDbPersistence } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+      await terminate(this.firestore);
+      await clearIndexedDbPersistence(this.firestore);
+    } catch (e) {
+      console.warn('Não foi possível limpar o cache local do Firestore', e);
+    }
+    return { pedidosAnonimizados: pedidosSnap.size };
   }
 
   async signOut() {

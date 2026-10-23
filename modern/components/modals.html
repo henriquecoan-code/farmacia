@@ -74,6 +74,14 @@
                     <div class="field-error" id="auth-password-confirm-error" role="alert" aria-live="polite"></div>
                 </div>
 
+                <div class="field-wrapper auth-register-only">
+                    <div class="consent-row">
+                        <input type="checkbox" id="auth-consent" name="consent" aria-describedby="auth-consent-error">
+                        <label for="auth-consent">Li e concordo com os <a href="termos.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</label>
+                    </div>
+                    <div class="field-error" id="auth-consent-error" role="alert" aria-live="polite"></div>
+                </div>
+
                 <button type="submit" class="btn btn--primary btn--full" id="auth-submit-btn">Entrar</button>
             </form>
             <div class="auth-switch" style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">

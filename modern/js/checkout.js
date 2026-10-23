@@ -601,18 +601,13 @@ class CheckoutPage {
     else container.innerHTML = 'Boleto válido por 2 dias úteis.';
   }
 
+  // Cartão é cobrado na maquininha (entrega/retirada): o site não pede número/CVV,
+  // para ninguém digitar um cartão real num formulário que não processa pagamento.
   cardFieldsHTML(){
     return `<div class="card-box-mini">
-      <div class="grid-2">
-        <div><label>Número do Cartão</label><input id="card-number" placeholder="0000 0000 0000 0000" maxlength="19" /></div>
-        <div><label>Nome Impresso</label><input id="card-holder" /></div>
-      </div>
-      <div class="grid-2">
-        <div><label>Validade</label><input id="card-exp" placeholder="MM/AA" maxlength="5" /></div>
-        <div><label>CVV</label><input id="card-cvv" placeholder="000" maxlength="4" /></div>
-      </div>
+      <p><i class="fas fa-credit-card"></i> O pagamento com cartão é feito <strong>na entrega ou na retirada</strong>, na maquininha.
+      O site não pede nem guarda dados de cartão.</p>
       <div id="installments-box" style="margin-top:.75rem"></div>
-      <p class="status-msg">(Simulação - dados não são enviados)</p>
     </div>`;
   }
 
@@ -746,15 +741,6 @@ class CheckoutPage {
     if (!this.isAuth()) { this.setStatus('checkout-status','Faça login para continuar.', 'error'); return false; }
     if (!this.isAddressValid()) { this.setStatus('checkout-status','Preencha endereço completo.', 'error'); return false; }
     if (this.payment === 'card') {
-      // Minimal validation for simulation
-      const num = document.getElementById('card-number')?.value.replace(/\s+/g,'');
-      const holder = document.getElementById('card-holder')?.value.trim();
-      const exp = document.getElementById('card-exp')?.value.trim();
-      const cvv = document.getElementById('card-cvv')?.value.trim();
-      if (!(num && num.length >= 12 && holder && /\d{2}\/\d{2}/.test(exp) && cvv && cvv.length >= 3)) {
-        this.setStatus('checkout-status','Preencha dados do cartão válidos.', 'error');
-        return false;
-      }
       if (!this.selectedInstallment) {
         this.setStatus('checkout-status','Selecione parcelas.', 'error');
         return false;
@@ -876,22 +862,6 @@ class CheckoutPage {
         else cep.value = v;
       });
     }
-    // Card masks (delegated on input event)
-    document.addEventListener('input', (e) => {
-      const t = e.target;
-      if (t && t.id === 'card-number') {
-        let v = t.value.replace(/\D/g,'').slice(0,16);
-        t.value = v.replace(/(\d{4})(?=\d)/g,'$1 ').trim();
-      }
-      if (t && t.id === 'card-exp') {
-        let v = t.value.replace(/\D/g,'').slice(0,4);
-        if (v.length >= 3) t.value = v.slice(0,2)+'/'+v.slice(2);
-        else t.value = v;
-      }
-      if (t && t.id === 'card-cvv') {
-        t.value = t.value.replace(/\D/g,'').slice(0,4);
-      }
-    });
   }
 
   async lookupCEP(){

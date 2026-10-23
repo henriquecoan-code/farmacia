@@ -1929,3 +1929,53 @@ img.lazy-img:not([data-src]) { filter: blur(0); }
   .topbar__btn { width: 100%; justify-content: center; }
   .topbar { font-size: .75rem; }
 }
+/* ===== LGPD: aviso de armazenamento local ===== */
+.storage-notice {
+  position: fixed;
+  left: var(--spacing-4);
+  right: var(--spacing-4);
+  bottom: var(--spacing-4);
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4);
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 1002;
+  font-size: var(--font-size-sm);
+  color: var(--gray-700);
+}
+.storage-notice__text { margin: 0; flex: 1; }
+.storage-notice__text i { color: var(--primary-color); margin-right: var(--spacing-1); }
+.storage-notice__text a { color: var(--primary-color); text-decoration: underline; }
+.storage-notice__btn { flex-shrink: 0; }
+@media (max-width: 768px) {
+  .storage-notice { bottom: calc(64px + var(--spacing-2)); flex-direction: column; align-items: stretch; }
+}
+
+/* ===== Páginas legais (privacidade.html, termos.html) ===== */
+.legal-page { max-width: 820px; margin: 0 auto; color: var(--gray-700); line-height: 1.7; }
+.legal-page h1 { font-size: var(--font-size-3xl); color: var(--gray-900); margin-bottom: var(--spacing-2); }
+.legal-page h2 { font-size: var(--font-size-xl); color: var(--gray-900); margin: var(--spacing-8) 0 var(--spacing-3); scroll-margin-top: 120px; }
+.legal-page h3 { font-size: var(--font-size-lg); color: var(--gray-800); margin: var(--spacing-5) 0 var(--spacing-2); }
+.legal-page p, .legal-page ul, .legal-page ol { margin-bottom: var(--spacing-4); }
+.legal-page ul, .legal-page ol { padding-left: var(--spacing-6); }
+.legal-page li { margin-bottom: var(--spacing-2); }
+.legal-page a { color: var(--primary-color); text-decoration: underline; }
+.legal-page table { width: 100%; border-collapse: collapse; margin-bottom: var(--spacing-4); font-size: var(--font-size-sm); }
+.legal-page th, .legal-page td { border: 1px solid var(--gray-200); padding: var(--spacing-2) var(--spacing-3); text-align: left; vertical-align: top; }
+.legal-page th { background: var(--gray-50); color: var(--gray-900); }
+.legal-page .legal-table-wrap { overflow-x: auto; }
+.legal-meta { color: var(--gray-500); font-size: var(--font-size-sm); margin-bottom: var(--spacing-6); }
+.legal-placeholder { background: #fef3c7; color: #92400e; padding: 0 .25rem; border-radius: var(--radius); font-weight: 600; }
+.legal-toc { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius-lg); padding: var(--spacing-4) var(--spacing-6); }
+.legal-toc ol { margin: 0; }
+
+/* Cadastro: consentimento */
+.consent-row { display: flex; gap: var(--spacing-2); align-items: flex-start; font-size: var(--font-size-sm); color: var(--gray-700); }
+.consent-row input { margin-top: .25rem; flex-shrink: 0; }
+.consent-row a { color: var(--primary-color); text-decoration: underline; }

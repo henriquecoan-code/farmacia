@@ -5,6 +5,7 @@ import { CartService } from './services/cart-service.js';
 import { ModalsManager } from './services/modals-service.js';
 import { eventBus } from './services/event-bus.js';
 import { analytics } from './services/analytics-service.js';
+import { showStorageNoticeOnce } from './services/legal.js';
 import './services/toast-service.js'; // initializes toast global
 import './pwa.js';
 
@@ -38,6 +39,7 @@ class Bootstrap {
     eventBus.emit('bootstrap:ready', { firebase: this.firebase, auth: this.auth, cart: this.cart, modals: this.modals });
     // Listeners globais de analytics (uma vez)
     this.installAnalyticsListeners();
+    showStorageNoticeOnce();
     this.initialized = true;
   }
 

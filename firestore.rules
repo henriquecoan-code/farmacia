@@ -8,9 +8,10 @@ rules_version = '2';
 //   meta/counters                 leitura pública (productsVersion p/ cache); cliente só incrementa orderSeq (+1) no checkout;
 //                                 admin faz bump de productsVersion/productsUpdatedAt
 //   pedidos/{id}                  create pelo cliente (checkout, transação junto com meta/counters);
-//                                 leitura pelo dono (userId) ou admin; admin atualiza status/history
+//                                 leitura pelo dono (userId) ou admin; admin atualiza status/history;
+//                                 dono só anonimiza (exclusão de conta)
 //   orders/{id}                   coleção legada: só leitura (dono por user.email/user.uid ou admin)
-//   usuarios/{uid}                perfil do cliente; dono lê/grava, exceto campos de permissão (role/admin/roles)
+//   usuarios/{uid}                perfil do cliente; dono lê/grava/apaga, exceto campos de permissão (role/admin/roles)
 //   usuarios/{uid}/enderecos/{id} endereços do cliente (conta/checkout)
 //   clientes/{id}                 coleção legada; só admin
 //   ofertas/{id}, carrinhos/{uid}, usuarios/{uid}/endereco/{id}
@@ -176,6 +177,17 @@ service cloud.firestore {
         && request.resource.data.status in ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
         && request.resource.data.history is list;
 
+      // LGPD (exclusão de conta em conta.html): o dono anonimiza o próprio pedido em vez de apagá-lo
+      // (guarda fiscal/sanitária). Some a identificação (userId, e-mail, endereço completo); itens e totais ficam.
+      allow update: if signedIn()
+        && resource.data.userId == request.auth.uid
+        && changedKeys().hasOnly(['userId', 'user', 'address', 'anonimizadoEm'])
+        && request.resource.data.userId == null
+        && request.resource.data.get('user', null) == null
+        && request.resource.data.address is map
+        && request.resource.data.address.keys().hasOnly(['city', 'state'])
+        && request.resource.data.anonimizadoEm == request.time;
+
       allow delete: if false;
     }
 
@@ -198,7 +210,8 @@ service cloud.firestore {
         || (isOwner(uid) && !request.resource.data.keys().hasAny(permissionFields()));
       allow update: if isAdmin()
         || (isOwner(uid) && !changedKeys().hasAny(permissionFields()));
-      allow delete: if isAdmin();
+      // Dono apaga o próprio perfil (LGPD, exclusão de conta)
+      allow delete: if isAdmin() || isOwner(uid);
 
       match /enderecos/{enderecoId} {
         allow read, write: if isOwner(uid) || isAdmin();

@@ -194,6 +194,7 @@ function renderAccount(root, user, client){
         </div>
       </div>
       <div id="addresses-section"></div>
+      <div id="privacy-section"></div>
     </div>`;
 
   // logout
@@ -206,6 +207,94 @@ function renderAccount(root, user, client){
   // addresses
   const addrContainer = root.querySelector('#addresses-section');
   renderAddressSection(addrContainer, client);
+
+  renderPrivacySection(root.querySelector('#privacy-section'), user);
+}
+
+// LGPD (art. 18): portabilidade (baixar dados) e eliminação (excluir conta)
+function renderPrivacySection(container, user){
+  container.innerHTML = `
+    <div class="card">
+      <div class="card__content">
+        <h3 class="card__title"><i class="fas fa-user-shield"></i> Privacidade e dados</h3>
+        <p class="card__text">Veja como tratamos seus dados na <a href="privacidade.html">Política de Privacidade</a>.</p>
+        <div class="card__actions" style="flex-wrap:wrap">
+          <button id="btn-export-data" class="btn btn--secondary"><i class="fas fa-download"></i> Baixar meus dados</button>
+          <button id="btn-delete-start" class="btn" style="color:var(--error-color)"><i class="fas fa-user-times"></i> Excluir minha conta</button>
+        </div>
+        <div id="delete-panel" hidden style="margin-top:1rem;border:1px solid var(--error-color);border-radius:var(--radius-lg);padding:1rem">
+          <p class="card__text"><strong>O que acontece ao excluir a conta:</strong></p>
+          <ul class="card__text" style="padding-left:1.25rem;margin-bottom:.75rem">
+            <li>Seu perfil, seus endereços salvos e seu login são apagados. Não dá para desfazer.</li>
+            <li>Seus pedidos <strong>não são apagados</strong>, porque a farmácia precisa guardá-los por obrigação fiscal e sanitária.
+              Eles são <strong>anonimizados</strong>: perdem o vínculo com você, o e-mail e o endereço completo (ficam só itens, valores, data, cidade e estado).</li>
+            <li>Receitas e conversas no WhatsApp não ficam no site; para apagá-las, fale com a farmácia.</li>
+          </ul>
+          <p class="card__text">Se quiser uma cópia, use "Baixar meus dados" antes.</p>
+          <div class="field-wrapper">
+            <label for="delete-confirm-text">Digite <strong>EXCLUIR</strong> para confirmar</label>
+            <input id="delete-confirm-text" autocomplete="off" />
+          </div>
+          <div class="field-wrapper">
+            <label for="delete-password">Sua senha</label>
+            <input id="delete-password" type="password" autocomplete="current-password" />
+          </div>
+          <div class="card__actions">
+            <button id="btn-delete-cancel" class="btn btn--secondary">Cancelar</button>
+            <button id="btn-delete-confirm" class="btn btn--primary" style="background:var(--error-color);border-color:var(--error-color)" disabled>
+              <i class="fas fa-trash"></i> Excluir definitivamente
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const exportBtn = container.querySelector('#btn-export-data');
+  exportBtn.addEventListener('click', async ()=>{
+    exportBtn.disabled = true;
+    try {
+      const data = await bootstrap.firebase.exportMyData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `meus-dados-farmacia-sao-benedito-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      window.toast?.success('Arquivo com seus dados gerado.');
+    } catch(e){ console.error(e); window.toast?.error('Não foi possível gerar o arquivo. Tente novamente.'); }
+    finally { exportBtn.disabled = false; }
+  });
+
+  const panel = container.querySelector('#delete-panel');
+  const confirmText = container.querySelector('#delete-confirm-text');
+  const pwd = container.querySelector('#delete-password');
+  const confirmBtn = container.querySelector('#btn-delete-confirm');
+  const syncConfirm = ()=>{ confirmBtn.disabled = confirmText.value.trim().toUpperCase() !== 'EXCLUIR' || !pwd.value; };
+  confirmText.addEventListener('input', syncConfirm);
+  pwd.addEventListener('input', syncConfirm);
+  container.querySelector('#btn-delete-start').addEventListener('click', ()=>{ panel.hidden = false; confirmText.focus(); });
+  container.querySelector('#btn-delete-cancel').addEventListener('click', ()=>{
+    panel.hidden = true; confirmText.value = ''; pwd.value = ''; syncConfirm();
+  });
+  confirmBtn.addEventListener('click', async ()=>{
+    if (confirmBtn.disabled) return;
+    if (!confirm(`Excluir definitivamente a conta ${user?.email || ''}? Esta ação não pode ser desfeita.`)) return;
+    confirmBtn.disabled = true;
+    try {
+      const { pedidosAnonimizados } = await bootstrap.firebase.deleteMyAccount(pwd.value);
+      try { localStorage.removeItem('modern_pharmacy_cart'); localStorage.removeItem('cart'); } catch {}
+      alert(`Sua conta foi excluída.${pedidosAnonimizados ? ` ${pedidosAnonimizados} pedido(s) foram anonimizados.` : ''}`);
+      window.location.href = 'index.html';
+    } catch(e){
+      console.error(e);
+      const code = e?.code || '';
+      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') window.toast?.error('Senha incorreta.');
+      else if (code === 'auth/too-many-requests') window.toast?.error('Muitas tentativas. Tente novamente mais tarde.');
+      else window.toast?.error('Não foi possível excluir a conta. Tente novamente ou fale com a farmácia.');
+      syncConfirm();
+    }
+  });
 }
 
 async function main(){

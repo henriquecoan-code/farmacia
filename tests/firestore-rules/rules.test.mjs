@@ -195,6 +195,27 @@ describe('pedidos: leitura e update', () => {
   test('admin não altera outros campos nem usa status inválido', async () => {
     await assertFails(updateDoc(doc(adminDb(), 'pedidos', 'pAlice'), { 'totals.total': 0 }));
     await assertFails(updateDoc(doc(adminDb(), 'pedidos', 'pAlice'), { status: 'pago', history: [] }));
+  });});
+
+describe('pedidos: anonimização (exclusão de conta)', () => {
+  const anon = () => ({ userId: null, user: null, address: { city: 'Cidade', state: 'SC' }, anonimizadoEm: serverTimestamp() });
+  test('dono anonimiza o próprio pedido (account.js -> anonymizeMyOrders)', async () => {
+    await assertSucceeds(updateDoc(doc(db(ALICE), 'pedidos', 'pAlice'), anon()));
+    let data;
+    await seed(async (fs) => { data = (await getDoc(doc(fs, 'pedidos', 'pAlice'))).data(); });
+    // Itens e total continuam (guarda fiscal)
+    if (data.totals.total !== 24.8 || data.userId !== null || data.address.street) throw new Error('anonimização incorreta');
+  });
+  test('outro usuário não anonimiza', async () => {
+    await assertFails(updateDoc(doc(db(BOB), 'pedidos', 'pAlice'), anon()));
+  });
+  test('dono não usa a anonimização para mudar status/total, manter endereço ou trocar o dono', async () => {
+    await assertFails(updateDoc(doc(db(ALICE), 'pedidos', 'pAlice'), { ...anon(), status: 'delivered' }));
+    await assertFails(updateDoc(doc(db(ALICE), 'pedidos', 'pAlice'), { ...anon(), 'totals.total': 0 }));
+    await assertFails(updateDoc(doc(db(ALICE), 'pedidos', 'pAlice'), { ...anon(), address: { street: 'Rua A', city: 'Cidade', state: 'SC' } }));
+    await assertFails(updateDoc(doc(db(ALICE), 'pedidos', 'pAlice'), { ...anon(), userId: BOB }));
+    await assertFails(updateDoc(doc(db(ALICE), 'pedidos', 'pAlice'), { ...anon(), user: 'alice@teste.com' }));
+    await assertFails(updateDoc(doc(db(ALICE), 'pedidos', 'pAlice'), { ...anon(), anonimizadoEm: '2020-01-01' }));
   });
 });
 
@@ -281,6 +302,16 @@ describe('usuarios', () => {
     await assertFails(getDoc(doc(db(BOB), 'usuarios', ALICE)));
     await assertFails(updateDoc(doc(db(BOB), 'usuarios', ALICE), { name: 'hack' }));
     await assertFails(getDocs(collection(db(BOB), 'usuarios')));
+  });
+  test('dono apaga o próprio perfil (exclusão de conta); outro usuário não', async () => {
+    await assertFails(deleteDoc(doc(db(BOB), 'usuarios', ALICE)));
+    await assertSucceeds(deleteDoc(doc(db(ALICE), 'usuarios', ALICE)));
+  });
+  test('cadastro grava consentimento no perfil', async () => {
+    await assertSucceeds(setDoc(doc(db(BOB), 'usuarios', BOB), {
+      nome: 'Bob', email: 'bob@teste.com', createdAt: serverTimestamp(),
+      consentimento: { versao: '2026-10-23', aceitoEm: serverTimestamp() }
+    }));
   });
   test('admin lista usuarios (getClients)', async () => {
     await assertSucceeds(getDocs(collection(adminDb(), 'usuarios')));

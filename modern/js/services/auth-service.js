@@ -1,5 +1,6 @@
 // Authentication Service - Handles user authentication
 import { eventBus } from './event-bus.js';
+import { POLICY_VERSION } from './legal.js';
 
 export class AuthService {
   constructor() {
@@ -83,19 +84,55 @@ export class AuthService {
     }
   }
 
+  // O modo (login/cadastro) é controlado pelo ModalsManager; isLoginMode fica como fallback
+  isRegisterMode() {
+    const mode = window.modalsManager?.currentAuthMode;
+    return mode ? mode === 'register' : !this.isLoginMode;
+  }
+
+  // Validação do cadastro: nome, senha, confirmação e aceite dos Termos/Política (LGPD)
+  validateRegister({ name, password, passwordConfirm, consent }) {
+    if (!name) return 'Informe seu nome.';
+    if (password.length < 6) return 'A senha precisa ter ao menos 6 caracteres.';
+    if (password !== passwordConfirm) return 'As senhas não conferem.';
+    if (!consent) {
+      const err = document.getElementById('auth-consent-error');
+      if (err) err.textContent = 'É preciso aceitar os Termos de Uso e a Política de Privacidade.';
+      return 'Para criar a conta, aceite os Termos de Uso e a Política de Privacidade.';
+    }
+    return null;
+  }
+
   // Handle auth form submission
   async handleAuthSubmit(event) {
     event.preventDefault();
+    // Algumas páginas registram dois listeners de submit (app.js + ModalsManager): evita envio duplo
+    if (this._submitting) return;
     
     const emailEl = document.getElementById('auth-email');
     const passwordEl = document.getElementById('auth-password');
     
     const email = emailEl ? emailEl.value : '';
     const password = passwordEl ? passwordEl.value : '';
+    const isRegister = this.isRegisterMode();
 
     if (!email || !password) {
       this.showError('Por favor, preencha todos os campos');
       return;
+    }
+
+    let name = '';
+    if (isRegister) {
+      name = (document.getElementById('auth-name')?.value || '').trim();
+      const consentErr = document.getElementById('auth-consent-error');
+      if (consentErr) consentErr.textContent = '';
+      const problem = this.validateRegister({
+        name,
+        password,
+        passwordConfirm: document.getElementById('auth-password-confirm')?.value || '',
+        consent: !!document.getElementById('auth-consent')?.checked
+      });
+      if (problem) { this.showError(problem); return; }
     }
 
     if (!this.firebaseService || !this.firebaseService.isInitialized) {
@@ -104,23 +141,31 @@ export class AuthService {
     }
 
     try {
+      this._submitting = true;
       this.showLoading();
 
-      if (this.isLoginMode) {
+      if (!isRegister) {
         await this.firebaseService.signIn(email, password);
         this.showSuccess('Login realizado com sucesso!');
   eventBus.emit('auth:login', { user: this.firebaseService.getCurrentUser?.() || null });
       } else {
-        await this.firebaseService.signUp(email, password);
+        const cred = await this.firebaseService.signUp(email, password);
+        try {
+          await this.firebaseService.createUserProfile(cred.user.uid, { nome: name, email, consentVersion: POLICY_VERSION });
+        } catch (e) {
+          console.error('Falha ao gravar perfil/consentimento', e);
+        }
         this.showSuccess('Conta criada com sucesso!');
   eventBus.emit('auth:login', { user: this.firebaseService.getCurrentUser?.() || null, newUser: true });
       }
 
       this.hideAuthModal();
+      window.modalsManager?.closeAuthModal?.();
     } catch (error) {
       console.error('Auth error:', error);
       this.showError(this.getErrorMessage(error));
     } finally {
+      this._submitting = false;
       this.hideLoading();
     }
   }
@@ -387,7 +432,7 @@ export class AuthService {
     const submitBtn = document.querySelector('#auth-form button[type="submit"]');
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.textContent = this.isLoginMode ? 'Entrar' : 'Cadastrar';
+      submitBtn.textContent = this.isRegisterMode() ? 'Cadastrar' : 'Entrar';
     }
   }
 
