@@ -1,6 +1,7 @@
 import ComponentLoader from './services/component-loader.js';
 import { bootstrap } from './bootstrap.js';
 import { eventBus } from './services/event-bus.js';
+import { POLICY_VERSION } from './services/legal.js';
 
 const loader = new ComponentLoader();
 
@@ -208,16 +209,20 @@ function renderAccount(root, user, client){
   const addrContainer = root.querySelector('#addresses-section');
   renderAddressSection(addrContainer, client);
 
-  renderPrivacySection(root.querySelector('#privacy-section'), user);
+  renderPrivacySection(root.querySelector('#privacy-section'), user, client);
 }
 
 // LGPD (art. 18): portabilidade (baixar dados) e eliminação (excluir conta)
-function renderPrivacySection(container, user){
+function renderPrivacySection(container, user, client){
   container.innerHTML = `
     <div class="card">
       <div class="card__content">
         <h3 class="card__title"><i class="fas fa-user-shield"></i> Privacidade e dados</h3>
         <p class="card__text">Veja como tratamos seus dados na <a href="privacidade.html">Política de Privacidade</a>.</p>
+        <div class="consent-row" style="margin-bottom:1rem">
+          <input type="checkbox" id="marketing-toggle" ${client?.marketing?.aceito ? 'checked' : ''}>
+          <label for="marketing-toggle">Quero receber ofertas e promoções por WhatsApp e e-mail</label>
+        </div>
         <div class="card__actions" style="flex-wrap:wrap">
           <button id="btn-export-data" class="btn btn--secondary"><i class="fas fa-download"></i> Baixar meus dados</button>
           <button id="btn-delete-start" class="btn" style="color:var(--error-color)"><i class="fas fa-user-times"></i> Excluir minha conta</button>
@@ -248,6 +253,20 @@ function renderPrivacySection(container, user){
         </div>
       </div>
     </div>`;
+
+  const marketingToggle = container.querySelector('#marketing-toggle');
+  marketingToggle.addEventListener('change', async ()=>{
+    const aceito = marketingToggle.checked;
+    marketingToggle.disabled = true;
+    try {
+      await bootstrap.firebase.setMarketingConsent(aceito, POLICY_VERSION);
+      window.toast?.success(aceito ? 'Você vai receber nossas ofertas.' : 'Pronto, você não vai mais receber ofertas.');
+    } catch(e){
+      console.error(e);
+      marketingToggle.checked = !aceito;
+      window.toast?.error('Não foi possível salvar sua preferência.');
+    } finally { marketingToggle.disabled = false; }
+  });
 
   const exportBtn = container.querySelector('#btn-export-data');
   exportBtn.addEventListener('click', async ()=>{

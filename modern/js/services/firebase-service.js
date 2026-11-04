@@ -342,7 +342,8 @@ export class FirebaseService {
   }
 
   // Perfil criado no cadastro, com o registro do aceite (LGPD): consentimento { versao, aceitoEm }
-  async createUserProfile(uid, { nome, email, consentVersion }) {
+  // e o consentimento opcional para ofertas: marketing { aceito, versao, atualizadoEm }
+  async createUserProfile(uid, { nome, email, consentVersion, marketing = false }) {
     if (!this.isInitialized) throw new Error('Firebase not initialized');
     const { doc, setDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
     await setDoc(doc(this.firestore, 'usuarios', uid), {
@@ -350,7 +351,19 @@ export class FirebaseService {
       name: nome,
       email,
       createdAt: serverTimestamp(),
-      consentimento: { versao: consentVersion, aceitoEm: serverTimestamp() }
+      consentimento: { versao: consentVersion, aceitoEm: serverTimestamp() },
+      marketing: { aceito: !!marketing, versao: consentVersion, atualizadoEm: serverTimestamp() }
+    }, { merge: true });
+  }
+
+  // Concede ou revoga o consentimento para ofertas por WhatsApp/e-mail (conta.html)
+  async setMarketingConsent(aceito, consentVersion) {
+    if (!this.isInitialized) throw new Error('Firebase not initialized');
+    const uid = this.auth?.currentUser?.uid;
+    if (!uid) throw new Error('Not signed in');
+    const { doc, setDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+    await setDoc(doc(this.firestore, 'usuarios', uid), {
+      marketing: { aceito: !!aceito, versao: consentVersion, atualizadoEm: serverTimestamp() }
     }, { merge: true });
   }
 

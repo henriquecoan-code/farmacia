@@ -151,7 +151,10 @@ export class AuthService {
       } else {
         const cred = await this.firebaseService.signUp(email, password);
         try {
-          await this.firebaseService.createUserProfile(cred.user.uid, { nome: name, email, consentVersion: POLICY_VERSION });
+          await this.firebaseService.createUserProfile(cred.user.uid, {
+            nome: name, email, consentVersion: POLICY_VERSION,
+            marketing: !!document.getElementById('auth-marketing')?.checked
+          });
         } catch (e) {
           console.error('Falha ao gravar perfil/consentimento', e);
         }
