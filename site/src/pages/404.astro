@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro';
+import { u } from '../lib/url';
+---
+<Base title="Página não encontrada" noindex>
+  <section class="nf">
+    <h1>Página não encontrada</h1>
+    <p>O produto pode ter saído do catálogo ou o endereço mudou.</p>
+    <p><a class="btn btn--primario" href={u('/busca/')}>Buscar produtos</a> <a class="btn btn--secundario" href={u('/')}>Ir para o início</a></p>
+  </section>
+</Base>
+<style>.nf { padding: 48px 0; text-align: center; } .nf p:last-child { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }</style>

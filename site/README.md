@@ -15,7 +15,7 @@ ERP (farmácia, só leitura) ──VPN + sync-erp──► Supabase (banco do si
 | Fase | Status |
 |---|---|
 | 1. Fundação: banco, regras de acesso, sync | ✅ código pronto e testado localmente; falta criar o Supabase e rodar |
-| 2. Catálogo público | ⏳ |
+| 2. Catálogo público: home, seções, produto, busca, sobre, privacidade, termos | ✅ pronto (com produtos de exemplo); falta o deploy |
 | 3. Conta e pedido | ⏳ |
 | 4. Admin | ⏳ |
 | 5. Pagamentos (Mercado Pago + Pix Sicredi) | ⏳ |
@@ -65,9 +65,17 @@ powershell -ExecutionPolicy Bypass -File .\site\scripts\run-sync-erp.ps1        
 ```bash
 cd site
 npm run test:db   # testa banco, regras de acesso e sync num Postgres em memória (sem Docker)
-npm run dev       # site em http://localhost:4321
-npm run build
+npm run dev       # site em http://localhost:4321 (a busca só existe depois do build)
+npm run build     # gera dist/ (~4 mil páginas) + índice de busca (Pagefind)
+npm run preview   # serve o dist/ em http://localhost:4321
 ```
+
+- Sem `PUBLIC_SUPABASE_URL` no `.env`, o build usa `../data/products.json` (exportação antiga) como **exemplo**, com os mesmos filtros do sync.
+- Dados da loja (rodapé, Sobre, políticas) ficam em `src/data/loja.ts`. Os campos `PREENCHER` aparecem destacados em amarelo no site.
+- Regras da Anvisa aplicadas no layout:
+  - medicamento de prescrição mostra o selo "Exige receita", sem "de/por", desconto ou destaque (RDC 96/2008);
+  - MIP traz a advertência obrigatória;
+  - o rodapé informa AFE, licença e farmacêutico responsável.
 
 - `supabase/migrations/`: tabelas (`0001`), regras de acesso RLS (`0002`) e funções chamadas pelo site (`0003`). O total do pedido é calculado **no banco** (`criar_pedido`).
 - `scripts/lib/produtos-erp.mjs`: regras ERP → produto (preço, categoria, filtros de `../config/product-filters.json`).
