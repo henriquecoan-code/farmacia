@@ -1,0 +1,189 @@
+---
+import '../styles/global.css';
+import { loja, enderecoCompleto, linkWhatsApp, PREENCHER } from '../data/loja';
+import { SECOES } from '../lib/catalogo';
+import { u, urlSecao } from '../lib/url';
+
+interface Props {
+  title: string;
+  description?: string;
+  jsonld?: object | object[];
+  noindex?: boolean;
+  /** inclui o conteúdo desta página no índice de busca (Pagefind) */
+  indexar?: boolean;
+}
+const { title, description = 'Farmácia São Benedito em Lauro Müller - SC: medicamentos, perfumaria e dermocosméticos com entrega na região.', jsonld, noindex = false } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const tituloCompleto = title === loja.nomeFantasia ? title : `${title} | ${loja.nomeFantasia}`;
+const marcar = (v: string) => v.startsWith(PREENCHER) ? `<span class="preencher">${v}</span>` : v;
+const ano = new Date().getFullYear();
+---
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{tituloCompleto}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex" />}
+    <meta name="theme-color" content="#1e40af" />
+    <link rel="icon" type="image/png" sizes="32x32" href={u('/img/favicon-32.png')} />
+    <link rel="apple-touch-icon" href={u('/img/logo-192.png')} />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:site_name" content={loja.nomeFantasia} />
+    <meta property="og:title" content={tituloCompleto} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={new URL(u('/img/logo-512.png'), Astro.site)} />
+    {jsonld && <script type="application/ld+json" set:html={JSON.stringify(jsonld)} />}
+    <slot name="head" />
+  </head>
+  <body>
+    <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+    <div class="faixa">
+      <div class="container faixa__in">
+        <span>Entrega em Lauro Müller, Orleans e Treviso</span>
+        <a href={linkWhatsApp()} target="_blank" rel="noopener">WhatsApp {loja.telefone}</a>
+      </div>
+    </div>
+
+    <header class="topo">
+      <div class="container topo__in">
+        <a class="marca" href={u('/')} aria-label={`${loja.nomeFantasia} — início`}>
+          <img src={u('/img/logo-192.png')} alt="" width="44" height="44" />
+          <span>Farmácia<br /><strong>São Benedito</strong></span>
+        </a>
+        <form class="busca" action={u('/busca/')} method="get" role="search">
+          <label class="sr-only" for="q">Buscar produtos</label>
+          <input id="q" name="q" type="search" placeholder="Buscar remédio, marca ou princípio ativo" autocomplete="off" />
+          <button type="submit" aria-label="Buscar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          </button>
+        </form>
+        <nav class="acoes" aria-label="Conta e carrinho">
+          <a href={u('/conta/')} class="acao">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+            <span>Conta</span>
+          </a>
+          <a href={u('/carrinho/')} class="acao acao--carrinho">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
+            <span>Carrinho</span>
+            <span class="contador" data-contador-carrinho hidden>0</span>
+          </a>
+        </nav>
+      </div>
+      <nav class="secoes" aria-label="Seções da loja">
+        <div class="container secoes__in">
+          {SECOES.map((s) => <a href={urlSecao(s.slug)} aria-current={Astro.url.pathname.includes(`/categoria/${s.slug}/`) ? 'page' : undefined}>{s.nome}</a>)}
+        </div>
+      </nav>
+    </header>
+
+    <main id="conteudo" class="container">
+      <slot />
+    </main>
+
+    <footer class="rodape">
+      <div class="container rodape__grade">
+        <section>
+          <h2>{loja.nomeFantasia}</h2>
+          <p>{loja.razaoSocial}<br />CNPJ {loja.cnpj}<br />{enderecoCompleto()}<br />CEP <Fragment set:html={marcar(loja.endereco.cep)} /></p>
+          <p>Telefone e WhatsApp: <a href={linkWhatsApp()} target="_blank" rel="noopener">{loja.telefone}</a><br />
+            E-mail: <a href={`mailto:${loja.email}`}>{loja.email}</a><br />
+            Horário: <Fragment set:html={marcar(loja.horario)} /></p>
+        </section>
+        <section>
+          <h2>Responsabilidade técnica</h2>
+          <p>Farmacêutico(a) responsável: <Fragment set:html={marcar(loja.farmaceutico)} /> — <Fragment set:html={marcar(loja.crf)} /><br />
+            Autorização de Funcionamento (AFE/Anvisa): <Fragment set:html={marcar(loja.afe)} /><br />
+            Licença sanitária: <Fragment set:html={marcar(loja.licencaSanitaria)} /></p>
+          <p class="rodape__aviso">Medicamentos sujeitos a controle especial e antimicrobianos não são vendidos pelo site.
+            Medicamentos de venda sob prescrição exigem a apresentação da receita na entrega ou retirada.</p>
+        </section>
+        <section>
+          <h2>Institucional</h2>
+          <ul>
+            <li><a href={u('/sobre/')}>Sobre a farmácia e entregas</a></li>
+            <li><a href={u('/privacidade/')}>Política de Privacidade</a></li>
+            <li><a href={u('/termos/')}>Termos de Uso</a></li>
+            <li><a href="https://consultas.anvisa.gov.br/" target="_blank" rel="noopener">Consultas Anvisa</a></li>
+          </ul>
+        </section>
+      </div>
+      <p class="container rodape__fim">© {ano} {loja.nomeFantasia}. As imagens dos produtos são ilustrativas. Preços e estoque sujeitos a alteração e confirmados no pedido.</p>
+    </footer>
+
+    <script>
+      import { lerCarrinho, totalItens, adicionar } from '../scripts/carrinho';
+      // Botões "Adicionar" (cards e página de produto)
+      document.addEventListener('click', (ev) => {
+        const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-add-carrinho]');
+        if (!btn) return;
+        const dados = JSON.parse(btn.dataset.produto || '{}');
+        const qtdEl = btn.dataset.qtdInput ? document.getElementById(btn.dataset.qtdInput) as HTMLInputElement | null : null;
+        adicionar(dados, Math.max(1, Number(qtdEl?.value) || 1));
+        const original = btn.textContent;
+        btn.textContent = 'Adicionado ✓';
+        btn.disabled = true;
+        setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1400);
+      });
+      const atualizar = () => {
+        const n = totalItens(lerCarrinho());
+        document.querySelectorAll<HTMLElement>('[data-contador-carrinho]').forEach((el) => {
+          el.textContent = String(n);
+          el.hidden = n === 0;
+        });
+      };
+      atualizar();
+      window.addEventListener('carrinho:mudou', atualizar);
+      window.addEventListener('storage', atualizar);
+    </script>
+  </body>
+</html>
+
+<style>
+  .faixa { background: var(--azul-escuro); color: #dbeafe; font-size: .85rem; }
+  .faixa__in { display: flex; justify-content: space-between; gap: 12px; padding-top: 6px; padding-bottom: 6px; }
+  .faixa a { color: #fff; font-weight: 600; text-decoration: none; white-space: nowrap; }
+  @media (max-width: 520px) { .faixa__in > span { display: none; } .faixa__in { justify-content: center; } }
+
+  .topo { background: #fff; border-bottom: 1px solid var(--borda); position: sticky; top: 0; z-index: 20; }
+  .topo__in { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding-top: 10px; padding-bottom: 10px; }
+  .marca { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--azul-escuro); line-height: 1.1; font-size: .9rem; }
+  .marca strong { font-size: 1.05rem; }
+  .busca { display: flex; min-width: 0; }
+  .busca input {
+    flex: 1; min-width: 0; height: 44px; padding: 0 14px; font: inherit; font-size: 16px;
+    border: 1px solid #cbd5e1; border-right: 0; border-radius: 10px 0 0 10px; background: var(--fundo);
+  }
+  .busca input:focus { outline: none; border-color: var(--azul); background: #fff; }
+  .busca button { width: 48px; border: 0; border-radius: 0 10px 10px 0; background: var(--azul); color: #fff; cursor: pointer; display: grid; place-items: center; }
+  .acoes { display: flex; gap: 4px; }
+  .acao { position: relative; display: flex; flex-direction: column; align-items: center; font-size: .75rem; color: var(--texto-2); text-decoration: none; padding: 4px 8px; border-radius: 8px; }
+  .acao:hover { background: var(--fundo); color: var(--azul); }
+  .contador { position: absolute; top: -2px; right: 2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--vermelho); color: #fff; font-size: .72rem; font-weight: 700; display: grid; place-items: center; }
+  @media (max-width: 720px) {
+    .topo__in { grid-template-columns: auto auto; grid-template-areas: 'marca acoes' 'busca busca'; }
+    .marca { grid-area: marca; } .acoes { grid-area: acoes; justify-self: end; } .busca { grid-area: busca; }
+  }
+
+  .secoes { border-top: 1px solid var(--borda); }
+  .secoes__in { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .secoes__in::-webkit-scrollbar { display: none; }
+  .secoes a { white-space: nowrap; padding: 10px 12px; font-weight: 600; font-size: .92rem; color: var(--texto-2); text-decoration: none; border-bottom: 3px solid transparent; }
+  .secoes a:hover, .secoes a[aria-current='page'] { color: var(--azul); border-bottom-color: var(--azul); }
+
+  main { min-height: 50vh; }
+
+  .rodape { background: #0f172a; color: #cbd5e1; margin-top: 40px; font-size: .9rem; }
+  .rodape a { color: #e2e8f0; }
+  .rodape h2 { color: #fff; font-size: 1rem; margin-top: 0; }
+  .rodape ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .rodape__grade { display: grid; gap: 24px; padding-top: 32px; padding-bottom: 16px; }
+  @media (min-width: 820px) { .rodape__grade { grid-template-columns: 1.2fr 1.4fr 1fr; } }
+  .rodape__aviso { color: #94a3b8; font-size: .85rem; }
+  .rodape__fim { border-top: 1px solid #1e293b; padding-top: 16px; padding-bottom: 24px; color: #94a3b8; font-size: .8rem; margin: 0 auto; }
+</style>

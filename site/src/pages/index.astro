@@ -1,0 +1,114 @@
+---
+import Base from '../layouts/Base.astro';
+import ProdutoCard from '../components/ProdutoCard.astro';
+import { carregarProdutos, destaquesHome, SECOES } from '../lib/catalogo';
+import { loja, enderecoCompleto, linkWhatsApp, PREENCHER } from '../data/loja';
+import { u, urlSecao } from '../lib/url';
+
+const produtos = await carregarProdutos();
+const destaques = destaquesHome(produtos, 8);
+const contagem = Object.fromEntries(SECOES.map((s) => [s.slug, produtos.filter((p) => s.categorias.includes(p.categoria)).length]));
+
+const jsonld = {
+  '@context': 'https://schema.org',
+  '@type': 'Pharmacy',
+  name: loja.nomeFantasia,
+  legalName: loja.razaoSocial,
+  taxID: loja.cnpj,
+  telephone: '+55 48 3464-3201',
+  email: loja.email,
+  url: new URL(u('/'), Astro.site).href,
+  image: new URL(u('/img/logo-512.png'), Astro.site).href,
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: loja.endereco.logradouro,
+    addressLocality: loja.endereco.cidade,
+    addressRegion: loja.endereco.uf,
+    ...(loja.endereco.cep.startsWith(PREENCHER) ? {} : { postalCode: loja.endereco.cep }),
+    addressCountry: 'BR',
+  },
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: `${new URL(u('/busca/'), Astro.site).href}?q={q}`,
+    'query-input': 'required name=q',
+  },
+};
+---
+<Base title={loja.nomeFantasia} jsonld={jsonld}>
+  <section class="hero">
+    <div>
+      <h1>Sua farmácia de confiança em Lauro Müller, agora também online</h1>
+      <p>Peça pelo site e receba em casa em Lauro Müller, Orleans e Treviso, ou retire na loja. Atendimento com farmacêutico.</p>
+      <div class="hero__acoes">
+        <a class="btn btn--primario" href={urlSecao('medicamentos')}>Ver medicamentos</a>
+        <a class="btn btn--whats" href={linkWhatsApp('Olá! Gostaria de ajuda com um pedido.')} target="_blank" rel="noopener">Falar no WhatsApp</a>
+      </div>
+    </div>
+    <ul class="hero__beneficios">
+      <li><strong>Entrega rápida</strong><span>Imediata em Lauro Müller em horário comercial</span></li>
+      <li><strong>Pague como preferir</strong><span>Pix, cartão online ou na entrega</span></li>
+      <li><strong>Farmacêutico responsável</strong><span>Orientação antes e depois da compra</span></li>
+    </ul>
+  </section>
+
+  <section class="secao" aria-labelledby="t-secoes">
+    <h2 id="t-secoes">Compre por seção</h2>
+    <div class="secoes-grade">
+      {SECOES.map((s) => (
+        <a class="secao-card" href={urlSecao(s.slug)} style={`--cor:${s.cor}`}>
+          <strong>{s.nome}</strong>
+          <span>{s.descricao}</span>
+          <small>{contagem[s.slug].toLocaleString('pt-BR')} produtos</small>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  {destaques.length > 0 && (
+    <section class="secao" aria-labelledby="t-destaques">
+      <div class="secao__topo">
+        <h2 id="t-destaques">Ofertas em perfumaria, saúde e bem-estar</h2>
+        <a href={urlSecao('dermocosmeticos')}>Ver mais</a>
+      </div>
+      <div class="grade">
+        {destaques.map((p, i) => <ProdutoCard produto={p} eager={i < 4} />)}
+      </div>
+    </section>
+  )}
+
+  <section class="secao receita" aria-labelledby="t-receita">
+    <h2 id="t-receita">Tem receita?</h2>
+    <p>Medicamentos de venda sob prescrição podem ser pedidos pelo site: é só apresentar a receita na entrega ou na retirada.
+      Medicamentos controlados e antibióticos são vendidos somente na loja.</p>
+    <p class="receita__end">{enderecoCompleto()}</p>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    display: grid; gap: 20px; margin: 16px 0 8px; padding: 24px 20px; border-radius: 16px; color: #fff;
+    background: linear-gradient(135deg, #1e3a8a, #1e40af 55%, #2563eb);
+  }
+  @media (min-width: 900px) { .hero { grid-template-columns: 1.4fr 1fr; padding: 40px; align-items: center; } }
+  .hero h1 { color: #fff; }
+  .hero p { color: #dbeafe; font-size: 1.05rem; margin: 0 0 16px; }
+  .hero__acoes { display: flex; gap: 10px; flex-wrap: wrap; }
+  .hero__acoes .btn--primario { background: #fff; color: var(--azul-escuro); }
+  .hero__beneficios { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .hero__beneficios li { background: rgb(255 255 255 / .1); border: 1px solid rgb(255 255 255 / .18); border-radius: 12px; padding: 12px 14px; display: grid; }
+  .hero__beneficios span { color: #dbeafe; font-size: .9rem; }
+
+  .secoes-grade { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+  .secao-card {
+    display: grid; gap: 4px; padding: 16px; border-radius: var(--raio); text-decoration: none; color: var(--texto);
+    background: #fff; border: 1px solid var(--borda); border-left: 5px solid var(--cor); box-shadow: var(--sombra);
+  }
+  .secao-card strong { color: var(--cor); font-size: 1.05rem; }
+  .secao-card span { color: var(--texto-2); font-size: .9rem; }
+  .secao-card small { color: var(--texto-3); }
+  .secao-card:hover { border-color: var(--cor); }
+
+  .receita { background: var(--ambar-claro); border: 1px solid #fde68a; border-radius: var(--raio); padding: 20px; margin: 24px 0; }
+  .receita p { margin: 0 0 8px; color: #78350f; }
+  .receita__end { font-size: .9rem; }
+</style>

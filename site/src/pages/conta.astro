@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro';
+import { linkWhatsApp, loja } from '../data/loja';
+---
+<Base title="Minha conta" noindex>
+  <section class="em-breve">
+    <h1>Minha conta</h1>
+    <p>Login, pedidos e dados da conta entram na próxima etapa do site.</p>
+    <p>Enquanto isso, faça seu pedido pelo <a href={linkWhatsApp()} target="_blank" rel="noopener">WhatsApp {loja.telefone}</a>.</p>
+  </section>
+</Base>
+<style>.em-breve { padding: 40px 0; }</style>
