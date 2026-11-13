@@ -1,0 +1,21 @@
+{
+  "name": "farmacia-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build && pagefind --site dist",
+    "preview": "astro preview",
+    "test:db": "node --test supabase/tests/*.test.mjs",
+    "sync:erp": "node scripts/sync-erp.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "astro": "^7.4.5",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "pagefind": "^1.6.0"
+  }
+}

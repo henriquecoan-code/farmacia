@@ -1,0 +1,60 @@
+---
+import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import fachada from '../assets/fachada.jpg';
+import { loja, enderecoCompleto, linkWhatsApp, PREENCHER } from '../data/loja';
+import { u } from '../lib/url';
+const marcar = (v: string) => v.startsWith(PREENCHER) ? `<span class="preencher">${v}</span>` : v;
+---
+<Base title="Sobre a farmácia e entregas" description={`${loja.nomeFantasia}: ${enderecoCompleto()}. Entregas em Lauro Müller, Orleans e Treviso.`}>
+  <nav class="migalhas" aria-label="Você está em"><ol><li><a href={u('/')}>Início</a></li><li aria-current="page">Sobre</li></ol></nav>
+  <div class="sobre">
+    <div>
+      <h1>{loja.nomeFantasia}</h1>
+      <p>Farmácia de Lauro Müller - SC, com atendimento farmacêutico, medicamentos, perfumaria e dermocosméticos.
+        O site atende os pedidos com a mesma equipe e o mesmo estoque da loja física.</p>
+
+      <h2>Entregas</h2>
+      <ul>
+        {loja.entregas.map((e) => <li><strong>{e.cidade}:</strong> {e.regra}.</li>)}
+        <li><strong>Outras cidades:</strong> consulte pelo <a href={linkWhatsApp()} target="_blank" rel="noopener">WhatsApp {loja.telefone}</a>.</li>
+      </ul>
+      <p>Você também pode retirar o pedido na loja.</p>
+
+      <h2>Medicamentos e receitas</h2>
+      <ul>
+        <li>Medicamentos de venda sob prescrição: a receita deve ser apresentada na entrega ou na retirada.</li>
+        <li>Medicamentos sujeitos a controle especial (Portaria 344/98) e antimicrobianos (antibióticos) <strong>não são vendidos pelo site</strong>, somente na loja.</li>
+      </ul>
+
+      <h2>Dados da empresa</h2>
+      <dl class="dados">
+        <dt>Razão social</dt><dd>{loja.razaoSocial}</dd>
+        <dt>CNPJ</dt><dd>{loja.cnpj}</dd>
+        <dt>Endereço</dt><dd set:html={`${enderecoCompleto()} — CEP ${marcar(loja.endereco.cep)}`} />
+        <dt>Telefone</dt><dd>{loja.telefone}</dd>
+        <dt>E-mail</dt><dd><a href={`mailto:${loja.email}`}>{loja.email}</a></dd>
+        <dt>Horário</dt><dd set:html={marcar(loja.horario)} />
+        <dt>Farmacêutico(a) responsável</dt><dd set:html={`${marcar(loja.farmaceutico)} — ${marcar(loja.crf)}`} />
+        <dt>AFE (Anvisa)</dt><dd set:html={marcar(loja.afe)} />
+        <dt>Licença sanitária</dt><dd set:html={marcar(loja.licencaSanitaria)} />
+      </dl>
+    </div>
+    <figure>
+      <Image src={fachada} alt="Fachada da Farmácia São Benedito" widths={[480, 800, 1200]} sizes="(min-width: 900px) 45vw, 100vw" />
+      <figcaption>{enderecoCompleto()}</figcaption>
+    </figure>
+  </div>
+</Base>
+
+<style>
+  .sobre { display: grid; gap: 24px; padding-bottom: 24px; }
+  @media (min-width: 900px) { .sobre { grid-template-columns: 1.2fr 1fr; align-items: start; } }
+  figure { margin: 0; }
+  figure img { border-radius: 16px; width: 100%; }
+  figcaption { color: var(--texto-3); font-size: .85rem; margin-top: 6px; }
+  .dados { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 6px 16px; background: #fff; border: 1px solid var(--borda); border-radius: var(--raio); padding: 16px; }
+  .dados dt { color: var(--texto-3); }
+  .dados dd { margin: 0; overflow-wrap: anywhere; }
+  @media (max-width: 520px) { .dados { grid-template-columns: 1fr; } .dados dd { margin-bottom: 8px; } }
+</style>

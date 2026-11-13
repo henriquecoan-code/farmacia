@@ -1,0 +1,130 @@
+---
+import Base from '../layouts/Base.astro';
+import { u } from '../lib/url';
+---
+<Base title="Carrinho" noindex>
+  <h1 class="titulo">Carrinho</h1>
+  <div class="carrinho" data-carrinho>
+    <div class="carrinho__lista" data-lista><p class="vazio">Carregando…</p></div>
+    <aside class="resumo" data-resumo hidden>
+      <p class="resumo__linha"><span data-total-rotulo>Total</span><strong data-total>R$ 0,00</strong></p>
+      <p class="aviso aviso--receita" data-aviso-receita hidden>Há medicamento de venda sob prescrição: apresente a receita na entrega ou retirada.</p>
+      <button class="btn btn--primario btn--bloco" type="button" disabled>Finalizar compra (em breve)</button>
+      <p class="resumo__nota">Frete e valor final são calculados ao finalizar.</p>
+    </aside>
+  </div>
+
+  <template id="tpl-item">
+    <article class="item">
+      <input type="checkbox" class="item__sel" aria-label="Incluir no pedido" />
+      <div class="item__info">
+        <a class="item__nome"></a>
+        <span class="selo selo--receita" hidden>Exige receita</span>
+        <span class="item__preco"></span>
+      </div>
+      <div class="item__qtd">
+        <button type="button" class="q" data-acao="menos" aria-label="Diminuir">−</button>
+        <input type="number" inputmode="numeric" min="1" aria-label="Quantidade" />
+        <button type="button" class="q" data-acao="mais" aria-label="Aumentar">+</button>
+      </div>
+      <strong class="item__total"></strong>
+      <button type="button" class="item__remover" data-acao="remover" aria-label="Remover do carrinho">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+      </button>
+    </article>
+  </template>
+
+  <script>
+    import { lerCarrinho, alterarQuantidade, remover, selecionar } from '../scripts/carrinho';
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+    const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const lista = document.querySelector<HTMLElement>('[data-lista]')!;
+    const resumo = document.querySelector<HTMLElement>('[data-resumo]')!;
+    const tpl = document.getElementById('tpl-item') as HTMLTemplateElement;
+
+    function render() {
+      const itens = lerCarrinho();
+      lista.replaceChildren();
+      if (!itens.length) {
+        lista.innerHTML = `<p class="vazio">Seu carrinho está vazio. <a href="${base}/">Ver produtos</a></p>`;
+        resumo.hidden = true;
+        return;
+      }
+      for (const it of itens) {
+        const el = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
+        el.dataset.cod = String(it.cod_red);
+        el.classList.toggle('item--fora', !it.selecionado);
+        (el.querySelector('.item__sel') as HTMLInputElement).checked = it.selecionado;
+        const nome = el.querySelector<HTMLAnchorElement>('.item__nome')!;
+        nome.textContent = it.nome;
+        nome.href = `${base}/produto/${it.slug}/`;
+        (el.querySelector('.selo') as HTMLElement).hidden = it.tipo_venda !== 'prescricao';
+        el.querySelector('.item__preco')!.textContent = `${brl(it.preco)} cada`;
+        const q = el.querySelector<HTMLInputElement>('input[type=number]')!;
+        q.value = String(it.quantidade);
+        q.max = String(it.estoque);
+        el.querySelector('.item__total')!.textContent = brl(it.preco * it.quantidade);
+        lista.appendChild(el);
+      }
+      const sel = itens.filter((i) => i.selecionado);
+      document.querySelector('[data-total]')!.textContent = brl(sel.reduce((s, i) => s + i.preco * i.quantidade, 0));
+      document.querySelector('[data-total-rotulo]')!.textContent = `Total (${sel.length} de ${itens.length} itens)`;
+      (document.querySelector('[data-aviso-receita]') as HTMLElement).hidden = !sel.some((i) => i.tipo_venda === 'prescricao');
+      resumo.hidden = false;
+    }
+
+    lista.addEventListener('click', (ev) => {
+      const btn = (ev.target as HTMLElement).closest<HTMLElement>('[data-acao]');
+      const item = (ev.target as HTMLElement).closest<HTMLElement>('.item');
+      if (!btn || !item) return;
+      const cod = Number(item.dataset.cod);
+      const atual = lerCarrinho().find((i) => i.cod_red === cod);
+      if (!atual) return;
+      if (btn.dataset.acao === 'remover') remover(cod);
+      if (btn.dataset.acao === 'mais') alterarQuantidade(cod, atual.quantidade + 1);
+      if (btn.dataset.acao === 'menos') alterarQuantidade(cod, atual.quantidade - 1);
+    });
+    lista.addEventListener('change', (ev) => {
+      const t = ev.target as HTMLInputElement;
+      const cod = Number(t.closest<HTMLElement>('.item')?.dataset.cod);
+      if (t.classList.contains('item__sel')) selecionar(cod, t.checked);
+      else if (t.type === 'number') alterarQuantidade(cod, Number(t.value));
+    });
+    window.addEventListener('carrinho:mudou', render);
+    render();
+  </script>
+</Base>
+
+<style>
+  .titulo { margin-top: 16px; }
+  .carrinho { display: grid; gap: 16px; padding-bottom: 24px; }
+  @media (min-width: 900px) { .carrinho { grid-template-columns: 1fr 320px; align-items: start; } }
+  .carrinho__lista { display: grid; gap: 10px; }
+  .vazio { background: #fff; border: 1px solid var(--borda); border-radius: var(--raio); padding: 24px; text-align: center; }
+  .resumo { background: #fff; border: 1px solid var(--borda); border-radius: var(--raio); padding: 16px; display: grid; gap: 12px; position: sticky; top: 140px; }
+  .resumo__linha { display: flex; justify-content: space-between; margin: 0; }
+  .resumo__linha strong { font-size: 1.3rem; }
+  .resumo__nota { margin: 0; font-size: .85rem; color: var(--texto-3); }
+</style>
+<style is:global>
+  .item { display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--borda); border-radius: var(--raio); padding: 12px; }
+  .item--fora { opacity: .6; }
+  .item__sel { width: 20px; height: 20px; accent-color: var(--azul); }
+  .item__info { display: grid; gap: 2px; min-width: 0; }
+  .item__nome { font-weight: 600; color: var(--texto); text-decoration: none; overflow-wrap: anywhere; }
+  .item__preco { font-size: .85rem; color: var(--texto-3); }
+  .item__info .selo { justify-self: start; }
+  .item__qtd { display: flex; align-items: center; border: 1px solid #cbd5e1; border-radius: 10px; overflow: hidden; }
+  .item__qtd .q { width: 36px; height: 38px; border: 0; background: var(--fundo); font-size: 1.1rem; cursor: pointer; }
+  .item__qtd input { width: 44px; height: 38px; border: 0; text-align: center; font: inherit; -moz-appearance: textfield; }
+  .item__qtd input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .item__remover { width: 38px; height: 38px; border-radius: 10px; border: 1px solid #fecaca; background: var(--vermelho-claro); color: var(--vermelho); cursor: pointer; display: grid; place-items: center; }
+  @media (max-width: 600px) {
+    .item { grid-template-columns: auto 1fr auto; }
+    .item__info { grid-column: 2 / -1; }
+    .item__qtd { grid-column: 2; justify-self: start; }
+    .item__total { grid-column: 3; grid-row: 2; justify-self: end; }
+    .item__remover { grid-column: 3; grid-row: 1; }
+    .item__info { grid-column: 2; }
+  }
+</style>

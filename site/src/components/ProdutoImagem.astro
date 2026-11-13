@@ -1,0 +1,49 @@
+---
+// Foto do produto ou, sem foto, um card tipográfico com a cor da seção (sem ícone genérico).
+import type { Produto } from '../lib/catalogo';
+import { secaoDaCategoria } from '../lib/catalogo';
+
+interface Props { produto: Produto; grande?: boolean; eager?: boolean }
+const { produto: p, grande = false, eager = false } = Astro.props;
+const foto = p.fotos?.[0];
+const cor = secaoDaCategoria(p.categoria).cor;
+// Nome sem a apresentação (ex.: "DIPIRONA 500MG 10CP" -> "Dipirona"), para o card
+const palavras = p.nome.split(/\s+/);
+const iDose = palavras.findIndex((w, i) => i > 0 && /\d/.test(w));
+const principal = (iDose > 0 ? palavras.slice(0, iDose) : palavras.slice(0, 3)).join(' ');
+const detalhe = iDose > 0 ? palavras.slice(iDose).join(' ') : '';
+---
+{foto ? (
+  <img class:list={['foto', { grande }]} src={foto} alt={p.nome} width={grande ? 560 : 280} height={grande ? 560 : 280}
+       loading={eager ? 'eager' : 'lazy'} decoding="async" />
+) : (
+  <div class:list={['sem-foto', { grande }]} style={`--cor:${cor}`} role="img" aria-label={`Imagem ilustrativa: ${p.nome}`}>
+    <span class="sem-foto__nome">{principal.toLowerCase()}</span>
+    {detalhe && <span class="sem-foto__det">{detalhe.toLowerCase()}</span>}
+    {p.laboratorio && <span class="sem-foto__lab">{p.laboratorio.toLowerCase()}</span>}
+  </div>
+)}
+
+<style>
+  .foto { aspect-ratio: 1; width: 100%; object-fit: contain; background: #fff; }
+  .sem-foto {
+    aspect-ratio: 1; width: 100%; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px;
+    padding: 14px; border-radius: 10px; text-transform: capitalize; overflow: hidden; position: relative;
+    background:
+      radial-gradient(circle at 85% 15%, color-mix(in srgb, var(--cor) 22%, transparent) 0 22%, transparent 23%),
+      linear-gradient(160deg, color-mix(in srgb, var(--cor) 9%, #fff), color-mix(in srgb, var(--cor) 18%, #fff));
+    color: color-mix(in srgb, var(--cor) 80%, #000);
+  }
+  .sem-foto::before {
+    content: ''; position: absolute; top: 14px; left: 14px; width: 28px; height: 4px; border-radius: 4px;
+    background: var(--cor); opacity: .6;
+  }
+  .sem-foto__nome { font-weight: 800; font-size: 1.05rem; line-height: 1.15; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .sem-foto__det { font-size: .82rem; opacity: .85; text-transform: lowercase; }
+  .sem-foto__lab { font-size: .72rem; opacity: .7; text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
+  .grande .sem-foto__nome, .sem-foto.grande .sem-foto__nome { font-size: clamp(1.4rem, 1rem + 2vw, 2.2rem); }
+  .sem-foto.grande { padding: 28px; }
+  .sem-foto.grande .sem-foto__det { font-size: 1.05rem; }
+  .sem-foto.grande .sem-foto__lab { font-size: .9rem; }
+</style>

@@ -1,0 +1,38 @@
+---
+import Base from '../layouts/Base.astro';
+import { u } from '../lib/url';
+---
+<Base title="Buscar produtos" description="Busque medicamentos, marcas e princípios ativos na Farmácia São Benedito.">
+  <h1 class="titulo">Buscar produtos</h1>
+  <p class="dica">Busque pelo nome, pela marca ou pelo princípio ativo (por exemplo, "dipirona" ou "losartana").</p>
+  <div id="busca" class="busca-pf"></div>
+  <noscript><p class="aviso aviso--erro">A busca precisa de JavaScript ativado.</p></noscript>
+
+  <link slot="head" rel="stylesheet" href={u('/pagefind/pagefind-ui.css')} />
+  <script is:inline define:vars={{ base: u('/') }}>
+    // O índice (pagefind/) é gerado no build: `npm run build`. No `npm run dev` a busca não existe.
+    const s = document.createElement('script');
+    s.src = `${base}pagefind/pagefind-ui.js`;
+    s.onload = () => {
+      // eslint-disable-next-line no-undef
+      const ui = new PagefindUI({
+        element: '#busca', showImages: false, showSubResults: false, resetStyles: false, pageSize: 12,
+        translations: { placeholder: 'Buscar remédio, marca ou princípio ativo', zero_results: 'Nada encontrado para [SEARCH_TERM]',
+          many_results: '[COUNT] resultados para [SEARCH_TERM]', one_result: '1 resultado para [SEARCH_TERM]', load_more: 'Ver mais resultados',
+          clear_search: 'Limpar', filters_label: 'Filtros' },
+      });
+      const q = new URLSearchParams(location.search).get('q');
+      if (q) ui.triggerSearch(q);
+    };
+    s.onerror = () => {
+      document.getElementById('busca').innerHTML = '<p class="aviso aviso--erro">A busca ainda não está disponível nesta versão do site.</p>';
+    };
+    document.head.appendChild(s);
+  </script>
+</Base>
+
+<style>
+  .titulo { margin-top: 16px; }
+  .dica { color: var(--texto-2); }
+  .busca-pf { --pagefind-ui-primary: #1e40af; --pagefind-ui-border-radius: 10px; --pagefind-ui-font: inherit; margin-bottom: 32px; }
+</style>
