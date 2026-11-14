@@ -305,7 +305,6 @@ sequenceDiagram
 - **Supabase Auth**:
   - o envio padrão de e-mail só chega a membros do projeto, então clientes reais precisam de SMTP próprio;
   - configure as Redirect URLs e a senha mínima de 8 caracteres.
-- **Dados legais pendentes** (`PREENCHER` em `site/src/data/loja.ts`): CEP, horário, AFE, licença sanitária, farmacêutico e CRF.
 - **O `repository_dispatch` do sync ainda não tem workflow** que gere e publique o site.
 
 ## Guia rápido

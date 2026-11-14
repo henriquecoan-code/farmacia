@@ -1,11 +1,10 @@
 ---
 import Base from '../layouts/Base.astro';
-import { loja, enderecoCompleto, PREENCHER } from '../data/loja';
+import { loja, enderecoCompleto, farmaceuticosTexto } from '../data/loja';
 import { u } from '../lib/url';
 // Ao mudar o texto de forma relevante, atualize a versão aqui e em config_loja.politica_versao
 const VERSAO = '2026-11';
 const ATUALIZADA = '04/11/2026';
-const marcar = (v: string) => v.startsWith(PREENCHER) ? `<span class="preencher">${v}</span>` : v;
 ---
 <Base title="Política de Privacidade" description="Como a Farmácia São Benedito trata seus dados pessoais, conforme a LGPD.">
   <article class="texto-legal">
@@ -21,7 +20,7 @@ const marcar = (v: string) => v.startsWith(PREENCHER) ? `<span class="preencher"
       <li>Nome fantasia: {loja.nomeFantasia}</li>
       <li>CNPJ: {loja.cnpj}</li>
       <li>Endereço: {enderecoCompleto()}</li>
-      <li>Farmacêutico(a) responsável técnico(a): <Fragment set:html={`${marcar(loja.farmaceutico)} — ${marcar(loja.crf)}`} /></li>
+      <li>Farmacêuticos responsáveis técnicos: {farmaceuticosTexto()}</li>
     </ul>
 
     <h2 id="dados">2. Quais dados coletamos</h2>

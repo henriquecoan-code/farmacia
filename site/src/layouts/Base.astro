@@ -1,7 +1,7 @@
 ---
 import '../styles/global.css';
 import '../styles/produto-card.css';
-import { loja, enderecoCompleto, linkWhatsApp, PREENCHER } from '../data/loja';
+import { loja, enderecoCompleto, linkWhatsApp, farmaceuticosTexto, PREENCHER } from '../data/loja';
 import { SECOES } from '../lib/catalogo';
 import { MENU_SECAO } from '../lib/secoes';
 import { u, urlSecao } from '../lib/url';
@@ -105,7 +105,7 @@ const ano = new Date().getFullYear();
         </section>
         <section>
           <h2>Responsabilidade técnica</h2>
-          <p>Farmacêutico(a) responsável: <Fragment set:html={marcar(loja.farmaceutico)} /> — <Fragment set:html={marcar(loja.crf)} /><br />
+          <p>Farmacêuticos responsáveis: {farmaceuticosTexto()}<br />
             Autorização de Funcionamento (AFE/Anvisa): <Fragment set:html={marcar(loja.afe)} /><br />
             Licença sanitária: <Fragment set:html={marcar(loja.licencaSanitaria)} /></p>
           <p class="rodape__aviso">Medicamentos sujeitos a controle especial e antimicrobianos não são vendidos pelo site.
