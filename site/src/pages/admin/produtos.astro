@@ -1,0 +1,212 @@
+---
+import Admin from '../../layouts/Admin.astro';
+---
+<Admin title="Produtos" ativo="produtos">
+  <div class="adm-cab">
+    <h1>Produtos</h1>
+    <p class="nota">Preço, estoque e nome vêm do ERP. Aqui você ajusta o que aparece na loja. As mudanças entram no site na próxima publicação.</p>
+  </div>
+
+  <form class="busca-adm" data-busca>
+    <input name="q" type="search" placeholder="Nome, código ou EAN" autocomplete="off" />
+    <select name="filtro">
+      <option value="">Todos</option>
+      <option value="ocultos">Ocultos</option>
+      <option value="bloqueados">Bloqueados pelos filtros</option>
+      <option value="destaque">Em destaque</option>
+      <option value="com_foto">Com foto</option>
+      <option value="sem_estoque">Sem estoque</option>
+    </select>
+    <button class="btn btn--primario" type="submit">Buscar</button>
+  </form>
+
+  <div class="tabela-rolagem">
+    <table class="tabela">
+      <thead><tr><th>Cód.</th><th>Produto</th><th>Preço</th><th>Estoque</th><th>Tipo</th><th>Na loja</th><th>Destaque</th><th></th></tr></thead>
+      <tbody data-linhas><tr><td colspan="8">Digite para buscar ou escolha um filtro.</td></tr></tbody>
+    </table>
+  </div>
+
+  <dialog class="editor" data-editor>
+    <form method="dialog" class="form" data-form-editor>
+      <h2 data-ed-titulo></h2>
+      <p class="nota" data-ed-sub></p>
+      <div class="ed-foto">
+        <img data-ed-img alt="" hidden />
+        <div class="form">
+          <label class="campo"><span>Foto do produto <small>(JPG/PNG/WebP; é reduzida para 800 px)</small></span><input type="file" accept="image/*" data-ed-arquivo /></label>
+          <button type="button" class="btn--link" data-ed-tirar-foto hidden>Remover foto</button>
+        </div>
+      </div>
+      <label class="campo"><span>Descrição</span><textarea name="descricao" maxlength="5000" rows="5" placeholder="Para que serve, modo de uso, apresentação…"></textarea></label>
+      <p class="msg" data-ed-msg hidden></p>
+      <div class="ed-acoes">
+        <button type="button" class="btn btn--primario" data-ed-salvar>Salvar</button>
+        <button type="submit" class="btn btn--secundario" value="cancelar">Fechar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    import { exigirEquipe } from '../../scripts/admin';
+    import { cliente, brl, esc, mensagemErro } from '../../scripts/sessao';
+
+    await exigirEquipe();
+    const sb = cliente();
+    const form = document.querySelector<HTMLFormElement>('[data-busca]')!;
+    const linhas = document.querySelector<HTMLElement>('[data-linhas]')!;
+    let produtos: any[] = [];
+
+    const COLUNAS = 'cod_red, slug, nome, laboratorio, ean, categoria, preco, estoque, tipo_venda, tipo_venda_manual, pendente, motivos_bloqueio, publicado, liberado_manual, destaque, descricao, fotos';
+
+    async function buscar() {
+      const d = new FormData(form);
+      const q = String(d.get('q') || '').trim();
+      const filtro = String(d.get('filtro') || '');
+      if (!q && !filtro) { linhas.innerHTML = '<tr><td colspan="8">Digite para buscar ou escolha um filtro.</td></tr>'; return; }
+      let consulta = sb.from('produtos').select(COLUNAS).order('nome').limit(100);
+      if (q) {
+        if (/^\d+$/.test(q)) consulta = q.length >= 8 ? consulta.ilike('ean', `%${q}%`) : consulta.eq('cod_red', Number(q));
+        else consulta = consulta.ilike('nome', `%${q.replace(/[%_]/g, '')}%`);
+      }
+      if (filtro === 'ocultos') consulta = consulta.eq('publicado', false);
+      if (filtro === 'bloqueados') consulta = consulta.eq('pendente', true).eq('liberado_manual', false);
+      if (filtro === 'destaque') consulta = consulta.eq('destaque', true);
+      if (filtro === 'com_foto') consulta = consulta.neq('fotos', '{}');
+      if (filtro === 'sem_estoque') consulta = consulta.lte('estoque', 0);
+      linhas.innerHTML = '<tr><td colspan="8">Buscando…</td></tr>';
+      const { data, error } = await consulta;
+      if (error) { linhas.innerHTML = `<tr><td colspan="8">${esc(mensagemErro(error))}</td></tr>`; return; }
+      produtos = data ?? [];
+      render();
+    }
+
+    function render() {
+      if (!produtos.length) { linhas.innerHTML = '<tr><td colspan="8">Nada encontrado.</td></tr>'; return; }
+      linhas.innerHTML = produtos.map((p) => {
+        const tipo = p.tipo_venda_manual ?? '';
+        const bloqueado = p.pendente && !p.liberado_manual;
+        return `<tr data-cod="${p.cod_red}">
+          <td>${p.cod_red}</td>
+          <td><strong>${esc(p.nome)}</strong><br><small>${esc(p.laboratorio ?? '')}${p.fotos?.length ? ' · 📷 foto' : ''}</small>
+            ${bloqueado ? `<br><small class="bloq">Bloqueado: ${esc((p.motivos_bloqueio ?? []).join(', '))} · <button type="button" class="btn--link" data-acao="liberar">liberar</button></small>` : ''}</td>
+          <td>${brl(p.preco)}</td>
+          <td>${p.estoque}</td>
+          <td><select data-acao="tipo" aria-label="Tipo de venda">
+            <option value="" ${tipo === '' ? 'selected' : ''}>Automático (${p.tipo_venda === 'mip' ? 'MIP' : 'prescrição'})</option>
+            <option value="mip" ${tipo === 'mip' ? 'selected' : ''}>MIP (venda livre)</option>
+            <option value="prescricao" ${tipo === 'prescricao' ? 'selected' : ''}>Prescrição</option>
+          </select></td>
+          <td><label class="interruptor"><input type="checkbox" data-acao="publicado" ${p.publicado ? 'checked' : ''}><span>${p.publicado ? 'Visível' : 'Oculto'}</span></label></td>
+          <td><input type="checkbox" data-acao="destaque" ${p.destaque ? 'checked' : ''} aria-label="Destaque"></td>
+          <td><button type="button" class="btn btn--secundario btn--peq" data-acao="editar">Foto / descrição</button></td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function salvar(cod: number, dados: Record<string, unknown>) {
+      const { error } = await sb.rpc('admin_atualizar_produto', { p_cod_red: cod, p_dados: dados });
+      if (error) { alert(mensagemErro(error)); return false; }
+      const p = produtos.find((x) => x.cod_red === cod);
+      if (p) Object.assign(p, dados);
+      return true;
+    }
+
+    linhas.addEventListener('change', async (ev) => {
+      const el = ev.target as HTMLInputElement & HTMLSelectElement;
+      const cod = Number(el.closest<HTMLElement>('tr')?.dataset.cod);
+      if (el.dataset.acao === 'publicado') { await salvar(cod, { publicado: el.checked }); render(); }
+      if (el.dataset.acao === 'destaque') await salvar(cod, { destaque: el.checked });
+      if (el.dataset.acao === 'tipo') await salvar(cod, { tipo_venda_manual: el.value || null });
+    });
+    linhas.addEventListener('click', async (ev) => {
+      const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-acao]');
+      if (!b || b.tagName !== 'BUTTON') return;
+      const cod = Number(b.closest<HTMLElement>('tr')?.dataset.cod);
+      if (b.dataset.acao === 'liberar' && confirm('Liberar este produto na loja mesmo com o bloqueio?')) { await salvar(cod, { liberado_manual: true }); render(); }
+      if (b.dataset.acao === 'editar') abrirEditor(cod);
+    });
+    form.addEventListener('submit', (ev) => { ev.preventDefault(); buscar(); });
+    form.querySelector('select')!.addEventListener('change', buscar);
+
+    // ---------- editor de foto e descrição
+    const dlg = document.querySelector<HTMLDialogElement>('[data-editor]')!;
+    const img = dlg.querySelector<HTMLImageElement>('[data-ed-img]')!;
+    const arquivo = dlg.querySelector<HTMLInputElement>('[data-ed-arquivo]')!;
+    const tirarFoto = dlg.querySelector<HTMLButtonElement>('[data-ed-tirar-foto]')!;
+    const edMsg = dlg.querySelector<HTMLElement>('[data-ed-msg]')!;
+    let atual: any = null;
+    let fotos: string[] = [];
+
+    function abrirEditor(cod: number) {
+      atual = produtos.find((p) => p.cod_red === cod);
+      if (!atual) return;
+      fotos = [...(atual.fotos ?? [])];
+      dlg.querySelector('[data-ed-titulo]')!.textContent = atual.nome;
+      dlg.querySelector('[data-ed-sub]')!.textContent = `Cód. ${atual.cod_red}${atual.ean ? ` · EAN ${atual.ean}` : ''}`;
+      (dlg.querySelector('textarea') as HTMLTextAreaElement).value = atual.descricao ?? '';
+      arquivo.value = '';
+      edMsg.hidden = true;
+      mostrarFoto();
+      dlg.showModal();
+    }
+    function mostrarFoto() {
+      img.hidden = !fotos[0];
+      if (fotos[0]) img.src = fotos[0];
+      tirarFoto.hidden = !fotos[0];
+    }
+    /** Reduz para no máximo 800 px e converte para WebP no próprio navegador. */
+    async function paraWebp(f: File): Promise<Blob> {
+      const bmp = await createImageBitmap(f);
+      const escala = Math.min(1, 800 / Math.max(bmp.width, bmp.height));
+      const c = Object.assign(document.createElement('canvas'), { width: Math.round(bmp.width * escala), height: Math.round(bmp.height * escala) });
+      const ctx = c.getContext('2d')!;
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(bmp, 0, 0, c.width, c.height);
+      return new Promise((ok, erro) => c.toBlob((b) => (b ? ok(b) : erro(new Error('conversão'))), 'image/webp', 0.85));
+    }
+    arquivo.addEventListener('change', async () => {
+      const f = arquivo.files?.[0];
+      if (!f || !atual) return;
+      edMsg.hidden = false; edMsg.className = 'msg msg--ok'; edMsg.textContent = 'Enviando foto…';
+      try {
+        const blob = await paraWebp(f);
+        const caminho = `produtos/${atual.cod_red}-${Date.now()}.webp`;
+        const { error } = await sb.storage.from('fotos').upload(caminho, blob, { contentType: 'image/webp', upsert: false });
+        if (error) throw error;
+        fotos = [sb.storage.from('fotos').getPublicUrl(caminho).data.publicUrl];
+        mostrarFoto();
+        edMsg.textContent = 'Foto enviada. Clique em Salvar.';
+      } catch (e) {
+        edMsg.className = 'msg msg--erro'; edMsg.textContent = mensagemErro(e);
+      }
+    });
+    tirarFoto.addEventListener('click', () => { fotos = []; mostrarFoto(); });
+    dlg.querySelector('[data-ed-salvar]')!.addEventListener('click', async () => {
+      if (!atual) return;
+      const descricao = (dlg.querySelector('textarea') as HTMLTextAreaElement).value.trim();
+      if (await salvar(atual.cod_red, { descricao, fotos })) {
+        edMsg.hidden = false; edMsg.className = 'msg msg--ok'; edMsg.textContent = 'Salvo. Aparece no site na próxima publicação.';
+        render();
+      }
+    });
+  </script>
+</Admin>
+
+<style>
+  .adm-cab { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .nota { color: var(--texto-3); font-size: .85rem; margin: 0; }
+  .busca-adm { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+  .busca-adm input { flex: 1; min-width: 220px; height: 40px; border: 1px solid #cbd5e1; border-radius: 10px; padding: 0 12px; font: inherit; font-size: 16px; }
+  .busca-adm select { height: 40px; border: 1px solid #cbd5e1; border-radius: 10px; padding: 0 10px; font: inherit; background: #fff; }
+  :global(.tabela select) { height: 32px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; font-size: .8rem; background: #fff; max-width: 170px; }
+  :global(.tabela .bloq) { color: var(--vermelho); }
+  :global(.interruptor) { display: flex; align-items: center; gap: 6px; font-size: .8rem; white-space: nowrap; }
+  :global(.btn--peq) { min-height: 32px; padding: 0 10px; font-size: .8rem; white-space: nowrap; }
+  .editor { border: 0; border-radius: 14px; padding: 18px; width: min(560px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgb(0 0 0 / .25); }
+  .editor::backdrop { background: rgb(15 23 42 / .5); }
+  .editor h2 { font-size: 1.05rem; margin: 0; }
+  .ed-foto { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; }
+  .ed-foto img { width: 120px; height: 120px; object-fit: contain; border: 1px solid var(--borda); border-radius: 10px; background: #fff; }
+  .ed-acoes { display: flex; gap: 8px; }
+</style>
