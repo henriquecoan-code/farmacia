@@ -28,6 +28,11 @@ export const MENU_SECAO: Record<string, { curto: string; icone: string }> = {
     icone: '<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M9 6V4h6v2M12 10v6M9 13h6"/>' },
 };
 
+/** Nome no plural dos tipos de medicamento (submenu e páginas /tipo/) */
+export const NOME_TIPO: Record<string, string> = {
+  genericos: 'Genéricos', referencia: 'Referência', similares: 'Similares', medicamentos: 'Outros medicamentos',
+};
+
 export const NOME_CATEGORIA: Record<string, string> = {
   genericos: 'Genérico', referencia: 'Referência', similares: 'Similar', medicamentos: 'Medicamento',
   dermocosmeticos: 'Perfumaria e dermocosméticos', suplementos: 'Suplementos e conveniência', hospitalares: 'Saúde e correlatos',

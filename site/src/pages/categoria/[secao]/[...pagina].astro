@@ -1,8 +1,10 @@
 ---
 import type { GetStaticPaths } from 'astro';
 import Base from '../../../layouts/Base.astro';
-import ProdutoCard from '../../../components/ProdutoCard.astro';
-import { carregarProdutos, SECOES, NOME_CATEGORIA, type Secao, type Produto } from '../../../lib/catalogo';
+import Catalogo from '../../../components/Catalogo.astro';
+import Listagem from '../../../components/Listagem.astro';
+import { carregarProdutos, SECOES, type Secao, type Produto } from '../../../lib/catalogo';
+import { NOME_TIPO } from '../../../lib/secoes';
 import { u, urlSecao } from '../../../lib/url';
 
 export const getStaticPaths = (async () => {
@@ -11,46 +13,25 @@ export const getStaticPaths = (async () => {
   return SECOES.flatMap((secao) => {
     const itens = produtos.filter((p) => secao.categorias.includes(p.categoria));
     const total = Math.max(1, Math.ceil(itens.length / POR_PAGINA));
+    const tipos = secao.categorias.length > 1 ? secao.categorias.filter((c) => itens.some((p) => p.categoria === c)) : [];
     return Array.from({ length: total }, (_, i) => ({
       params: { secao: secao.slug, pagina: i === 0 ? undefined : String(i + 1) },
-      props: { secao, pagina: i + 1, totalPaginas: total, totalItens: itens.length, itens: itens.slice(i * POR_PAGINA, (i + 1) * POR_PAGINA) },
+      props: { secao, tipos, pagina: i + 1, totalPaginas: total, totalItens: itens.length, itens: itens.slice(i * POR_PAGINA, (i + 1) * POR_PAGINA) },
     }));
   });
 }) satisfies GetStaticPaths;
 
-interface Props { secao: Secao; pagina: number; totalPaginas: number; totalItens: number; itens: Produto[] }
-const { secao, pagina, totalPaginas, totalItens, itens } = Astro.props;
+interface Props { secao: Secao; tipos: string[]; pagina: number; totalPaginas: number; totalItens: number; itens: Produto[] }
+const { secao, tipos, pagina, totalPaginas, totalItens, itens } = Astro.props;
 const titulo = pagina > 1 ? `${secao.nome} — página ${pagina}` : secao.nome;
-const subcats = secao.categorias.filter((c) => c !== 'medicamentos' && secao.categorias.length > 1);
+const atalhos = tipos.length
+  ? [{ nome: 'Todos', href: urlSecao(secao.slug), ativo: true }, ...tipos.map((c) => ({ nome: NOME_TIPO[c] ?? c, href: u(`/tipo/${c}/`) }))]
+  : [];
 ---
 <Base title={titulo} description={`${secao.nome} na Farmácia São Benedito: ${secao.descricao} ${totalItens} produtos com entrega em Lauro Müller e região.`}>
-  <nav class="migalhas" aria-label="Você está em">
-    <ol><li><a href={u('/')}>Início</a></li><li aria-current="page">{secao.nome}</li></ol>
-  </nav>
-  <header class="cab">
-    <h1>{secao.nome}</h1>
-    <p>{totalItens.toLocaleString('pt-BR')} produtos{totalPaginas > 1 && ` · página ${pagina} de ${totalPaginas}`}</p>
-    {subcats.length > 0 && (
-      <p class="cab__dica">Inclui {subcats.map((c) => NOME_CATEGORIA[c].toLowerCase() + 's').join(', ')}.
-        Procure pelo princípio ativo na <a href={u('/busca/')}>busca</a> para comparar genéricos e similares.</p>
-    )}
-  </header>
-
-  <div class="grade">
-    {itens.map((p, i) => <ProdutoCard produto={p} eager={i < 4} />)}
-  </div>
-
-  {totalPaginas > 1 && (
-    <nav class="paginacao" aria-label="Páginas">
-      {pagina > 1 ? <a class="btn btn--secundario" href={urlSecao(secao.slug, pagina - 1)} rel="prev">← Anterior</a> : <span />}
-      <span>Página {pagina} de {totalPaginas}</span>
-      {pagina < totalPaginas ? <a class="btn btn--secundario" href={urlSecao(secao.slug, pagina + 1)} rel="next">Próxima →</a> : <span />}
-    </nav>
-  )}
+  <Catalogo secao={secao.slug}>
+    <Listagem titulo={secao.nome} descricao={secao.descricao} migalhas={[{ nome: secao.nome }]}
+      itens={itens} pagina={pagina} totalPaginas={totalPaginas} totalItens={totalItens}
+      urlPagina={(n) => urlSecao(secao.slug, n)} atalhos={atalhos} />
+  </Catalogo>
 </Base>
-
-<style>
-  .cab { padding: 8px 0 16px; }
-  .cab p { margin: 0; color: var(--texto-2); }
-  .cab__dica { margin-top: 6px !important; font-size: .9rem; }
-</style>

@@ -117,11 +117,10 @@ test('criar_pedido recusa produto oculto, bloqueado, sem estoque ou acima do est
   await rejects(as('anon', null, () => rows(`select public.criar_pedido('[{"cod_red":1,"quantidade":1}]', 'retirada', 'pix')`)), /permission denied/);
 });
 
-test('item de prescrição exige declaração de receita', async () => {
+test('item de prescrição entra sem declaração e o pedido fica marcado (0005)', async () => {
   const itens = JSON.stringify([{ cod_red: 2, quantidade: 1 }]);
-  await rejects(as('authenticated', U.a, () => rows(`select public.criar_pedido($1, 'retirada', 'pix')`, [itens])), /declaracao_receita_necessaria/);
   const [{ r }] = await as('authenticated', U.a, () =>
-    rows(`select public.criar_pedido($1, 'retirada', 'pix', null, 1, true) as r`, [itens]));
+    rows(`select public.criar_pedido($1, 'retirada', 'pix') as r`, [itens]));
   assert.equal(r.tem_prescricao, true);
   assert.equal(Number(r.frete), 0);
 });

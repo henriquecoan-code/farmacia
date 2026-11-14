@@ -1,12 +1,194 @@
 ---
 import Base from '../layouts/Base.astro';
+import { u } from '../lib/url';
 import { linkWhatsApp, loja } from '../data/loja';
 ---
 <Base title="Minha conta" noindex>
-  <section class="em-breve">
-    <h1>Minha conta</h1>
-    <p>Login, pedidos e dados da conta entram na próxima etapa do site.</p>
-    <p>Enquanto isso, faça seu pedido pelo <a href={linkWhatsApp()} target="_blank" rel="noopener">WhatsApp {loja.telefone}</a>.</p>
-  </section>
+  <div class="conta">
+    <header class="cab">
+      <h1>Minha conta</h1>
+      <p data-email class="cab__email"></p>
+    </header>
+    <p class="carregando" data-carregando>Carregando…</p>
+
+    <div class="grade-conta" data-conteudo hidden>
+      <div>
+        <section class="painel">
+          <h2>Meus pedidos</h2>
+          <p class="texto-2">Acompanhe o status e veja os detalhes dos seus pedidos.</p>
+          <a class="btn btn--secundario" href={u('/conta/pedidos/')}>Ver meus pedidos</a>
+        </section>
+
+        <section class="painel">
+          <h2>Meus dados</h2>
+          <form class="form" data-form-perfil>
+            <label class="campo"><span>Nome completo</span><input name="nome" autocomplete="name" required minlength="3" /></label>
+            <label class="campo"><span>Telefone / WhatsApp</span><input name="telefone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(48) 99999-9999" /></label>
+            <p class="msg" data-msg hidden></p>
+            <button class="btn btn--primario" type="submit">Salvar</button>
+          </form>
+        </section>
+
+        <section class="painel">
+          <h2>Endereços</h2>
+          <ul class="enderecos" data-enderecos></ul>
+          <button class="btn btn--secundario" type="button" data-novo-endereco>+ Adicionar endereço</button>
+          <form class="form form-endereco" data-form-endereco hidden>
+            <div data-campos-endereco></div>
+            <p class="msg" data-msg hidden></p>
+            <div class="acoes-form">
+              <button class="btn btn--primario" type="submit">Salvar endereço</button>
+              <button class="btn btn--secundario" type="button" data-cancelar-endereco>Cancelar</button>
+            </div>
+          </form>
+        </section>
+      </div>
+
+      <div>
+        <section class="painel">
+          <h2>Privacidade e dados</h2>
+          <p class="texto-2">Seus direitos pela LGPD. Veja a <a href={u('/privacidade/')}>Política de Privacidade</a>.</p>
+          <div class="acoes-lgpd">
+            <button class="btn btn--secundario" type="button" data-exportar>Baixar meus dados</button>
+            <button class="btn btn--perigo" type="button" data-excluir>Excluir minha conta</button>
+          </div>
+          <div class="excluir" data-confirmar-exclusao hidden>
+            <p><strong>Isto não pode ser desfeito.</strong> Apagamos seu login, seus dados e endereços.
+              Os pedidos ficam guardados sem o seu nome, e-mail, telefone ou endereço, por obrigação fiscal.
+              Se quiser uma cópia, use "Baixar meus dados" antes.</p>
+            <label class="campo"><span>Para confirmar, digite EXCLUIR</span><input data-texto-excluir autocomplete="off" /></label>
+            <div class="acoes-form">
+              <button class="btn btn--perigo" type="button" data-excluir-confirma>Excluir definitivamente</button>
+              <button class="btn btn--secundario" type="button" data-excluir-cancela>Cancelar</button>
+            </div>
+          </div>
+          <p class="msg" data-msg-lgpd hidden></p>
+        </section>
+
+        <section class="painel">
+          <h2>Precisa de ajuda?</h2>
+          <p class="texto-2">Fale com a farmácia pelo <a href={linkWhatsApp()} target="_blank" rel="noopener">WhatsApp {loja.telefone}</a>.</p>
+          <button class="btn btn--secundario" type="button" data-sair>Sair da conta</button>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import { cliente, exigirLogin, mensagemErro, esc, BASE } from '../scripts/sessao';
+    import { listarEnderecos, salvarEndereco, excluirEndereco, resumoEndereco, formEnderecoHTML, lerFormEndereco, ligarCep, type Endereco } from '../scripts/enderecos';
+
+    const sb = cliente();
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector<T>(s)!;
+    const msgEm = (el: HTMLElement, t: string, ok = false) => { el.textContent = t; el.hidden = !t; el.className = `msg ${ok ? 'msg--ok' : 'msg--erro'}`; };
+
+    const user = await exigirLogin();
+    $('[data-email]').textContent = user.email ?? '';
+
+    // ---------- perfil
+    const fPerfil = $<HTMLFormElement>('[data-form-perfil]');
+    const { data: perfil } = await sb.from('perfis').select('nome, telefone').eq('user_id', user.id).maybeSingle();
+    (fPerfil.elements.namedItem('nome') as HTMLInputElement).value = perfil?.nome ?? '';
+    (fPerfil.elements.namedItem('telefone') as HTMLInputElement).value = perfil?.telefone ?? '';
+    fPerfil.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const d = new FormData(fPerfil);
+      const { error } = await sb.from('perfis').upsert({
+        user_id: user.id, nome: String(d.get('nome')).trim(), telefone: String(d.get('telefone')).trim() || null,
+      });
+      msgEm(fPerfil.querySelector('[data-msg]')!, error ? mensagemErro(error) : 'Dados salvos.', !error);
+    });
+
+    // ---------- endereços
+    const lista = $('[data-enderecos]');
+    const fEnd = $<HTMLFormElement>('[data-form-endereco]');
+    let enderecos: Endereco[] = [];
+    let editando: string | undefined;
+
+    function renderEnderecos() {
+      lista.innerHTML = enderecos.length
+        ? enderecos.map((e) => `<li><div><strong>${esc(e.apelido || 'Endereço')}</strong><br><span>${esc(resumoEndereco(e))}</span></div>
+            <div class="li-acoes"><button class="btn--link" data-editar="${e.id}">Editar</button><button class="btn--link" data-apagar="${e.id}">Excluir</button></div></li>`).join('')
+        : '<li class="vazio-lista">Nenhum endereço cadastrado.</li>';
+    }
+    function abrirForm(e?: Endereco) {
+      editando = e?.id;
+      $('[data-campos-endereco]').innerHTML = formEnderecoHTML(e);
+      ligarCep(fEnd);
+      fEnd.hidden = false;
+      msgEm(fEnd.querySelector('[data-msg]')!, '');
+      fEnd.querySelector<HTMLInputElement>('input[name=cep]')!.focus();
+    }
+    enderecos = await listarEnderecos();
+    renderEnderecos();
+    $('[data-novo-endereco]').addEventListener('click', () => abrirForm());
+    $('[data-cancelar-endereco]').addEventListener('click', () => { fEnd.hidden = true; });
+    lista.addEventListener('click', async (ev) => {
+      const t = ev.target as HTMLElement;
+      if (t.dataset.editar) abrirForm(enderecos.find((e) => e.id === t.dataset.editar));
+      if (t.dataset.apagar && confirm('Excluir este endereço?')) {
+        try { await excluirEndereco(t.dataset.apagar); enderecos = enderecos.filter((e) => e.id !== t.dataset.apagar); renderEnderecos(); }
+        catch (e) { alert(mensagemErro(e)); }
+      }
+    });
+    fEnd.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      try {
+        const salvo = await salvarEndereco(user.id, lerFormEndereco(fEnd), editando);
+        enderecos = editando ? enderecos.map((e) => (e.id === editando ? salvo : e)) : [...enderecos, salvo];
+        renderEnderecos();
+        fEnd.hidden = true;
+      } catch (e) { msgEm(fEnd.querySelector('[data-msg]')!, mensagemErro(e)); }
+    });
+
+    // ---------- LGPD
+    const msgLgpd = $('[data-msg-lgpd]');
+    $('[data-exportar]').addEventListener('click', async () => {
+      const { data, error } = await sb.rpc('exportar_meus_dados');
+      if (error) return msgEm(msgLgpd, mensagemErro(error));
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `meus-dados-farmacia-sao-benedito-${new Date().toISOString().slice(0, 10)}.json` });
+      a.click();
+      URL.revokeObjectURL(a.href);
+      msgEm(msgLgpd, 'Arquivo gerado.', true);
+    });
+    $('[data-excluir]').addEventListener('click', () => { $('[data-confirmar-exclusao]').hidden = false; });
+    $('[data-excluir-cancela]').addEventListener('click', () => { $('[data-confirmar-exclusao]').hidden = true; });
+    $('[data-excluir-confirma]').addEventListener('click', async () => {
+      if ($<HTMLInputElement>('[data-texto-excluir]').value.trim().toUpperCase() !== 'EXCLUIR') {
+        return msgEm(msgLgpd, 'Digite EXCLUIR para confirmar.');
+      }
+      const { error } = await sb.rpc('excluir_minha_conta');
+      if (error) return msgEm(msgLgpd, mensagemErro(error));
+      await sb.auth.signOut({ scope: 'local' });
+      location.replace(`${BASE}/?conta=excluida`);
+    });
+
+    // ---------- sair
+    $('[data-sair]').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      location.replace(`${BASE}/`);
+    });
+
+    $('[data-carregando]').hidden = true;
+    $('[data-conteudo]').hidden = false;
+  </script>
 </Base>
-<style>.em-breve { padding: 40px 0; }</style>
+
+<style>
+  .cab { padding: 12px 0 6px; }
+  .cab__email { margin: 0; color: var(--texto-3); font-size: .9rem; }
+  .grade-conta { display: grid; gap: 12px; padding-bottom: 24px; }
+  @media (min-width: 860px) { .grade-conta { grid-template-columns: 1.3fr 1fr; align-items: start; } }
+  .grade-conta > div > .painel + .painel { margin-top: 12px; }
+  .texto-2 { color: var(--texto-2); font-size: .9rem; margin-top: 0; }
+  .enderecos { list-style: none; padding: 0; margin: 0 0 10px; display: grid; gap: 8px; }
+  :global(.enderecos li) { display: flex; justify-content: space-between; gap: 10px; border: 1px solid var(--borda); border-radius: 10px; padding: 10px; font-size: .88rem; }
+  :global(.enderecos .li-acoes) { display: flex; gap: 12px; align-items: start; }
+  :global(.vazio-lista) { color: var(--texto-3); }
+  .form-endereco { margin-top: 12px; border-top: 1px solid var(--borda); padding-top: 12px; }
+  .acoes-form, .acoes-lgpd { display: flex; gap: 8px; flex-wrap: wrap; }
+  .excluir { margin-top: 12px; border: 1px solid #fecaca; background: var(--vermelho-claro); border-radius: 10px; padding: 12px; display: grid; gap: 10px; font-size: .88rem; }
+  .excluir p { margin: 0; }
+  [data-msg-lgpd] { margin-top: 10px; }
+</style>

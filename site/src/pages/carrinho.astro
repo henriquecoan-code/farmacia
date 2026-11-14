@@ -9,7 +9,7 @@ import { u } from '../lib/url';
     <aside class="resumo" data-resumo hidden>
       <p class="resumo__linha"><span data-total-rotulo>Total</span><strong data-total>R$ 0,00</strong></p>
       <p class="aviso aviso--receita" data-aviso-receita hidden>Há medicamento de venda sob prescrição: apresente a receita na entrega ou retirada.</p>
-      <button class="btn btn--primario btn--bloco" type="button" disabled>Finalizar compra (em breve)</button>
+      <a class="btn btn--primario btn--bloco" href={u('/checkout/')} data-finalizar>Finalizar compra</a>
       <p class="resumo__nota">Frete e valor final são calculados ao finalizar.</p>
     </aside>
   </div>
@@ -20,6 +20,7 @@ import { u } from '../lib/url';
       <div class="item__info">
         <a class="item__nome"></a>
         <span class="item__preco"></span>
+        <span class="item__aviso" hidden></span>
       </div>
       <div class="item__qtd">
         <button type="button" class="q" data-acao="menos" aria-label="Diminuir">−</button>
@@ -34,7 +35,8 @@ import { u } from '../lib/url';
   </template>
 
   <script>
-    import { lerCarrinho, alterarQuantidade, remover, selecionar } from '../scripts/carrinho';
+    import { lerCarrinho, alterarQuantidade, remover, selecionar, itensDoPedido, limparAvisosDePreco } from '../scripts/carrinho';
+    import { revalidar } from '../scripts/carrinho-revalidar';
     const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const lista = document.querySelector<HTMLElement>('[data-lista]')!;
@@ -53,7 +55,14 @@ import { u } from '../lib/url';
         const el = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
         el.dataset.cod = String(it.cod_red);
         el.classList.toggle('item--fora', !it.selecionado);
-        (el.querySelector('.item__sel') as HTMLInputElement).checked = it.selecionado;
+        el.classList.toggle('item--indisponivel', !!it.indisponivel);
+        const sel = el.querySelector('.item__sel') as HTMLInputElement;
+        sel.checked = it.selecionado && !it.indisponivel;
+        sel.disabled = !!it.indisponivel;
+        const aviso = el.querySelector<HTMLElement>('.item__aviso')!;
+        if (it.indisponivel) { aviso.textContent = 'Sem estoque no momento — não entra no pedido'; aviso.hidden = false; aviso.className = 'item__aviso item__aviso--erro'; }
+        else if (it.preco_anterior !== undefined) { aviso.innerHTML = `Preço atualizado: era <s>${brl(it.preco_anterior)}</s>, agora ${brl(it.preco)}`; aviso.hidden = false; }
+        else if (it.quantidade >= it.estoque) { aviso.textContent = `Máximo disponível: ${it.estoque}`; aviso.hidden = false; }
         const nome = el.querySelector<HTMLAnchorElement>('.item__nome')!;
         nome.textContent = it.nome;
         nome.href = `${base}/produto/${it.slug}/`;
@@ -61,13 +70,14 @@ import { u } from '../lib/url';
         const q = el.querySelector<HTMLInputElement>('input[type=number]')!;
         q.value = String(it.quantidade);
         q.max = String(it.estoque);
-        el.querySelector('.item__total')!.textContent = brl(it.preco * it.quantidade);
+        el.querySelector('.item__total')!.textContent = it.indisponivel ? '—' : brl(it.preco * it.quantidade);
         lista.appendChild(el);
       }
-      const sel = itens.filter((i) => i.selecionado);
+      const sel = itensDoPedido(itens);
       document.querySelector('[data-total]')!.textContent = brl(sel.reduce((s, i) => s + i.preco * i.quantidade, 0));
       document.querySelector('[data-total-rotulo]')!.textContent = `Total (${sel.length} de ${itens.length} itens)`;
       (document.querySelector('[data-aviso-receita]') as HTMLElement).hidden = !sel.some((i) => i.tipo_venda === 'prescricao');
+      document.querySelector('[data-finalizar]')!.classList.toggle('desativado', sel.length === 0);
       resumo.hidden = false;
     }
 
@@ -90,6 +100,8 @@ import { u } from '../lib/url';
     });
     window.addEventListener('carrinho:mudou', render);
     render();
+    // confere preço e estoque no banco; os avisos de preço aparecem uma vez
+    revalidar().finally(() => { render(); limparAvisosDePreco(); });
   </script>
 </Base>
 
@@ -107,6 +119,10 @@ import { u } from '../lib/url';
 <style is:global>
   .item { display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--borda); border-radius: var(--raio); padding: 12px; }
   .item--fora { opacity: .6; }
+  .item--indisponivel > :not(.item__remover) { opacity: .45; }
+  .item__aviso { font-size: .8rem; color: var(--ambar); }
+  .item__aviso--erro { color: var(--vermelho); }
+  .desativado { pointer-events: none; opacity: .5; }
   .item__sel { width: 20px; height: 20px; accent-color: var(--azul); }
   .item__info { display: grid; gap: 2px; min-width: 0; }
   .item__nome { font-weight: 600; color: var(--texto); text-decoration: none; overflow-wrap: anywhere; }

@@ -120,7 +120,7 @@ const dadosCarrinho = JSON.stringify({ cod_red: p.cod_red, slug: p.slug, nome: p
         ) : medicamento ? (
           <p class="aviso aviso--mip">{p.nome.split(' ')[0].toUpperCase()} É UM MEDICAMENTO. SEU USO PODE TRAZER RISCOS. PROCURE O MÉDICO E O FARMACÊUTICO. LEIA A BULA.</p>
         ) : null}
-        <a class="btn btn--whats btn--bloco" href={linkWhatsApp(`Olá! Tenho uma dúvida sobre o produto ${p.nome} (cód. ${p.cod_red}).`)} target="_blank" rel="noopener">
+        <a class="btn btn--whats" href={linkWhatsApp(`Olá! Tenho uma dúvida sobre o produto ${p.nome} (cód. ${p.cod_red}).`)} target="_blank" rel="noopener">
           Tirar dúvida com o farmacêutico
         </a>
       </div>
@@ -144,23 +144,25 @@ const dadosCarrinho = JSON.stringify({ cod_red: p.cod_red, slug: p.slug, nome: p
 </Base>
 
 <style>
-  .produto { display: grid; gap: 14px; padding: 6px 0 10px; }
-  @media (min-width: 860px) { .produto { grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 28px; } }
+  .produto { display: grid; gap: 14px; padding: 6px 0 10px; max-width: 920px; margin: 0 auto; }
+  @media (min-width: 860px) { .produto { grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 32px; align-items: center; } }
   .produto__img { background: #fff; border: 1px solid var(--borda); border-radius: 12px; padding: 8px; align-self: start; }
   @media (max-width: 859px) { .produto__img { max-width: 260px; width: 100%; margin: 0 auto; } }
   .produto__cat { margin: 0 0 2px; color: var(--azul); font-weight: 700; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
   .ficha { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0 0 12px; font-size: .85rem; }
   .ficha dt { color: var(--texto-3); }
   .ficha dd { margin: 0; overflow-wrap: anywhere; }
-  .compra { background: #fff; border: 1px solid var(--borda); border-radius: 12px; padding: 12px; display: grid; gap: 8px; max-width: 460px; box-shadow: var(--sombra); }
+  .compra { background: #fff; border: 1px solid var(--borda); border-radius: 12px; padding: 12px; display: grid; gap: 8px; max-width: 460px; box-shadow: var(--sombra); justify-items: start; }
   .preco { display: flex; flex-direction: column; gap: 4px; }
   .preco__de { display: flex; align-items: center; gap: 8px; }
   .preco s { color: var(--texto-3); }
   .preco strong { font-size: 1.6rem; line-height: 1; }
   .estoque { margin: 0; color: var(--verde); font-weight: 600; }
   .estoque.esgotado { color: var(--vermelho); }
-  .compra__acoes { display: grid; grid-template-columns: 72px 1fr; gap: 8px; }
-  .qtd input { width: 100%; height: 40px; border: 1px solid #cbd5e1; border-radius: 10px; text-align: center; font: inherit; font-size: 16px; }
+  .compra__acoes { display: flex; gap: 8px; align-items: center; }
+  /* botões compactos (cerca de 1/3 da largura do quadro) */
+  .compra .btn { min-height: 36px; padding: 0 14px; font-size: .85rem; width: auto; }
+  .qtd input { width: 56px; height: 36px; border: 1px solid #cbd5e1; border-radius: 10px; text-align: center; font: inherit; font-size: 16px; }
   .aviso { margin: 0; }
   .nota-receita { margin: 0; font-size: .85rem; color: var(--texto-3); }
   .aviso--mip { font-size: .78rem; letter-spacing: .01em; }

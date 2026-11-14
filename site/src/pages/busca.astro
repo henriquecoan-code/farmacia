@@ -1,9 +1,11 @@
 ---
 import Base from '../layouts/Base.astro';
+import Catalogo from '../components/Catalogo.astro';
 import { u } from '../lib/url';
 import { SECOES } from '../lib/secoes';
 ---
 <Base title="Buscar produtos" description="Busque medicamentos, marcas e princípios ativos na Farmácia São Benedito.">
+  <Catalogo>
   <nav class="migalhas" aria-label="Você está em"><ol><li><a href={u('/')}>Início</a></li><li aria-current="page">Busca</li></ol></nav>
   <header class="cab">
     <h1 data-titulo>Buscar produtos</h1>
@@ -28,6 +30,8 @@ import { SECOES } from '../lib/secoes';
   <div class="grade" data-resultados></div>
   <p class="mais"><button type="button" class="btn btn--secundario" data-mais hidden>Ver mais produtos</button></p>
   <noscript><p class="aviso aviso--erro">A busca precisa de JavaScript ativado.</p></noscript>
+
+  </Catalogo>
 
   <script>
     import { cardHtml, type ProdutoBusca } from '../scripts/card-html';

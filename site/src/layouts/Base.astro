@@ -68,7 +68,7 @@ const ano = new Date().getFullYear();
         <nav class="acoes" aria-label="Conta e carrinho">
           <a href={u('/conta/')} class="acao">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
-            <span>Conta</span>
+            <span data-rotulo-conta>Entrar</span>
           </a>
           <a href={u('/carrinho/')} class="acao acao--carrinho">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
@@ -160,6 +160,11 @@ const ano = new Date().getFullYear();
       };
       atualizar();
       window.addEventListener('carrinho:mudou', atualizar);
+      // "Entrar" ou "Conta" sem carregar o Supabase: só olha se há sessão salva
+      try {
+        const logado = Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k));
+        document.querySelectorAll('[data-rotulo-conta]').forEach((el) => { el.textContent = logado ? 'Conta' : 'Entrar'; });
+      } catch { /* sem localStorage */ }
       window.addEventListener('storage', atualizar);
     </script>
   </body>

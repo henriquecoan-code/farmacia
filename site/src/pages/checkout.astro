@@ -1,0 +1,232 @@
+---
+import Base from '../layouts/Base.astro';
+import { u } from '../lib/url';
+import { loja, enderecoCompleto } from '../data/loja';
+---
+<Base title="Finalizar compra" noindex>
+  <h1 class="titulo">Finalizar compra</h1>
+  <p class="carregando" data-carregando>Carregando…</p>
+  <p class="vazio" data-vazio hidden>Nenhum produto selecionado para o pedido. <a href={u('/carrinho/')}>Voltar ao carrinho</a></p>
+
+  <form class="checkout" data-checkout hidden novalidate>
+    <div class="etapas">
+      <section class="painel">
+        <h2>1. Seus dados</h2>
+        <div class="linha-2">
+          <label class="campo"><span>Nome completo</span><input name="nome" autocomplete="name" required minlength="3" /></label>
+          <label class="campo"><span>Telefone / WhatsApp</span><input name="telefone" type="tel" inputmode="tel" autocomplete="tel" required placeholder="(48) 99999-9999" /></label>
+        </div>
+        <p class="nota">Usamos o telefone para confirmar o pedido e combinar a entrega.</p>
+      </section>
+
+      <section class="painel">
+        <h2>2. Entrega</h2>
+        <div class="opcoes" data-opcoes-entrega>
+          <label class="opcao"><input type="radio" name="entrega" value="retirada" /><span><strong>Retirar na loja</strong><small>{enderecoCompleto()} · grátis</small></span><em data-frete="retirada">Grátis</em></label>
+          <label class="opcao"><input type="radio" name="entrega" value="padrao" checked /><span><strong>Entrega</strong><small>{loja.entregas.map((e) => `${e.cidade}: ${e.regra}`).join(' · ')}</small></span><em data-frete="padrao"></em></label>
+          <label class="opcao"><input type="radio" name="entrega" value="expresso" /><span><strong>Entrega expressa</strong><small>Prioridade na separação e na saída</small></span><em data-frete="expresso"></em></label>
+        </div>
+
+        <div class="enderecos" data-bloco-endereco>
+          <h3>Endereço de entrega</h3>
+          <div class="opcoes" data-lista-enderecos></div>
+          <button type="button" class="btn--link" data-novo-endereco>+ Novo endereço</button>
+          <div class="novo-endereco" data-form-endereco hidden></div>
+        </div>
+      </section>
+
+      <section class="painel">
+        <h2>3. Pagamento</h2>
+        <div class="opcoes">
+          <label class="opcao"><input type="radio" name="pagamento" value="na_entrega" checked /><span><strong>Pagar na entrega ou retirada</strong><small>Cartão de débito/crédito na maquininha, Pix ou dinheiro</small></span></label>
+          <label class="opcao opcao--off"><input type="radio" name="pagamento" value="pix" disabled /><span><strong>Pix pelo site</strong><small>Em breve</small></span></label>
+          <label class="opcao opcao--off"><input type="radio" name="pagamento" value="cartao_online" disabled /><span><strong>Cartão de crédito pelo site</strong><small>Em breve, com parcelamento</small></span></label>
+        </div>
+      </section>
+
+      <section class="painel">
+        <h2>4. Observações <small>(opcional)</small></h2>
+        <label class="campo"><span class="sr-only">Observação</span><textarea name="observacao" maxlength="500" placeholder="Ponto de referência, troco para quanto, melhor horário…"></textarea></label>
+      </section>
+    </div>
+
+    <aside class="painel resumo">
+      <h2>Resumo</h2>
+      <ul class="itens" data-itens></ul>
+      <dl class="totais">
+        <dt>Subtotal</dt><dd data-subtotal></dd>
+        <dt>Frete</dt><dd data-frete-total></dd>
+        <dt class="total">Total</dt><dd class="total" data-total></dd>
+      </dl>
+      <p class="msg" data-msg hidden></p>
+      <button class="btn btn--primario btn--bloco" type="submit" data-enviar>Confirmar pedido</button>
+      <p class="nota">O valor final é conferido no momento do pedido. Ao confirmar, você concorda com os <a href={u('/termos/')} target="_blank">Termos de Uso</a>.</p>
+    </aside>
+  </form>
+
+  <script>
+    import { cliente, exigirLogin, mensagemErro, esc, brl, BASE } from '../scripts/sessao';
+    import { itensDoPedido, removerItens } from '../scripts/carrinho';
+    import { revalidar } from '../scripts/carrinho-revalidar';
+    import { listarEnderecos, salvarEndereco, resumoEndereco, formEnderecoHTML, lerFormEndereco, ligarCep, type Endereco } from '../scripts/enderecos';
+
+    const sb = cliente();
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector<T>(s)!;
+    const form = $<HTMLFormElement>('[data-checkout]');
+    const msg = $('[data-msg]');
+    const erro = (t: string) => { msg.textContent = t; msg.hidden = !t; msg.className = 'msg msg--erro'; if (t) msg.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
+
+    const user = await exigirLogin();
+    await revalidar();
+    let itens = itensDoPedido();
+    if (!itens.length) {
+      $('[data-carregando]').hidden = true;
+      $('[data-vazio]').hidden = false;
+      throw new Error('carrinho vazio');
+    }
+
+    const [{ data: cfg }, { data: perfil }, enderecosIniciais] = await Promise.all([
+      sb.from('config_loja').select('*').single(),
+      sb.from('perfis').select('nome, telefone').eq('user_id', user.id).maybeSingle(),
+      listarEnderecos(),
+    ]);
+    let enderecos: Endereco[] = enderecosIniciais;
+    const campo = (n: string) => form.elements.namedItem(n) as HTMLInputElement;
+    campo('nome').value = perfil?.nome ?? '';
+    campo('telefone').value = perfil?.telefone ?? '';
+    if (!cfg?.retirada_habilitada) form.querySelector<HTMLElement>('input[value=retirada]')!.closest('label')!.hidden = true;
+
+    // ---------- endereços
+    const listaEnd = $('[data-lista-enderecos]');
+    const blocoNovo = $('[data-form-endereco]');
+    function renderEnderecos(selecionar?: string) {
+      listaEnd.innerHTML = enderecos.map((e, i) => `
+        <label class="opcao"><input type="radio" name="endereco_id" value="${e.id}" ${(selecionar ? e.id === selecionar : i === 0) ? 'checked' : ''}>
+          <span><strong>${esc(e.apelido || 'Endereço')}</strong><small>${esc(resumoEndereco(e))}</small></span></label>`).join('');
+      if (!enderecos.length) abrirNovo();
+    }
+    function abrirNovo() {
+      blocoNovo.innerHTML = formEnderecoHTML();
+      blocoNovo.hidden = false;
+      ligarCep(blocoNovo);
+      listaEnd.querySelectorAll('input').forEach((r) => { (r as HTMLInputElement).checked = false; });
+    }
+    renderEnderecos();
+    $('[data-novo-endereco]').addEventListener('click', abrirNovo);
+    listaEnd.addEventListener('change', () => { blocoNovo.hidden = true; blocoNovo.innerHTML = ''; });
+
+    // ---------- totais (prévia; o banco recalcula em criar_pedido)
+    const subtotal = () => itens.reduce((s, i) => s + i.preco * i.quantidade, 0);
+    const freteDe = (entrega: string) => {
+      if (entrega === 'retirada') return 0;
+      if (entrega === 'expresso') return Number(cfg.frete_expresso);
+      return cfg.frete_gratis_acima != null && subtotal() >= Number(cfg.frete_gratis_acima) ? 0 : Number(cfg.frete_padrao);
+    };
+    const entregaAtual = () => (form.querySelector<HTMLInputElement>('input[name=entrega]:checked')?.value ?? 'padrao');
+    function atualizar() {
+      const ent = entregaAtual();
+      $('[data-bloco-endereco]').hidden = ent === 'retirada';
+      for (const op of ['padrao', 'expresso']) {
+        const v = freteDe(op);
+        form.querySelector(`[data-frete="${op}"]`)!.textContent = v ? brl(v) : 'Grátis';
+      }
+      $('[data-itens]').innerHTML = itens.map((i) => `<li><span>${i.quantidade}× ${esc(i.nome)}</span><span>${brl(i.preco * i.quantidade)}</span></li>`).join('');
+      $('[data-subtotal]').textContent = brl(subtotal());
+      $('[data-frete-total]').textContent = freteDe(ent) ? brl(freteDe(ent)) : 'Grátis';
+      $('[data-total]').textContent = brl(subtotal() + freteDe(ent));
+    }
+    form.addEventListener('change', atualizar);
+    atualizar();
+
+    // ---------- enviar
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      erro('');
+      const nome = campo('nome').value.trim();
+      const telefone = campo('telefone').value.trim();
+      if (nome.length < 3) return erro('Informe seu nome completo.');
+      if (telefone.replace(/\D/g, '').length < 10) return erro('Informe um telefone com DDD.');
+      const entrega = entregaAtual();
+
+      const botao = $<HTMLButtonElement>('[data-enviar]');
+      botao.disabled = true; botao.textContent = 'Enviando pedido…';
+      try {
+        // perfil (nome/telefone vão copiados no pedido)
+        if (nome !== (perfil?.nome ?? '') || telefone !== (perfil?.telefone ?? '')) {
+          const { error } = await sb.from('perfis').upsert({ user_id: user.id, nome, telefone });
+          if (error) throw error;
+        }
+        // endereço
+        let enderecoId: string | null = null;
+        if (entrega !== 'retirada') {
+          if (!blocoNovo.hidden && blocoNovo.innerHTML) {
+            const novo = lerFormEndereco(form);
+            if (!novo.cep || !novo.logradouro || !novo.numero || !novo.bairro || !novo.cidade || !novo.uf) {
+              throw new Error('endereco_incompleto');
+            }
+            const salvo = await salvarEndereco(user.id, novo);
+            enderecos = [...enderecos, salvo];
+            renderEnderecos(salvo.id);
+            blocoNovo.hidden = true; blocoNovo.innerHTML = '';
+            enderecoId = salvo.id;
+          } else {
+            enderecoId = form.querySelector<HTMLInputElement>('input[name=endereco_id]:checked')?.value ?? null;
+          }
+          if (!enderecoId) throw new Error('endereco_invalido');
+        }
+        const pagamento = form.querySelector<HTMLInputElement>('input[name=pagamento]:checked')!.value;
+        const { data, error } = await sb.rpc('criar_pedido', {
+          p_itens: itens.map((i) => ({ cod_red: i.cod_red, quantidade: i.quantidade })),
+          p_entrega: entrega,
+          p_pagamento: pagamento,
+          p_endereco_id: enderecoId,
+          p_parcelas: 1,
+          p_observacao: (form.elements.namedItem('observacao') as HTMLTextAreaElement).value.trim() || null,
+        });
+        if (error) throw error;
+        removerItens(itens.map((i) => i.cod_red)); // os desmarcados continuam no carrinho
+        location.replace(`${BASE}/conta/pedido/?id=${data.id}&novo=1`);
+      } catch (e: any) {
+        botao.disabled = false; botao.textContent = 'Confirmar pedido';
+        if (/endereco_incompleto/.test(e?.message)) return erro('Preencha todos os campos do endereço.');
+        erro(mensagemErro(e));
+        if (/produto_indisponivel|estoque_insuficiente/.test(e?.message)) {
+          await revalidar();
+          itens = itensDoPedido();
+          atualizar();
+        }
+      }
+    });
+
+    $('[data-carregando]').hidden = true;
+    form.hidden = false;
+  </script>
+</Base>
+
+<style>
+  .titulo { margin-top: 12px; }
+  .vazio { background: #fff; border: 1px solid var(--borda); border-radius: 12px; padding: 20px; text-align: center; }
+  .checkout { display: grid; gap: 12px; padding-bottom: 24px; }
+  @media (min-width: 900px) { .checkout { grid-template-columns: 1fr 340px; align-items: start; } .resumo { position: sticky; top: 130px; } }
+  .etapas { display: grid; gap: 12px; }
+  .etapas .painel + .painel { margin-top: 0; }
+  h2 small { font-weight: 400; color: var(--texto-3); font-size: .8rem; }
+  h3 { font-size: .95rem; margin: 14px 0 8px; }
+  .nota { margin: 6px 0 0; font-size: .8rem; color: var(--texto-3); }
+  .opcoes { display: grid; gap: 8px; }
+  :global(.opcao) { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 12px; cursor: pointer; font-size: .9rem; }
+  :global(.opcao:has(input:checked)) { border-color: var(--azul); background: var(--azul-claro); }
+  :global(.opcao input) { width: 18px; height: 18px; accent-color: var(--azul); margin: 0; }
+  :global(.opcao span) { display: grid; gap: 1px; min-width: 0; }
+  :global(.opcao small) { color: var(--texto-3); font-size: .78rem; }
+  :global(.opcao em) { font-style: normal; font-weight: 700; white-space: nowrap; }
+  .opcao--off { opacity: .55; cursor: not-allowed; }
+  .novo-endereco { margin-top: 10px; display: grid; gap: 10px; }
+  .btn--link { margin-top: 8px; font-size: .88rem; }
+  .resumo { display: grid; gap: 10px; }
+  .itens { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: .85rem; max-height: 260px; overflow: auto; }
+  :global(.itens li) { display: flex; justify-content: space-between; gap: 8px; }
+  .totais { display: grid; grid-template-columns: 1fr auto; gap: 4px; margin: 0; font-size: .9rem; border-top: 1px solid var(--borda); padding-top: 10px; }
+  .totais dd { margin: 0; text-align: right; }
+  .totais .total { font-weight: 800; font-size: 1.1rem; }
+</style>

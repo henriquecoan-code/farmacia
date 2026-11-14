@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import ProdutoCard from '../components/ProdutoCard.astro';
+import Catalogo from '../components/Catalogo.astro';
 import { carregarProdutos, destaquesHome, SECOES } from '../lib/catalogo';
 import { loja, enderecoCompleto, linkWhatsApp, PREENCHER } from '../data/loja';
 import { u, urlSecao } from '../lib/url';
@@ -51,7 +52,8 @@ const jsonld = {
     </ul>
   </section>
 
-  <section class="secao" aria-labelledby="t-secoes">
+  <Catalogo>
+  <section class="secao secao--secoes" aria-labelledby="t-secoes">
     <h2 id="t-secoes">Compre por seção</h2>
     <div class="secoes-grade">
       {SECOES.map((s) => (
@@ -68,7 +70,7 @@ const jsonld = {
     <section class="secao" aria-labelledby="t-destaques">
       <div class="secao__topo">
         <h2 id="t-destaques">Ofertas em perfumaria, saúde e bem-estar</h2>
-        <a href={urlSecao('dermocosmeticos')}>Ver mais</a>
+        <a href={u('/ofertas/')}>Ver todas as ofertas</a>
       </div>
       <div class="grade">
         {destaques.map((p, i) => <ProdutoCard produto={p} eager={i < 4} />)}
@@ -82,6 +84,7 @@ const jsonld = {
       Medicamentos controlados e antibióticos são vendidos somente na loja.</p>
     <p class="receita__end">{enderecoCompleto()}</p>
   </section>
+  </Catalogo>
 </Base>
 
 <style>
@@ -98,6 +101,8 @@ const jsonld = {
   .hero__beneficios li { background: rgb(255 255 255 / .1); border: 1px solid rgb(255 255 255 / .18); border-radius: 10px; padding: 8px 12px; display: grid; font-size: .9rem; }
   .hero__beneficios span { color: #dbeafe; font-size: .8rem; }
 
+  /* no computador o submenu lateral já lista as seções */
+  @media (min-width: 1000px) { .secao--secoes { display: none; } }
   .secoes-grade { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); }
   .secao-card {
     display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; text-decoration: none; color: var(--texto);

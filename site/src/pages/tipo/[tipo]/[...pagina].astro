@@ -1,0 +1,41 @@
+---
+// Tipos de medicamento (genéricos, referência, similares, outros) — subníveis da seção Medicamentos.
+import type { GetStaticPaths } from 'astro';
+import Base from '../../../layouts/Base.astro';
+import Catalogo from '../../../components/Catalogo.astro';
+import Listagem from '../../../components/Listagem.astro';
+import { carregarProdutos, SECOES, type Produto } from '../../../lib/catalogo';
+import { NOME_TIPO } from '../../../lib/secoes';
+import { u, urlSecao } from '../../../lib/url';
+
+export const getStaticPaths = (async () => {
+  const POR_PAGINA = 48;
+  const produtos = await carregarProdutos();
+  return SECOES.filter((s) => s.categorias.length > 1).flatMap((secao) => {
+    const tipos = secao.categorias.filter((c) => produtos.some((p) => p.categoria === c));
+    return tipos.flatMap((tipo) => {
+      const itens = produtos.filter((p) => p.categoria === tipo);
+      const total = Math.max(1, Math.ceil(itens.length / POR_PAGINA));
+      return Array.from({ length: total }, (_, i) => ({
+        params: { tipo, pagina: i === 0 ? undefined : String(i + 1) },
+        props: { tipo, tipos, secaoSlug: secao.slug, secaoNome: secao.nome, pagina: i + 1, totalPaginas: total, totalItens: itens.length,
+          itens: itens.slice(i * POR_PAGINA, (i + 1) * POR_PAGINA) },
+      }));
+    });
+  });
+}) satisfies GetStaticPaths;
+
+interface Props { tipo: string; tipos: string[]; secaoSlug: string; secaoNome: string; pagina: number; totalPaginas: number; totalItens: number; itens: Produto[] }
+const { tipo, tipos, secaoSlug, secaoNome, pagina, totalPaginas, totalItens, itens } = Astro.props;
+const nome = NOME_TIPO[tipo] ?? tipo;
+const urlTipo = (c: string, n = 1) => u(n > 1 ? `/tipo/${c}/${n}/` : `/tipo/${c}/`);
+const atalhos = [{ nome: 'Todos', href: urlSecao(secaoSlug) }, ...tipos.map((c) => ({ nome: NOME_TIPO[c] ?? c, href: urlTipo(c), ativo: c === tipo }))];
+---
+<Base title={pagina > 1 ? `${nome} — página ${pagina}` : `Medicamentos: ${nome}`} description={`${nome} na Farmácia São Benedito, com entrega em Lauro Müller e região. ${totalItens} produtos.`}>
+  <Catalogo secao={secaoSlug} tipo={tipo}>
+    <Listagem titulo={nome} migalhas={[{ nome: secaoNome, href: urlSecao(secaoSlug) }, { nome }]}
+      descricao="Procure pelo princípio ativo na busca para comparar referência, genéricos e similares."
+      itens={itens} pagina={pagina} totalPaginas={totalPaginas} totalItens={totalItens}
+      urlPagina={(n) => urlTipo(tipo, n)} atalhos={atalhos} />
+  </Catalogo>
+</Base>

@@ -1,0 +1,60 @@
+---
+// Página de lista de produtos (seção, tipo, ofertas): cabeçalho, atalhos de tipo (telas menores),
+// grade de cards e paginação. Fica dentro do <Catalogo> (submenu lateral).
+import type { Produto } from '../lib/catalogo';
+import ProdutoCard from './ProdutoCard.astro';
+import { u } from '../lib/url';
+
+interface Props {
+  titulo: string;
+  descricao?: string;
+  migalhas: { nome: string; href?: string }[];
+  itens: Produto[];
+  pagina: number;
+  totalPaginas: number;
+  totalItens: number;
+  /** URL da página n (1 = primeira) */
+  urlPagina: (n: number) => string;
+  /** atalhos (chips) mostrados acima da grade em telas sem submenu */
+  atalhos?: { nome: string; href: string; ativo?: boolean }[];
+}
+const { titulo, descricao, migalhas, itens, pagina, totalPaginas, totalItens, urlPagina, atalhos = [] } = Astro.props;
+---
+<nav class="migalhas" aria-label="Você está em">
+  <ol>
+    <li><a href={u('/')}>Início</a></li>
+    {migalhas.map((m) => <li aria-current={m.href ? undefined : 'page'}>{m.href ? <a href={m.href}>{m.nome}</a> : m.nome}</li>)}
+  </ol>
+</nav>
+<header class="cab">
+  <h1>{titulo}</h1>
+</header>
+
+{atalhos.length > 0 && (
+  <nav class="atalhos" aria-label="Filtrar por tipo">
+    {atalhos.map((a) => <a class="chip" href={a.href} aria-current={a.ativo ? 'page' : undefined}>{a.nome}</a>)}
+  </nav>
+)}
+
+<div class="grade">
+  {itens.map((p, i) => <ProdutoCard produto={p} eager={i < 4} />)}
+</div>
+
+{totalPaginas > 1 && (
+  <nav class="paginacao" aria-label="Páginas">
+    {pagina > 1 ? <a class="btn btn--secundario" href={urlPagina(pagina - 1)} rel="prev">← Anterior</a> : <span />}
+    <span>Página {pagina} de {totalPaginas}</span>
+    {pagina < totalPaginas ? <a class="btn btn--secundario" href={urlPagina(pagina + 1)} rel="next">Próxima →</a> : <span />}
+  </nav>
+)}
+
+<style>
+  .cab { padding: 4px 0 10px; }
+  .cab h1 { margin-bottom: 2px; }
+  .cab p { margin: 0; color: var(--texto-2); font-size: .88rem; }
+  .cab__dica { margin-top: 4px !important; font-size: .82rem !important; color: var(--texto-3) !important; }
+  .atalhos { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-bottom: 10px; }
+  .atalhos::-webkit-scrollbar { display: none; }
+  .chip { white-space: nowrap; border: 1px solid #cbd5e1; background: #fff; color: var(--texto-2); border-radius: 999px; padding: 5px 12px; font-size: .84rem; text-decoration: none; }
+  .chip[aria-current='page'] { background: var(--azul); border-color: var(--azul); color: #fff; }
+</style>

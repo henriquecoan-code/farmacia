@@ -1,0 +1,37 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Nova senha" noindex>
+  <section class="painel pagina-estreita">
+    <h1 class="titulo">Criar nova senha</h1>
+    <form class="form" data-form>
+      <label class="campo"><span>Nova senha <small>(mínimo 8 caracteres)</small></span><input name="senha" type="password" autocomplete="new-password" required minlength="8" /></label>
+      <p class="msg" data-msg hidden></p>
+      <button class="btn btn--primario btn--bloco" type="submit">Salvar nova senha</button>
+    </form>
+  </section>
+
+  <script>
+    import { cliente, mensagemErro, usuarioAtual, BASE } from '../scripts/sessao';
+    const sb = cliente();
+    const form = document.querySelector<HTMLFormElement>('[data-form]')!;
+    const msg = form.querySelector<HTMLElement>('[data-msg]')!;
+    const mostrar = (t: string, ok = false) => { msg.textContent = t; msg.hidden = !t; msg.className = `msg ${ok ? 'msg--ok' : 'msg--erro'}`; };
+
+    // O link do e-mail abre esta página já com a sessão de recuperação (detectSessionInUrl)
+    setTimeout(async () => {
+      if (!(await usuarioAtual())) mostrar('Link inválido ou expirado. Peça um novo em "Entrar" → "Esqueci a senha".');
+    }, 1500);
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const senha = String(new FormData(form).get('senha'));
+      if (senha.length < 8) return mostrar('A senha precisa ter pelo menos 8 caracteres.');
+      const { error } = await sb.auth.updateUser({ password: senha });
+      if (error) return mostrar(mensagemErro(error));
+      mostrar('Senha alterada! Indo para a sua conta…', true);
+      setTimeout(() => location.replace(`${BASE}/conta/`), 1200);
+    });
+  </script>
+</Base>
+<style>.titulo { font-size: 1.2rem; }</style>
