@@ -8,7 +8,6 @@ import { u } from '../lib/url';
     <div class="carrinho__lista" data-lista><p class="vazio">Carregando…</p></div>
     <aside class="resumo" data-resumo hidden>
       <p class="resumo__linha"><span data-total-rotulo>Total</span><strong data-total>R$ 0,00</strong></p>
-      <p class="aviso aviso--receita" data-aviso-receita hidden>Há medicamento de venda sob prescrição: apresente a receita na entrega ou retirada.</p>
       <a class="btn btn--primario btn--bloco" href={u('/checkout/')} data-finalizar>Finalizar compra</a>
       <p class="resumo__nota">Frete e valor final são calculados ao finalizar.</p>
     </aside>
@@ -76,7 +75,6 @@ import { u } from '../lib/url';
       const sel = itensDoPedido(itens);
       document.querySelector('[data-total]')!.textContent = brl(sel.reduce((s, i) => s + i.preco * i.quantidade, 0));
       document.querySelector('[data-total-rotulo]')!.textContent = `Total (${sel.length} de ${itens.length} itens)`;
-      (document.querySelector('[data-aviso-receita]') as HTMLElement).hidden = !sel.some((i) => i.tipo_venda === 'prescricao');
       document.querySelector('[data-finalizar]')!.classList.toggle('desativado', sel.length === 0);
       resumo.hidden = false;
     }
