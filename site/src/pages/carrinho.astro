@@ -19,7 +19,6 @@ import { u } from '../lib/url';
       <input type="checkbox" class="item__sel" aria-label="Incluir no pedido" />
       <div class="item__info">
         <a class="item__nome"></a>
-        <span class="selo selo--receita" hidden>Exige receita</span>
         <span class="item__preco"></span>
       </div>
       <div class="item__qtd">
@@ -58,7 +57,6 @@ import { u } from '../lib/url';
         const nome = el.querySelector<HTMLAnchorElement>('.item__nome')!;
         nome.textContent = it.nome;
         nome.href = `${base}/produto/${it.slug}/`;
-        (el.querySelector('.selo') as HTMLElement).hidden = it.tipo_venda !== 'prescricao';
         el.querySelector('.item__preco')!.textContent = `${brl(it.preco)} cada`;
         const q = el.querySelector<HTMLInputElement>('input[type=number]')!;
         q.value = String(it.quantidade);

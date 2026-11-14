@@ -27,6 +27,8 @@ export async function atualizarAoVivo() {
   if (precoEl) precoEl.textContent = brl(Number(data.preco));
   const maxEl = art.querySelector<HTMLElement>('[data-ao-vivo="preco_maximo"]');
   if (maxEl) maxEl.textContent = brl(Number(data.preco_maximo));
+  const pctEl = art.querySelector<HTMLElement>('[data-ao-vivo="percentual"]');
+  if (pctEl && Number(data.preco_maximo) > 0) pctEl.textContent = `-${Math.round((1 - Number(data.preco) / Number(data.preco_maximo)) * 100)}%`;
   if (qtd) qtd.max = String(data.estoque);
   if (botao?.dataset.produto) {
     const dados = JSON.parse(botao.dataset.produto);

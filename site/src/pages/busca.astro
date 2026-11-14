@@ -1,38 +1,135 @@
 ---
 import Base from '../layouts/Base.astro';
 import { u } from '../lib/url';
+import { SECOES } from '../lib/secoes';
 ---
 <Base title="Buscar produtos" description="Busque medicamentos, marcas e princípios ativos na Farmácia São Benedito.">
-  <h1 class="titulo">Buscar produtos</h1>
-  <p class="dica">Busque pelo nome, pela marca ou pelo princípio ativo (por exemplo, "dipirona" ou "losartana").</p>
-  <div id="busca" class="busca-pf"></div>
+  <nav class="migalhas" aria-label="Você está em"><ol><li><a href={u('/')}>Início</a></li><li aria-current="page">Busca</li></ol></nav>
+  <header class="cab">
+    <h1 data-titulo>Buscar produtos</h1>
+    <p class="cab__info" data-info aria-live="polite">Busque pelo nome, pela marca ou pelo princípio ativo.</p>
+  </header>
+
+  <div class="ferramentas" data-ferramentas hidden>
+    <div class="filtros" role="group" aria-label="Filtrar por seção" data-filtros>
+      <button type="button" class="chip" aria-pressed="true" data-secao="">Todas</button>
+      {SECOES.map((s) => <button type="button" class="chip" aria-pressed="false" data-secao={s.nome}>{s.nome}<span class="chip__n"></span></button>)}
+    </div>
+    <label class="ordem">
+      <span>Ordenar</span>
+      <select data-ordem>
+        <option value="">Mais relevantes</option>
+        <option value="asc">Menor preço</option>
+        <option value="desc">Maior preço</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="grade" data-resultados></div>
+  <p class="mais"><button type="button" class="btn btn--secundario" data-mais hidden>Ver mais produtos</button></p>
   <noscript><p class="aviso aviso--erro">A busca precisa de JavaScript ativado.</p></noscript>
 
-  <link slot="head" rel="stylesheet" href={u('/pagefind/pagefind-ui.css')} />
-  <script is:inline define:vars={{ base: u('/') }}>
-    // O índice (pagefind/) é gerado no build: `npm run build`. No `npm run dev` a busca não existe.
-    const s = document.createElement('script');
-    s.src = `${base}pagefind/pagefind-ui.js`;
-    s.onload = () => {
-      // eslint-disable-next-line no-undef
-      const ui = new PagefindUI({
-        element: '#busca', showImages: false, showSubResults: false, resetStyles: false, pageSize: 12,
-        translations: { placeholder: 'Buscar remédio, marca ou princípio ativo', zero_results: 'Nada encontrado para [SEARCH_TERM]',
-          many_results: '[COUNT] resultados para [SEARCH_TERM]', one_result: '1 resultado para [SEARCH_TERM]', load_more: 'Ver mais resultados',
-          clear_search: 'Limpar', filters_label: 'Filtros' },
+  <script>
+    import { cardHtml, type ProdutoBusca } from '../scripts/card-html';
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+    const POR_PAGINA = 24;
+    const $ = <T extends HTMLElement>(s: string) => document.querySelector<T>(s)!;
+    const grade = $('[data-resultados]');
+    const info = $('[data-info]');
+    const mais = $<HTMLButtonElement>('[data-mais]');
+    const ferramentas = $('[data-ferramentas]');
+    const ordem = $<HTMLSelectElement>('[data-ordem]');
+
+    const params = new URLSearchParams(location.search);
+    const q = (params.get('q') || '').trim();
+    let secao = params.get('secao') || '';
+    let resultados: any[] = [];
+    let mostrados = 0;
+    let pagefind: any;
+
+    const campo = document.querySelector<HTMLInputElement>('#q');
+    if (campo) campo.value = q;
+
+    async function carregar() {
+      if (!pagefind) {
+        try {
+          pagefind = await import(/* @vite-ignore */ `${base}/pagefind/pagefind.js`);
+          await pagefind.options({ excerptLength: 0 });
+          await pagefind.filters(); // carrega os filtros; sem isso a contagem por seção vem vazia
+        } catch {
+          info.textContent = 'A busca fica disponível na versão publicada do site (é gerada no build).';
+          return;
+        }
+      }
+      info.textContent = 'Buscando…';
+      const opts: any = {};
+      if (secao) opts.filters = { secao };
+      if (ordem.value) opts.sort = { preco: ordem.value };
+      const busca = await pagefind.search(q, opts);
+      resultados = busca.results;
+      // contagem por seção (sem o filtro aplicado)
+      const geral = secao ? await pagefind.search(q) : busca;
+      const contas = geral.filters?.secao ?? {};
+      document.querySelectorAll<HTMLButtonElement>('[data-secao]').forEach((b) => {
+        const nome = b.dataset.secao!;
+        b.setAttribute('aria-pressed', String(nome === secao));
+        const n = b.querySelector('.chip__n');
+        if (n) n.textContent = contas[nome] ? ` ${contas[nome]}` : ' 0';
+        b.hidden = !!nome && !contas[nome] && nome !== secao;
       });
-      const q = new URLSearchParams(location.search).get('q');
-      if (q) ui.triggerSearch(q);
-    };
-    s.onerror = () => {
-      document.getElementById('busca').innerHTML = '<p class="aviso aviso--erro">A busca ainda não está disponível nesta versão do site.</p>';
-    };
-    document.head.appendChild(s);
+      grade.replaceChildren();
+      mostrados = 0;
+      const total = resultados.length;
+      info.textContent = total
+        ? `${total.toLocaleString('pt-BR')} ${total === 1 ? 'produto encontrado' : 'produtos encontrados'}`
+        : 'Nenhum produto encontrado. Tente outro nome, a marca ou o princípio ativo.';
+      ferramentas.hidden = false;
+      await mostrarMais();
+    }
+
+    async function mostrarMais() {
+      const lote = resultados.slice(mostrados, mostrados + POR_PAGINA);
+      const dados = await Promise.all(lote.map((r) => r.data()));
+      const html = dados.map((d) => {
+        try { return cardHtml(JSON.parse(d.meta.produto) as ProdutoBusca, base); } catch { return ''; }
+      }).join('');
+      grade.insertAdjacentHTML('beforeend', html);
+      mostrados += lote.length;
+      mais.hidden = mostrados >= resultados.length;
+    }
+
+    document.querySelector('[data-filtros]')!.addEventListener('click', (ev) => {
+      const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-secao]');
+      if (!b) return;
+      secao = b.dataset.secao || '';
+      const url = new URL(location.href);
+      secao ? url.searchParams.set('secao', secao) : url.searchParams.delete('secao');
+      history.replaceState(null, '', url);
+      carregar();
+    });
+    ordem.addEventListener('change', carregar);
+    mais.addEventListener('click', mostrarMais);
+
+    if (q) {
+      $('[data-titulo]').textContent = `Resultados para “${q}”`;
+      document.title = `${q} | Busca | Farmácia São Benedito`;
+      carregar();
+    } else {
+      campo?.focus();
+    }
   </script>
 </Base>
 
 <style>
-  .titulo { margin-top: 16px; }
-  .dica { color: var(--texto-2); }
-  .busca-pf { --pagefind-ui-primary: #1e40af; --pagefind-ui-border-radius: 10px; --pagefind-ui-font: inherit; margin-bottom: 32px; }
+  .cab { padding: 8px 0 12px; }
+  .cab__info { margin: 0; color: var(--texto-2); }
+  .ferramentas { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .filtros { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+  .filtros::-webkit-scrollbar { display: none; }
+  .chip { white-space: nowrap; border: 1px solid #cbd5e1; background: #fff; color: var(--texto-2); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: .88rem; cursor: pointer; }
+  .chip[aria-pressed='true'] { background: var(--azul); border-color: var(--azul); color: #fff; }
+  .chip__n { opacity: .75; }
+  .ordem { display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--texto-2); }
+  .ordem select { height: 38px; border: 1px solid #cbd5e1; border-radius: 10px; padding: 0 10px; font: inherit; background: #fff; }
+  .mais { text-align: center; padding: 20px 0; margin: 0; }
 </style>

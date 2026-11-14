@@ -22,17 +22,18 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; } /* classes com display (botões, flex) não podem anular o atributo hidden */
 html { -webkit-text-size-adjust: 100%; }
 body {
-  margin: 0; font-family: var(--fonte); font-size: 16px; line-height: 1.5;
+  margin: 0; font-family: var(--fonte); font-size: 15px; line-height: 1.5;
   color: var(--texto); background: var(--fundo);
 }
 img { max-width: 100%; height: auto; display: block; }
 a { color: var(--azul); }
 a:hover { color: var(--azul-escuro); }
 h1, h2, h3 { line-height: 1.25; margin: 0 0 .5em; }
-h1 { font-size: clamp(1.4rem, 1.1rem + 1.2vw, 2rem); }
-h2 { font-size: clamp(1.15rem, 1rem + .6vw, 1.45rem); }
+h1 { font-size: clamp(1.2rem, 1.05rem + .7vw, 1.6rem); }
+h2 { font-size: clamp(1.05rem, .98rem + .35vw, 1.25rem); }
 :focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; border-radius: 4px; }
 
 .container { width: 100%; max-width: var(--largura); margin: 0 auto; padding: 0 16px; }
@@ -69,15 +70,17 @@ h2 { font-size: clamp(1.15rem, 1rem + .6vw, 1.45rem); }
 .preencher { background: #fef9c3; color: #854d0e; padding: 0 4px; border-radius: 4px; }
 
 /* ---------- grade de produtos ---------- */
-.grade { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 640px) { .grade { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
-@media (min-width: 960px) { .grade { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.grade { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 560px) { .grade { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } }
+@media (min-width: 800px) { .grade { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .grade { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (min-width: 1180px) { .grade { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 
-.secao { padding: 24px 0; }
+.secao { padding: 14px 0; }
 .secao__topo { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .secao__topo a { font-weight: 600; text-decoration: none; white-space: nowrap; }
 
-.migalhas { font-size: .875rem; color: var(--texto-3); padding: 12px 0 4px; }
+.migalhas { font-size: .8rem; color: var(--texto-3); padding: 8px 0 2px; }
 .migalhas ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
 .migalhas li + li::before { content: '›'; margin-right: 4px; }
 .migalhas a { color: var(--texto-2); text-decoration: none; }

@@ -24,27 +24,7 @@ export interface Produto {
   fotos: string[];
 }
 
-export interface Secao {
-  slug: string;
-  nome: string;
-  descricao: string;
-  categorias: string[];
-  cor: string; // cor do card sem foto
-}
-
-export const SECOES: Secao[] = [
-  { slug: 'medicamentos', nome: 'Medicamentos', descricao: 'Genéricos, referência e similares.', categorias: ['genericos', 'referencia', 'similares', 'medicamentos'], cor: '#1e40af' },
-  { slug: 'dermocosmeticos', nome: 'Perfumaria e dermocosméticos', descricao: 'Cuidados com a pele, cabelo, higiene e perfumaria.', categorias: ['dermocosmeticos'], cor: '#9d174d' },
-  { slug: 'suplementos', nome: 'Suplementos e conveniência', descricao: 'Vitaminas, suplementos e itens de conveniência.', categorias: ['suplementos'], cor: '#047857' },
-  { slug: 'hospitalares', nome: 'Saúde e correlatos', descricao: 'Curativos, aparelhos e materiais de saúde.', categorias: ['hospitalares'], cor: '#b45309' },
-];
-
-export const NOME_CATEGORIA: Record<string, string> = {
-  genericos: 'Genérico', referencia: 'Referência', similares: 'Similar', medicamentos: 'Medicamento',
-  dermocosmeticos: 'Perfumaria e dermocosméticos', suplementos: 'Suplementos e conveniência', hospitalares: 'Saúde e correlatos',
-};
-
-export const secaoDaCategoria = (cat: string) => SECOES.find((s) => s.categorias.includes(cat)) ?? SECOES[0];
+export { SECOES, NOME_CATEGORIA, secaoDaCategoria, brl, type Secao } from './secoes';
 
 const CATEGORIAS_MEDICAMENTO = new Set(['genericos', 'referencia', 'similares', 'medicamentos']);
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -56,7 +36,7 @@ async function doSupabase(url: string, key: string): Promise<Produto[]> {
   const passo = 1000;
   for (let ini = 0; ; ini += passo) {
     const res = await fetch(`${url}/rest/v1/produtos_publicos?select=*&order=cod_red`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}`, Range: `${ini}-${ini + passo - 1}`, 'Range-Unit': 'items' },
+      headers: { apikey: key, Range: `${ini}-${ini + passo - 1}`, 'Range-Unit': 'items' },
     });
     if (!res.ok) throw new Error(`Supabase respondeu HTTP ${res.status} ao ler produtos_publicos`);
     const lote = (await res.json()) as any[];
@@ -136,7 +116,6 @@ export function carregarProdutos(): Promise<Produto[]> {
 
 export const temDesconto = (p: Produto) => p.preco_maximo > p.preco + 0.004;
 export const percentualDesconto = (p: Produto) => Math.round((1 - p.preco / p.preco_maximo) * 100);
-export const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 // Destaques da home: só MIP (RDC 96/2008). Sem destaque marcado no admin, mostra os maiores descontos.
 export function destaquesHome(produtos: Produto[], n = 12): Produto[] {

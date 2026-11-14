@@ -32,7 +32,7 @@ $sbFile = "C:\Keys\supabase-db-url.txt"
 if (-not (Test-Path $sbFile)) { Write-Error "Crie $sbFile com a connection string do Supabase."; exit 1 }
 $env:SUPABASE_DB_URL = (Get-Content $sbFile -Raw).Trim()
 # Certificado CA do Supabase (Project Settings > Database > SSL Configuration > Download certificate)
-if (Test-Path "C:\Keys\supabase-ca.crt") { $env:SUPABASE_DB_CA = "C:\Keys\supabase-ca.crt" }
+foreach ($ca in "C:\Keys\supabase-ca.crt", "C:\Keys\prod-ca-2021.crt") { if (Test-Path $ca) { $env:SUPABASE_DB_CA = $ca; break } }
 
 # --- Build automático do site (opcional) ---
 if (Test-Path "C:\Keys\github-dispatch-token.txt") {

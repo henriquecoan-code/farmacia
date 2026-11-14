@@ -32,7 +32,7 @@ for (const k of ['PGHOST', 'PGDATABASE', 'PGUSER', 'SUPABASE_DB_URL']) {
 const filial = Number(env.ESTOQUE_COD_FILIAL || 3);
 if (!Number.isInteger(filial)) { console.error('ESTOQUE_COD_FILIAL inválido'); process.exit(1); }
 const limit = Number(env.SYNC_LIMIT || 0);
-const sampleIds = (env.SYNC_SAMPLE_IDS || '').split(',').map((s) => Number(s.trim())).filter(Number.isInteger);
+const sampleIds = (env.SYNC_SAMPLE_IDS || '').split(',').map((s) => s.trim()).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n > 0);
 const amostra = sampleIds.length > 0 || limit > 0;
 
 // ------------------------------------------------------------------ ERP (somente leitura)
@@ -52,6 +52,8 @@ async function lerErp() {
       WHERE p.flg_ativo = 'A'
         -- SNGPC: classe terapêutica 1 = antimicrobiano, 2 = controle especial -> nunca vão para o site
         AND (p.tip_classeterapeutica IS NULL OR NULLIF(TRIM(p.tip_classeterapeutica::text), '') IS NULL)
+        -- listas da Portaria 344 (A1..C5) e 'T' (antimicrobiano) em tip_lista: também ficam fora
+        AND NULLIF(TRIM(COALESCE(p.tip_lista::text, '')), '') IS NULL
         ${sampleIds.length ? `AND p.cod_reduzido IN (${sampleIds.join(',')})` : ''}
       ORDER BY p.cod_reduzido
       ${limit > 0 ? `LIMIT ${Math.trunc(limit)}` : ''}`;

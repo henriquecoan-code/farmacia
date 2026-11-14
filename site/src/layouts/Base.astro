@@ -1,7 +1,9 @@
 ---
 import '../styles/global.css';
+import '../styles/produto-card.css';
 import { loja, enderecoCompleto, linkWhatsApp, PREENCHER } from '../data/loja';
 import { SECOES } from '../lib/catalogo';
+import { MENU_SECAO } from '../lib/secoes';
 import { u, urlSecao } from '../lib/url';
 
 interface Props {
@@ -77,7 +79,13 @@ const ano = new Date().getFullYear();
       </div>
       <nav class="secoes" aria-label="Seções da loja">
         <div class="container secoes__in">
-          {SECOES.map((s) => <a href={urlSecao(s.slug)} aria-current={Astro.url.pathname.includes(`/categoria/${s.slug}/`) ? 'page' : undefined}>{s.nome}</a>)}
+          {SECOES.map((s) => (
+            <a href={urlSecao(s.slug)} aria-current={Astro.url.pathname.includes(`/categoria/${s.slug}/`) ? 'page' : undefined}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={MENU_SECAO[s.slug].icone} />
+              <span class="secoes__nome">{s.nome}</span>
+              <span class="secoes__curto">{MENU_SECAO[s.slug].curto}</span>
+            </a>
+          ))}
         </div>
       </nav>
     </header>
@@ -120,15 +128,28 @@ const ano = new Date().getFullYear();
       import { lerCarrinho, totalItens, adicionar } from '../scripts/carrinho';
       // Botões "Adicionar" (cards e página de produto)
       document.addEventListener('click', (ev) => {
+        // − / + da quantidade nos cards
+        const passo = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-qtd-passo]');
+        if (passo) {
+          const input = passo.parentElement?.querySelector<HTMLInputElement>('input');
+          if (input) {
+            const max = Number(input.max) || 999;
+            input.value = String(Math.min(max, Math.max(1, (Number(input.value) || 1) + Number(passo.dataset.qtdPasso))));
+          }
+          return;
+        }
         const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-add-carrinho]');
         if (!btn) return;
         const dados = JSON.parse(btn.dataset.produto || '{}');
-        const qtdEl = btn.dataset.qtdInput ? document.getElementById(btn.dataset.qtdInput) as HTMLInputElement | null : null;
+        const qtdEl = btn.dataset.qtdInput
+          ? document.getElementById(btn.dataset.qtdInput) as HTMLInputElement | null
+          : btn.closest('.card')?.querySelector<HTMLInputElement>('.qtd-mini input') ?? null;
         adicionar(dados, Math.max(1, Number(qtdEl?.value) || 1));
-        const original = btn.textContent;
-        btn.textContent = 'Adicionado ✓';
+        if (qtdEl && !btn.dataset.qtdInput) qtdEl.value = '1';
+        const original = btn.innerHTML;
+        btn.innerHTML = btn.closest('.card') ? '✓ <span class="card__add-txt">Adicionado</span>' : 'Adicionado ✓';
         btn.disabled = true;
-        setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1400);
+        setTimeout(() => { btn.innerHTML = original; btn.disabled = false; }, 1400);
       });
       const atualizar = () => {
         const n = totalItens(lerCarrinho());
@@ -165,16 +186,33 @@ const ano = new Date().getFullYear();
   .acao { position: relative; display: flex; flex-direction: column; align-items: center; font-size: .75rem; color: var(--texto-2); text-decoration: none; padding: 4px 8px; border-radius: 8px; }
   .acao:hover { background: var(--fundo); color: var(--azul); }
   .contador { position: absolute; top: -2px; right: 2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--vermelho); color: #fff; font-size: .72rem; font-weight: 700; display: grid; place-items: center; }
+  .contador[hidden] { display: none; }
   @media (max-width: 720px) {
     .topo__in { grid-template-columns: auto auto; grid-template-areas: 'marca acoes' 'busca busca'; }
     .marca { grid-area: marca; } .acoes { grid-area: acoes; justify-self: end; } .busca { grid-area: busca; }
   }
 
   .secoes { border-top: 1px solid var(--borda); }
-  .secoes__in { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-  .secoes__in::-webkit-scrollbar { display: none; }
-  .secoes a { white-space: nowrap; padding: 10px 12px; font-weight: 600; font-size: .92rem; color: var(--texto-2); text-decoration: none; border-bottom: 3px solid transparent; }
+  .secoes__in { display: flex; justify-content: center; gap: 8px; }
+  .secoes a {
+    display: flex; align-items: center; gap: 8px; white-space: nowrap; padding: 10px 14px;
+    font-weight: 600; font-size: .92rem; color: var(--texto-2); text-decoration: none; border-bottom: 3px solid transparent;
+  }
+  .secoes svg { flex: none; color: var(--azul); }
   .secoes a:hover, .secoes a[aria-current='page'] { color: var(--azul); border-bottom-color: var(--azul); }
+  .secoes__curto { display: none; }
+  /* telas médias: nomes curtos ao lado do ícone */
+  @media (max-width: 1000px) {
+    .secoes__nome { display: none; }
+    .secoes__curto { display: block; }
+  }
+  /* celular: 4 colunas iguais, ícone em cima e nome curto embaixo */
+  @media (max-width: 720px) {
+    .secoes__in { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; padding: 0 4px; }
+    .secoes a { flex-direction: column; gap: 2px; padding: 8px 2px 6px; font-size: .72rem; text-align: center; }
+    .secoes__nome { display: none; }
+    .secoes__curto { display: block; }
+  }
 
   main { min-height: 50vh; }
 
