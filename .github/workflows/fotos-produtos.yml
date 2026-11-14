@@ -1,0 +1,51 @@
+# Trata as fotos enviadas para fotos-entrada/ e salva em site/public/produtos/<EAN>.webp
+# (pares produto -> código de barras; ver site/scripts/fotos-produtos.mjs)
+name: Fotos de produtos
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'fotos-entrada/*'   # só a pasta de entrada (não dispara para fotos-entrada/revisar/)
+  workflow_dispatch:
+
+concurrency:
+  group: fotos-produtos
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  processar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Instalar dependências
+        working-directory: site
+        run: npm ci
+
+      - name: Tratar fotos
+        working-directory: site
+        run: node scripts/fotos-produtos.mjs
+
+      - name: Salvar no repositório
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A fotos-entrada site/public/produtos
+          if git diff --cached --quiet; then echo "Nada mudou."; exit 0; fi
+          git commit -m "Fotos de produtos processadas"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 5
+          done
+          exit 1

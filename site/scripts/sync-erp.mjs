@@ -10,7 +10,8 @@
 //   SYNC_LIMIT / SYNC_SAMPLE_IDS   amostra para teste (desliga o "zerar ausentes")
 //   ESTOQUE_COD_FILIAL   filial do estoque (padrão 3)
 //   ERP_EXPR_PRESCRICAO  (opcional) expressão SQL booleana sobre "p" (cadprodu) que indica venda sob prescrição
-//   ERP_EXPR_EAN         (opcional) expressão SQL que devolve o EAN do produto
+//   ERP_EXPR_EAN         (opcional) expressão SQL que devolve o(s) EAN(s) do produto, separados por vírgula.
+//                        Padrão: todos os códigos da tabela cadcdbar (gtin ou cod_barra) do produto.
 //   GITHUB_TOKEN + GITHUB_REPO   (opcional) dispara o build do site quando o catálogo muda
 // As expressões ERP_EXPR_* vêm do runner .ps1 (configuração local do operador), nunca de entrada externa.
 import pg from 'pg';
@@ -65,7 +66,10 @@ async function lerErp() {
     }
 
     const exprPresc = env.ERP_EXPR_PRESCRICAO ? `(${env.ERP_EXPR_PRESCRICAO})` : 'NULL::boolean';
-    const exprEan = env.ERP_EXPR_EAN ? `(${env.ERP_EXPR_EAN})::text` : 'NULL::text';
+    // Códigos de barras: cadcdbar (um produto pode ter vários). O site liga a foto produtos/<EAN>.webp por eles.
+    const EAN_PADRAO = `SELECT string_agg(DISTINCT COALESCE(NULLIF(TRIM(b.gtin), ''), b.cod_barra::text), ',')
+                          FROM cadcdbar b WHERE b.cod_rede = p.cod_rede AND b.cod_reduzido = p.cod_reduzido`;
+    const exprEan = `(${env.ERP_EXPR_EAN || EAN_PADRAO})::text`;
     const res = await erp.query(`
       SELECT p.cod_reduzido AS cod_red, p.nom_produto AS nome, p.nom_prodcomp AS nome_comp, p.cod_grupo,
              p.vlr_venda, p.prc_desconto, d.nom_dcb AS dcb, l.nom_laborat AS laboratorio,
