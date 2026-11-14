@@ -23,6 +23,7 @@ $env:PG_STATEMENT_TIMEOUT = "60000"
 
 # Preencher depois do passo 0 (run-erp-investigar.ps1). Ex.: "p.flg_receita = 'S'"
 # $env:ERP_EXPR_PRESCRICAO = ""
+# EAN: o padrão já lê todos os códigos da tabela cadcdbar. Só defina para trocar a regra.
 # $env:ERP_EXPR_EAN = ""
 
 # --- Supabase (banco do site) ---

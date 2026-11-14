@@ -93,7 +93,10 @@ export function linhaParaProduto(r, F) {
   const tipoVenda = (r.prescricao === true || r.prescricao === false)
     ? (r.prescricao ? 'prescricao' : 'mip')
     : (CATEGORIAS_MEDICAMENTO.has(categoria) ? 'prescricao' : 'mip');
-  const ean = r.ean ? String(r.ean).replace(/\D/g, '') || null : null;
+  // Um ou mais EANs separados por vírgula/espaço (cadcdbar); cada um só com dígitos
+  const ean = r.ean
+    ? [...new Set(String(r.ean).split(/[,;\s]+/).map((e) => e.replace(/\D/g, '')).filter(Boolean))].join(',') || null
+    : null;
   const base = {
     cod_red: codRed,
     slug: slugify(nome, codRed),

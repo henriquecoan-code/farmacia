@@ -1,7 +1,7 @@
 // Catálogo usado no BUILD (páginas estáticas).
 // Fonte: view produtos_publicos do Supabase; sem Supabase configurado, usa ../data/products.json
 // (exportação antiga do site) como exemplo, para desenvolver o visual.
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 // regras compartilhadas com o sync do ERP (módulo JS)
 import { carregarFiltros, motivosBloqueio } from '../../scripts/lib/produtos-erp.mjs';
@@ -96,6 +96,31 @@ function doExemplo(): Produto[] {
     });
 }
 
+// Fotos tiradas na farmácia (scripts/fotos-produtos.mjs): public/produtos/<EAN>.webp.
+// Produto sem foto cadastrada no admin ganha a foto cujo EAN bate com um dos códigos dele (cadcdbar).
+const normalizarEan = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '');
+function fotosPorEan(): Map<string, string> {
+  const mapa = new Map<string, string>();
+  let arquivos: string[] = [];
+  try { arquivos = readdirSync(resolve(process.cwd(), 'public/produtos')); } catch { return mapa; }
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  for (const a of arquivos) {
+    const m = /^(\d+)\.webp$/i.exec(a);
+    if (m) mapa.set(normalizarEan(m[1]), `${base}/produtos/${a}`);
+  }
+  return mapa;
+}
+function ligarFotos(lista: Produto[]): Produto[] {
+  const fotos = fotosPorEan();
+  if (!fotos.size) return lista;
+  for (const p of lista) {
+    if (p.fotos?.length || !p.ean) continue;
+    const foto = p.ean.split(',').map(normalizarEan).map((e) => fotos.get(e)).find(Boolean);
+    if (foto) p.fotos = [foto];
+  }
+  return lista;
+}
+
 let cache: Promise<Produto[]> | null = null;
 export function carregarProdutos(): Promise<Produto[]> {
   if (!cache) {
@@ -103,7 +128,7 @@ export function carregarProdutos(): Promise<Produto[]> {
     const key = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
     cache = (url && key ? doSupabase(url, key) : Promise.resolve(doExemplo())).then((lista) => {
       if (!url) console.warn(`[catalogo] Supabase não configurado: usando ${lista.length} produtos de exemplo (data/products.json).`);
-      return lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      return ligarFotos(lista).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     });
   }
   return cache;

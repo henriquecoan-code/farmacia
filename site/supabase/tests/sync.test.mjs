@@ -30,6 +30,7 @@ test('regras portadas: preço, categoria, perfumaria, slug, bloqueio', () => {
   assert.ok(bloq.motivos_bloqueio.some((m) => m.startsWith('palavra:')));
   assert.equal(linhaParaProduto(erp({ prescricao: false }), F).tipo_venda, 'mip');
   assert.equal(linhaParaProduto(erp({ ean: '789-1234' }), F).ean, '7891234');
+  assert.equal(linhaParaProduto(erp({ ean: '7898755181432, 07898755181432,7898755181432' }), F).ean, '7898755181432,07898755181432');
 });
 
 let db;
