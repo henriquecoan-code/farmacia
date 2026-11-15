@@ -22,8 +22,45 @@ if ($GuardarSenha) {
   $sec = Read-Host "Senha do Postgres do ERP (usuario consulta)" -AsSecureString
   if ($sec.Length -eq 0) { Write-Error "Senha vazia: nada foi gravado."; exit 1 }
   $sec | ConvertFrom-SecureString | Set-Content -Path $senhaFile -Encoding ASCII
+  # Confere na hora que da para ler de volta
+  try { Get-Content $senhaFile -Raw | ForEach-Object { $_.Trim() } | ConvertTo-SecureString -ErrorAction Stop | Out-Null }
+  catch { Write-Error "A senha foi gravada, mas nao consegui ler de volta: $($_.Exception.Message)"; exit 1 }
   Write-Host "Senha guardada em $senhaFile (cifrada para o usuario $env:USERNAME neste computador)."
   exit 0
+}
+
+# ------------------------------------------------------------------ log e aviso (so no modo agendado)
+$logFile = $null
+$hcUrl = $null
+if ($Agendado) {
+  # Roda da raiz do projeto, seja qual for a pasta de onde a tarefa foi chamada
+  Set-Location (Resolve-Path (Join-Path $PSScriptRoot "..\.."))
+  if (-not (Test-Path $pastaLogs)) { New-Item -ItemType Directory -Path $pastaLogs -Force | Out-Null }
+  $logFile = Join-Path $pastaLogs ("sync-{0}-{1}.log" -f $Modo, (Get-Date -Format "yyyy-MM"))
+  # C:\Keys\healthchecks.json = { "sync-estoque": "https://hc-ping.com/...", "sync-completo": "..." }
+  # Sem o arquivo (ou sem a chave), nao avisa.
+  $hcFile = "C:\Keys\healthchecks.json"
+  if (Test-Path $hcFile) {
+    try { $hcUrl = (Get-Content $hcFile -Raw | ConvertFrom-Json)."sync-$Modo" } catch { $hcUrl = $null }
+  }
+}
+# Uma falha no aviso nunca derruba o sync
+function Avisar([string]$sufixo, [string]$corpo) {
+  if (-not $hcUrl) { return }
+  try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $bytes = [Text.Encoding]::UTF8.GetBytes($corpo)
+    Invoke-WebRequest -Uri ($hcUrl.TrimEnd('/') + $sufixo) -Method Post -Body $bytes -TimeoutSec 15 -UseBasicParsing | Out-Null
+  } catch { }
+}
+# Erro antes de o sync comecar: no modo agendado tambem vai para o log e para o healthchecks
+function Falhar([string]$msg) {
+  if ($Agendado) {
+    Add-Content -Path $logFile -Value @(("=== {0:yyyy-MM-dd HH:mm:ss} modo={1} codigo=1 (nao iniciou)" -f (Get-Date), $Modo), $msg) -Encoding UTF8
+    Avisar "/fail" $msg
+  }
+  Write-Error $msg
+  exit 1
 }
 
 # --- ERP (somente leitura) ---
@@ -34,15 +71,14 @@ $env:PGUSER = "consulta"
 if (-not $env:PGPASSWORD) {
   if (Test-Path $senhaFile) {
     try {
-      $sec = Get-Content $senhaFile -Raw | ConvertTo-SecureString
+      # Trim: o arquivo termina com quebra de linha, que o ConvertTo-SecureString nao aceita
+      $sec = (Get-Content $senhaFile -Raw).Trim() | ConvertTo-SecureString -ErrorAction Stop
       $env:PGPASSWORD = [System.Net.NetworkCredential]::new("", $sec).Password
     } catch {
-      Write-Error "Nao consegui ler $senhaFile (foi gravado por outro usuario ou em outro computador). Rode de novo com -GuardarSenha."
-      exit 1
+      Falhar "Nao consegui ler $senhaFile (foi gravado por outro usuario ou em outro computador). Rode de novo com -GuardarSenha."
     }
   } elseif ($Agendado) {
-    Write-Error "Senha do ERP nao guardada. Rode uma vez: run-sync-erp.ps1 -GuardarSenha"
-    exit 1
+    Falhar "Senha do ERP nao guardada. Rode uma vez: run-sync-erp.ps1 -GuardarSenha"
   } else {
     $sec = Read-Host "Senha do Postgres do ERP ($env:PGUSER)" -AsSecureString
     $env:PGPASSWORD = [System.Net.NetworkCredential]::new("", $sec).Password
@@ -60,7 +96,7 @@ $env:PG_STATEMENT_TIMEOUT = "60000"
 # --- Supabase (banco do site) ---
 # Arquivo com UMA linha: a connection string do Session pooler (Supabase > Project Settings > Database).
 $sbFile = "C:\Keys\supabase-db-url.txt"
-if (-not (Test-Path $sbFile)) { Write-Error "Crie $sbFile com a connection string do Supabase."; exit 1 }
+if (-not (Test-Path $sbFile)) { Falhar "Crie $sbFile com a connection string do Supabase." }
 $env:SUPABASE_DB_URL = (Get-Content $sbFile -Raw).Trim()
 # Certificado CA do Supabase (Project Settings > Database > SSL Configuration > Download certificate)
 foreach ($ca in "C:\Keys\supabase-ca.crt", "C:\Keys\prod-ca-2021.crt") { if (Test-Path $ca) { $env:SUPABASE_DB_CA = $ca; break } }
@@ -80,29 +116,10 @@ if (-not $Agendado) {
 }
 
 # ------------------------------------------------------------------ execucao agendada
-# Roda da raiz do projeto, seja qual for a pasta de onde a tarefa foi chamada
-Set-Location (Resolve-Path (Join-Path $PSScriptRoot "..\.."))
-if (-not (Test-Path $pastaLogs)) { New-Item -ItemType Directory -Path $pastaLogs -Force | Out-Null }
-$logFile = Join-Path $pastaLogs ("sync-{0}-{1}.log" -f $Modo, (Get-Date -Format "yyyy-MM"))
-
-# Aviso ao healthchecks.io: C:\Keys\healthchecks.json = { "sync-estoque": "https://hc-ping.com/...", "sync-completo": "..." }
-# Sem o arquivo (ou sem a chave), nao avisa. Uma falha no aviso nunca derruba o sync.
-$hcUrl = $null
-$hcFile = "C:\Keys\healthchecks.json"
-if (Test-Path $hcFile) {
-  try { $hcUrl = (Get-Content $hcFile -Raw | ConvertFrom-Json)."sync-$Modo" } catch { $hcUrl = $null }
-}
-function Avisar([string]$sufixo, [string]$corpo) {
-  if (-not $hcUrl) { return }
-  try {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $bytes = [Text.Encoding]::UTF8.GetBytes($corpo)
-    Invoke-WebRequest -Uri ($hcUrl.TrimEnd('/') + $sufixo) -Method Post -Body $bytes -TimeoutSec 15 -UseBasicParsing | Out-Null
-  } catch { }
-}
-
 Avisar "/start" ""
 $inicio = Get-Date
+# O Node escreve em UTF-8; sem isto os acentos saem trocados no log
+try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }
 $saida = @(& node .\site\scripts\sync-erp.mjs 2>&1 | ForEach-Object { "$_" })
 $codigo = $LASTEXITCODE
 $cabecalho = "=== {0:yyyy-MM-dd HH:mm:ss} modo={1} codigo={2} duracao={3:N0}s" -f $inicio, $Modo, $codigo, ((Get-Date) - $inicio).TotalSeconds
