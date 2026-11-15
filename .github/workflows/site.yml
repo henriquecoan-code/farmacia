@@ -89,3 +89,20 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Avisa o healthchecks.io se a publicação deu certo ou falhou (painel único das automações).
+  # Opcional: só avisa se existir o secret HEALTHCHECK_SITE (Settings -> Secrets and variables -> Actions).
+  avisar:
+    needs: [build, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Avisar o healthchecks.io
+        env:
+          HC_URL: ${{ secrets.HEALTHCHECK_SITE }}
+          RESULTADO: build=${{ needs.build.result }} deploy=${{ needs.deploy.result }} evento=${{ github.event_name }}
+        run: |
+          if [ -z "$HC_URL" ]; then echo "Sem HEALTHCHECK_SITE: nada a avisar."; exit 0; fi
+          sufixo=""
+          if [ "${{ needs.deploy.result }}" != "success" ]; then sufixo="/fail"; fi
+          curl -fsS -m 15 --retry 3 --data-raw "$RESULTADO" "${HC_URL%/}$sufixo" > /dev/null || echo "Aviso não entregue."

@@ -189,6 +189,15 @@ sequenceDiagram
 - Dispara `repository_dispatch` (`catalogo-atualizado`) se houver `C:\Keys\github-dispatch-token.txt`; o workflow `site.yml` escuta esse evento e republica o site.
 - `erp-investigar.mjs` é o "passo 0": descobre colunas do ERP e grava o resultado em `.saida/`.
 
+### Sync agendado (PC da farmácia)
+- **Senha do ERP:** `run-sync-erp.ps1 -GuardarSenha` grava `C:\Keys\erp-senha.dpapi`, cifrada pelo Windows (DPAPI). Só o mesmo usuário, no mesmo computador, consegue ler. Sem `-Agendado`, o runner ainda pergunta a senha se o arquivo não existir.
+- **`agendar-sync.ps1`** cria as tarefas na pasta `\Farmacia\` do Agendador de Tarefas (`-Listar` mostra a situação, `-Remover` apaga):
+  - **Sync estoque:** a cada 30 min, das 07:30 às 22:00;
+  - **Sync completo:** todo dia às 22:30 (republica o site se o catálogo mudou).
+- As tarefas chamam `wscript run-oculto.vbs <modo>`, que roda `run-sync-erp.ps1 -Modo <modo> -Agendado` sem janela e devolve o código de saída. Rodam com o usuário logado (por causa da senha cifrada) e recuperam a execução perdida se o PC estava desligado.
+- **Log:** `%LOCALAPPDATA%\FarmaciaSync\logs\sync-<modo>-AAAA-MM.log`.
+- **Monitoramento (healthchecks.io):** com `C:\Keys\healthchecks.json` (`{ "sync-estoque": "https://hc-ping.com/…", "sync-completo": "…" }`), cada execução agendada avisa o início, o sucesso ou a falha, com as últimas linhas do log. O workflow `site.yml` avisa pela URL do secret `HEALTHCHECK_SITE`. Sem o arquivo ou o secret, nada é avisado.
+
 ### Fotos de produtos
 1. Fotografar no celular duas fotos por produto, em sequência: o produto e depois o código de barras.
 2. Enviar para `fotos-entrada/`.
@@ -251,6 +260,7 @@ sequenceDiagram
 | Nova página com login | Copiar o padrão de `conta.astro`: `exigirLogin()` + `noindex` |
 | Nova regra de pedido ou erro do banco | Nova migration `000N_*.sql` (+ teste em `db.test.mjs`) e uma linha em `mensagemErro()` |
 | Aplicar migrations | `.\site\scripts\run-aplicar-migrations.ps1` |
+| Agendar o sync no PC da farmácia | `run-sync-erp.ps1 -GuardarSenha` (uma vez) e `.\site\scripts\agendar-sync.ps1`; conferir com `-Listar` |
 | Sincronizar o ERP | `.\site\scripts\run-sync-erp.ps1 [-Modo estoque] [-DryRun]` (com VPN) |
 | Regras de bloqueio de produto | `config/product-filters.json` |
 | Fotos | Enviar para `fotos-entrada/` (Action) ou rodar `node scripts/fotos-produtos.mjs` dentro de `site/` |

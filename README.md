@@ -62,8 +62,15 @@ Os comandos rodam **da raiz do projeto**, com a VPN ligada quando leem o ERP. As
 |---|---|
 | Sincronizar produtos (completo) | `powershell -ExecutionPolicy Bypass -File .\site\scripts\run-sync-erp.ps1` |
 | Sincronizar só o estoque | `powershell -ExecutionPolicy Bypass -File .\site\scripts\run-sync-erp.ps1 -Modo estoque` |
+| Guardar a senha do ERP (uma vez) | `powershell -ExecutionPolicy Bypass -File .\site\scripts\run-sync-erp.ps1 -GuardarSenha` |
+| Agendar os syncs no Windows | `powershell -ExecutionPolicy Bypass -File .\site\scripts\agendar-sync.ps1` |
+| Ver a situação dos syncs agendados | `powershell -ExecutionPolicy Bypass -File .\site\scripts\agendar-sync.ps1 -Listar` |
 | Aplicar mudanças no banco | `powershell -ExecutionPolicy Bypass -File .\site\scripts\run-aplicar-migrations.ps1` |
 | Dar acesso ao painel da equipe | `powershell -ExecutionPolicy Bypass -File .\site\scripts\run-equipe.ps1 -Email pessoa@exemplo.com` |
+
+**Syncs automáticos:** depois de agendados, o estoque é copiado a cada 30 minutos (das 07:30 às 22:00) e o sync completo roda todo dia às 22:30, sem janela, enquanto o usuário estiver logado no Windows. As tarefas ficam no Agendador de Tarefas (`taskschd.msc`), na pasta **Farmacia**, e o log em `%LOCALAPPDATA%\FarmaciaSync\logs`.
+
+**Monitoramento:** com o arquivo `C:\Keys\healthchecks.json` (um endereço do [healthchecks.io](https://healthchecks.io) para `sync-estoque` e outro para `sync-completo`) e o secret `HEALTHCHECK_SITE` no GitHub, cada execução avisa o painel, que manda e-mail se algo falhar ou deixar de rodar.
 
 **Fotos de produtos:** envie para a pasta `fotos-entrada/` duas fotos por produto, em sequência (o produto e depois o código de barras). O workflow **Fotos de produtos** trata as imagens e as liga ao produto pelo código de barras.
 
