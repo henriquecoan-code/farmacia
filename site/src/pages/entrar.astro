@@ -11,7 +11,7 @@ import { u } from '../lib/url';
 
     <section class="painel" data-painel="entrar">
       <h1 class="titulo">Entrar</h1>
-      <form class="form" data-form="entrar">
+      <form class="form" data-form="entrar" method="post">
         <label class="campo"><span>E-mail</span><input name="email" type="email" autocomplete="email" required /></label>
         <label class="campo"><span>Senha</span><input name="senha" type="password" autocomplete="current-password" required /></label>
         <p class="msg" data-msg hidden></p>
@@ -22,7 +22,7 @@ import { u } from '../lib/url';
 
     <section class="painel" data-painel="criar" hidden>
       <h1 class="titulo">Criar conta</h1>
-      <form class="form" data-form="criar">
+      <form class="form" data-form="criar" method="post">
         <label class="campo"><span>Nome completo</span><input name="nome" autocomplete="name" required minlength="3" /></label>
         <label class="campo"><span>E-mail</span><input name="email" type="email" autocomplete="email" required /></label>
         <label class="campo"><span>Senha <small>(mínimo 8 caracteres)</small></span><input name="senha" type="password" autocomplete="new-password" required minlength="8" /></label>
@@ -48,9 +48,16 @@ import { u } from '../lib/url';
       b.disabled = sim; b.dataset.txt ??= b.textContent!; b.textContent = sim ? 'Aguarde…' : b.dataset.txt;
     };
 
-    // Já logado (ou voltando do link de confirmação por e-mail): segue em frente
-    usuarioAtual().then((u) => { if (u) location.replace(destinoVolta()); });
-    sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN') location.replace(destinoVolta()); });
+    // Link de confirmação da conta (?token_hash=…, modelo de e-mail do Supabase): vale em qualquer
+    // navegador ou aparelho. Enquanto ele é conferido (mais abaixo), nada redireciona: se o navegador
+    // já tiver outra conta aberta, sair da página antes interromperia a confirmação.
+    const tokenHash = new URLSearchParams(location.search).get('token_hash');
+
+    // Já logado: segue em frente
+    if (!tokenHash) {
+      usuarioAtual().then((u) => { if (u) location.replace(destinoVolta()); });
+      sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN') location.replace(destinoVolta()); });
+    }
 
     // Abas
     const abrir = (aba: string) => {
@@ -72,13 +79,12 @@ import { u } from '../lib/url';
       location.replace(destinoVolta());
     });
 
-    // Link de confirmação da conta (?token_hash=…, modelo de e-mail do Supabase): vale em qualquer
-    // navegador ou aparelho. Ao confirmar, o SIGNED_IN acima leva a pessoa adiante.
-    const tokenHash = new URLSearchParams(location.search).get('token_hash');
+    // Confere o link de confirmação e só então segue para a conta confirmada
     if (tokenHash) {
-      sb.auth.verifyOtp({ token_hash: tokenHash, type: 'email' }).then(({ error }) => {
-        if (error) mostrar(fEntrar, 'Link de confirmação inválido ou já usado. Se a conta já foi confirmada, é só entrar com o e-mail e a senha.');
-      });
+      const falhou = () => mostrar(fEntrar, 'Link de confirmação inválido ou já usado. Se a conta já foi confirmada, é só entrar com o e-mail e a senha.');
+      sb.auth.verifyOtp({ token_hash: tokenHash, type: 'email' })
+        .then(({ error }) => (error ? falhou() : location.replace(destinoVolta())))
+        .catch(falhou);
     }
 
     // Esqueci a senha

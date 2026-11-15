@@ -4,7 +4,8 @@ import Base from '../layouts/Base.astro';
 <Base title="Nova senha" noindex>
   <section class="painel pagina-estreita">
     <h1 class="titulo">Criar nova senha</h1>
-    <form class="form" data-form>
+    <!-- method="post": se o script ainda não carregou, o envio nativo nunca põe a senha na URL -->
+    <form class="form" data-form method="post">
       <label class="campo"><span>Nova senha <small>(mínimo 8 caracteres)</small></span><input name="senha" type="password" autocomplete="new-password" required minlength="8" /></label>
       <p class="msg" data-msg hidden></p>
       <button class="btn btn--primario btn--bloco" type="submit">Salvar nova senha</button>
@@ -22,11 +23,15 @@ import Base from '../layouts/Base.astro';
     // aqui funciona em qualquer navegador ou aparelho, não só naquele em que a pessoa pediu a troca.
     const invalido = 'Link inválido ou expirado. Peça um novo em "Entrar" → "Esqueci a senha".';
     const tokenHash = new URLSearchParams(location.search).get('token_hash');
-    if (tokenHash) {
-      const { error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
-      history.replaceState(null, '', location.pathname); // o código só vale uma vez
-      if (error && !(await usuarioAtual())) mostrar(invalido);
-    } else {
+    // A conferência corre em paralelo: o formulário já está ligado (abaixo) e espera por ela ao enviar,
+    // para o navegador nunca fazer o envio nativo com a senha.
+    const verificacao: Promise<unknown> = tokenHash
+      ? sb.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' }).then(async ({ error }) => {
+          history.replaceState(null, '', location.pathname); // o código só vale uma vez
+          if (error && !(await usuarioAtual())) mostrar(invalido);
+        }).catch(() => mostrar(invalido))
+      : Promise.resolve();
+    if (!tokenHash) {
       // Link no formato antigo: a sessão de recuperação vem pela própria URL (detectSessionInUrl)
       setTimeout(async () => { if (!(await usuarioAtual())) mostrar(invalido); }, 1500);
     }
@@ -35,6 +40,8 @@ import Base from '../layouts/Base.astro';
       ev.preventDefault();
       const senha = String(new FormData(form).get('senha'));
       if (senha.length < 8) return mostrar('A senha precisa ter pelo menos 8 caracteres.');
+      await verificacao;
+      if (!(await usuarioAtual())) return mostrar(invalido);
       const { error } = await sb.auth.updateUser({ password: senha });
       if (error) return mostrar(mensagemErro(error));
       mostrar('Senha alterada! Indo para a sua conta…', true);
