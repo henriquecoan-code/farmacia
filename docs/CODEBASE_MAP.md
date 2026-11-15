@@ -9,16 +9,7 @@ total_tokens: 253442
 > Gerado pelo Cartographer. Último mapeamento: 2026-11-14T17:46:58Z.
 > Ficaram de fora: `data/products.json` (3 MB de dados), as pastas geradas (`site/dist`, `site/.astro`, `node_modules`) e `site/scripts/.saida/`, que é privada e tem credenciais e dados do ERP.
 
-O repositório tem **dois sites** e **dois pipelines de dados** convivendo enquanto a migração não termina:
-
-| | Site antigo (no ar) | Site novo (em construção) |
-|---|---|---|
-| Pasta | raiz (`*.html`, `modern/`, `sw.js`) | `site/` |
-| Tecnologia | HTML + ES modules sem build, Firebase 9.6 via CDN | Astro 7 (estático) + Supabase + Pagefind |
-| Banco | Firestore (`produtos`, `catalogo/parte-N`, `pedidos`…) | Supabase Postgres, região São Paulo (`produtos`, `pedidos`…) |
-| Sync do ERP | `scripts/*.mjs` (firebase-admin) | `site/scripts/sync-erp.mjs` (pg) |
-| Total do pedido | calculado no navegador (inseguro) | calculado no banco (`criar_pedido`) |
-| Hospedagem | GitHub Pages, branch `main` na raiz | ainda sem deploy (build local; fase 6) |
+O repositório tem **um site só**: a loja em `site/` (Astro 7 estático + Supabase + Pagefind), publicada na raiz do GitHub Pages pelo workflow `site.yml`. O site antigo (HTML na raiz e em `modern/`, com Firebase/Firestore) e o sync antigo ERP → Firestore (`scripts/`) foram removidos em 11/2026 e ficam só no histórico do Git.
 
 ## Visão geral
 
@@ -28,55 +19,38 @@ graph TB
         ERP[(ERP Postgres<br/>sgfpod1, só leitura)]
     end
     subgraph PC["PC da farmácia (PowerShell, chaves em C:\Keys)"]
-        SyncOld[scripts/sync-*.mjs]
-        SyncNew[site/scripts/sync-erp.mjs]
+        Sync[site/scripts/sync-erp.mjs]
     end
-    subgraph Antigo["Site antigo"]
-        FS[(Firestore)]
-        Old[index.html + modern/js]
-    end
-    subgraph Novo["Site novo"]
+    subgraph Site["Site"]
         SB[(Supabase Postgres<br/>RLS + RPCs)]
-        Build[Astro build + Pagefind]
-        New[site/dist estático]
+        Build[GitHub Actions: Astro build + Pagefind]
+        Pages[GitHub Pages]
     end
     Fotos[fotos-entrada/ → GitHub Action] --> PubFotos[site/public/produtos/EAN.webp]
 
-    ERP -->|SELECT| SyncOld --> FS --> Old
-    ERP -->|SELECT, sessão READ ONLY| SyncNew --> SB
-    SB -->|REST produtos_publicos| Build --> New
+    ERP -->|SELECT, sessão READ ONLY| Sync --> SB
+    Sync -.->|repository_dispatch| Build
+    SB -->|REST produtos_publicos| Build --> Pages
     PubFotos --> Build
-    New -->|navegador: login, carrinho, criar_pedido| SB
+    Pages -->|navegador: login, carrinho, criar_pedido| SB
 ```
 
 ## Estrutura de pastas
 
 ```
-/                         site antigo (GitHub Pages serve a raiz)
-├── index.html, produtos.html, checkout.html, conta.html, pedidos.html,
-│   privacidade.html, termos.html, instrucoes.html, modern-admin.html
-├── modern-index.html     só redireciona para ./
-├── sw.js                 service worker (CACHE_NAME = farmacia-shell-vN)
-├── manifest.webmanifest
-├── firestore.rules, firebase.json
-├── modern/
-│   ├── components/       header/footer/modals/bottom-nav injetados via ComponentLoader
-│   ├── css/              modern-styles.css (tokens) + CSS por página
-│   └── js/               bootstrap, páginas e services/ (firebase, cart, auth, modals…)
-├── scripts/              pipeline antigo ERP → Firestore (+ SQL de auditoria do ERP)
-├── config/product-filters.json   regras de bloqueio (usadas pelos DOIS pipelines)
-├── data/products.json    exportação antiga (vitrine e dados de exemplo do site novo)
-├── tests/firestore-rules/  testes das regras do Firestore (emulador)
-├── docs/                 SEGURANCA-FIRESTORE.md, este mapa
+/
+├── config/product-filters.json   regras de bloqueio de produto (usadas pelo sync)
+├── data/products.json    exportação antiga do ERP (dados de exemplo quando não há Supabase configurado)
+├── docs/                 este mapa
 ├── fotos-entrada/        fotos do celular para processar (gatilho do Action)
 ├── .github/workflows/fotos-produtos.yml
-├── .github/workflows/site.yml   publica o Pages: site antigo na raiz + site novo em /novo/ (push na main,
-│                                aviso do sync "catalogo-atualizado", fim do workflow de fotos e todo dia às 03:30)
-├── .claude/              launch.json (previews "site" e "site-novo"), skill fotos-produtos
-└── site/                 SITE NOVO
+├── .github/workflows/site.yml   gera o site e publica na raiz do Pages (push na main, aviso do sync
+│                                "catalogo-atualizado", fim do workflow de fotos e todo dia às 03:30)
+├── .claude/              launch.json (preview "site-novo"), skill fotos-produtos
+└── site/                 O SITE
     ├── astro.config.mjs  SITE_URL / BASE_PATH por variável de ambiente
     ├── .env              só PUBLIC_SUPABASE_URL e PUBLIC_SUPABASE_ANON_KEY (fora do Git)
-    ├── public/           img/, produtos/<EAN>.webp
+    ├── public/           img/, produtos/<EAN>.webp, sw.js (desliga o service worker do site antigo)
     ├── src/
     │   ├── data/loja.ts  dados da loja (RDC 44); campos PREENCHER
     │   ├── lib/          catalogo.ts (build), secoes.ts, supabase.ts, url.ts
@@ -196,35 +170,24 @@ sequenceDiagram
 ## Pipelines ERP → site
 
 ### Regras comuns
-- O ERP é lido em `cadprodu` + `cadestoq` (filial 3) + `cadcddcb` (DCB) + `cadlabor` + `cadcdbar` (EAN; este só no pipeline novo). Só entram produtos com `flg_ativo='A'`.
+- O ERP é lido em `cadprodu` + `cadestoq` (filial 3) + `cadcddcb` (DCB) + `cadlabor` + `cadcdbar` (EAN). Só entram produtos com `flg_ativo='A'`.
 - **Exclusões regulatórias**:
-  - `tip_classeterapeutica` preenchida (SNGPC 1 = antimicrobiano, 2 = controle especial) fica fora nos dois pipelines;
-  - o pipeline novo exclui também `tip_lista` preenchida (listas A1–C5 da Portaria 344 e `T`, antimicrobiano).
+  - `tip_classeterapeutica` preenchida (SNGPC 1 = antimicrobiano, 2 = controle especial) fica fora;
+  - `tip_lista` preenchida (listas A1–C5 da Portaria 344 e `T`, antimicrobiano).
 - **`calcularPreco`**: um desconto maior que 1 é lido como porcentagem; entre 0 e 1, como fração.
 - **Categorias** por `cod_grupo`: 10000 suplementos, 9000 hospitalares, 4000 genéricos, 8000 dermocosméticos (com `nom_prodcomp` como nome), 3000 referência, 2000 similares; o resto vira `medicamentos`.
 - **`config/product-filters.json`**: palavras proibidas, preço mínimo, desconto máximo, regex e allowlist. Um produto que bate nessas regras fica `pendente`; não é apagado.
 - O ERP **não tem campo de tarja**: `tip_id_tarja` está vazio. Os medicamentos ficam `prescricao` por padrão, e o admin corrige com `tipo_venda_manual`.
 
-### Pipeline novo: `site/scripts/sync-erp.mjs`
+### Sync: `site/scripts/sync-erp.mjs`
 - Runner: `.\site\scripts\run-sync-erp.ps1 [-Modo completo|estoque] [-DryRun]`, executado da raiz do projeto e com VPN.
 - Lê o ERP numa sessão `READ ONLY` e grava no Supabase numa única transação; o `DRY_RUN` faz ROLLBACK no fim.
 - **`lib/produtos-erp.mjs`**: transformação pura (preço, categoria, slug, bloqueio, EAN).
 - **`lib/gravar-supabase.mjs`**:
   - upsert com `ON CONFLICT … WHERE (…) IS DISTINCT FROM (…)`, então só grava o que mudou e nunca toca nos campos editoriais;
   - zera o estoque de produtos que saíram do ERP, exceto em amostra.
-- Dispara `repository_dispatch` (`catalogo-atualizado`) se houver `GITHUB_TOKEN`. **Ainda não há workflow que escute esse evento.**
+- Dispara `repository_dispatch` (`catalogo-atualizado`) se houver `C:\Keys\github-dispatch-token.txt`; o workflow `site.yml` escuta esse evento e republica o site.
 - `erp-investigar.mjs` é o "passo 0": descobre colunas do ERP e grava o resultado em `.saida/`.
-
-### Pipeline antigo: `scripts/` (Firestore)
-- **`sync-pg-to-firestore.mjs`** (completo) e **`sync-stock-only.mjs`** (estoque) comparam com o estado local `scripts/.state/produtos-sync.json` e gravam só o que mudou.
-- **`build-catalog.mjs`** gera e atualiza de forma incremental o catálogo agregado `catalogo/parte-N` + `meta/counters`.
-- Outros:
-  - `clean-products.mjs` desativa ou apaga produtos com estoque ≤ 0;
-  - `export-pg-to-json.mjs` gera `data/products.json`;
-  - `verify-stock.mjs` compara o ERP com o Firestore numa amostra;
-  - `set-admin-claim.mjs` e `process-admin-requests.mjs` cuidam das permissões de admin no Firebase;
-  - os SQL de auditoria e permissão do ERP (`grant-*`, `enable-maintenance-*`).
-- A cota grátis do Firestore é de 50 mil leituras e 20 mil gravações por dia. Detalhes em `scripts/README.md`.
 
 ### Fotos de produtos
 1. Fotografar no celular duas fotos por produto, em sequência: o produto e depois o código de barras.
@@ -241,73 +204,42 @@ sequenceDiagram
 
 ---
 
-## Site antigo (raiz + `modern/`)
+## Publicação (`.github/workflows/site.yml`)
 
-- **Entradas**:
-
-  | Página | Script |
-  |---|---|
-  | `index.html` | `app.js` |
-  | `produtos.html` | `produtos-firebase.js` |
-  | `checkout.html` | `checkout.js` |
-  | `conta.html` | `account.js` |
-  | `pedidos.html` | `orders.js` |
-  | `instrucoes.html` | `instrucoes.js` |
-  | `privacidade.html`, `termos.html` | `legal-page.js` |
-  | `modern-admin.html` | `admin.js` |
-
-- **Inicialização (`bootstrap.js`)**: uma única `init()` compartilhada, que inicia, nesta ordem:
-  1. firebase (pode falhar e seguir em modo offline);
-  2. carrinho;
-  3. auth;
-  4. modais.
-
-  No fim expõe `window.cartService`, `window.authService` e `window.modalsManager`.
-- **Catálogo (`firebase-service.js`)**, em ordem de tentativa:
-  1. cache no IndexedDB com menos de 10 minutos;
-  2. `meta/counters.catalogVersion`;
-  3. as partes de `catalogo/parte-N`;
-  4. a coleção `produtos` inteira (cerca de 10 mil leituras);
-  5. o cache vencido, ou `data/products.json`.
-- **Carrinho** em `modern_pharmacy_cart`. **Pedido** via `createOrder`, que usa uma transação no `orderSeq`.
-- **Tokens de CSS**: `modern-styles.css` (`--primary-color #1e40af`, Inter). Os componentes são HTML injetados pelo `ComponentLoader`, com cache `component_cache_v4_*` de 6 horas.
+- Endereço: `https://henriquecoan-code.github.io/farmacia/` (`SITE_URL` + `BASE_PATH=/farmacia`). No Pages, a fonte é **GitHub Actions**.
+- Passos: `npm ci` → `npm run test:db` → `npm run build` (lê os produtos do Supabase) → confere que há pelo menos 500 páginas de produto → publica `site/dist`.
+- Se o Supabase não responder ou os testes falharem, nada é publicado e o site no ar continua como estava.
+- Gatilhos: push na `main` (em `site/`, `config/` ou no próprio workflow), `repository_dispatch` do sync, fim do workflow de fotos, todo dia às 03:30 e execução manual.
+- **Domínio próprio:** trocar `SITE_URL` pelo domínio e `BASE_PATH` por `/`, configurar o domínio no Pages e atualizar a Site URL e as Redirect URLs do Supabase Auth.
+- `site/public/sw.js` existe só para desligar o service worker que o site antigo registrava neste mesmo endereço (ele servia as páginas antigas do cache).
 
 ---
 
 ## Convenções
 - Código, comentários, mensagens e documentação em **português**.
 - Segredos **nunca** no repositório:
-  - chaves em `C:\Keys\` (Firebase admin, `supabase-db-url.txt`, CA, token do GitHub);
+  - chaves em `C:\Keys\` (`supabase-db-url.txt`, CA, token do GitHub);
   - senha do ERP pedida pelo `Read-Host` ou lida de `$env:PGPASSWORD`;
   - no `site/.env`, só valores públicos.
 - Os runners `.ps1` rodam **da raiz do projeto**: `powershell -ExecutionPolicy Bypass -File .\site\scripts\…`. Não são scripts do `npm run`.
-- Site novo:
+- No site:
   - todo `innerHTML` passa por `esc()`;
   - erros do banco são códigos (`raise exception 'codigo:…'`), traduzidos por `mensagemErro()`;
   - o preço vindo do navegador nunca é confiado.
 - Um card de produto existe em **dois lugares**: `ProdutoCard.astro` e `scripts/card-html.ts`. Mudou um, mude o outro.
-- Testes:
-  - `cd site && npm run test:db` cobre banco, RLS e sync, num Postgres em memória (PGlite);
-  - `tests/firestore-rules` cobre o site antigo e precisa de Java e do emulador.
+- Testes: `cd site && npm run test:db` cobre banco, RLS e sync, num Postgres em memória (PGlite). O workflow de publicação roda esses testes antes de gerar o site.
 
 ## Armadilhas
 - **`getStaticPaths` é isolado** do resto do arquivo: constantes como `POR_PAGINA` precisam ficar dentro dele.
-- **O build do site novo precisa rodar dentro de `site/`**: o modo de exemplo lê `../data/products.json` a partir do `process.cwd()`.
+- **O build precisa rodar dentro de `site/`**: o modo de exemplo lê `../data/products.json` a partir do `process.cwd()`.
 - **A busca não funciona no `npm run dev`**: use `npm run build && npm run preview`.
 - **Classes com `display` anulavam `hidden`**: o `global.css` tem `[hidden]{display:none!important}`.
-- **No site antigo, mudou JS ou CSS, aumente `CACHE_NAME` em `sw.js`.** O service worker serve arquivos do mesmo domínio primeiro do cache e não revalida. Para HTML de componente, aumente também `version` no `ComponentLoader`.
-- **Problemas conhecidos do site antigo** (a migração resolve):
-  - total do pedido calculado no navegador;
-  - cupons fixos no JS;
-  - quando o `createOrder` falha, a tela de sucesso aparece mesmo assim;
-  - o admin grava `name/price/stock` enquanto a loja lê `nome/precoComDesconto/quantidade`;
-  - o pipeline antigo não filtra `tip_lista`;
-  - `instrucoes.html` é público e sem `noindex`.
+- **No Git Bash do Windows, `BASE_PATH=/farmacia` é convertido em caminho de arquivo** e o build falha. Para testar o build com o caminho de produção, use o PowerShell (`$env:BASE_PATH='/farmacia'`).
 - **`VERSAO_POLITICA` aparece em 4 lugares**: `sessao.ts`, `privacidade.astro`, `termos.astro` e `config_loja.politica_versao`.
 - **Supabase Auth**:
   - o envio padrão de e-mail só chega a membros do projeto, então clientes reais precisam de SMTP próprio;
   - configure as Redirect URLs e a senha mínima de 8 caracteres.
-- **O `repository_dispatch` do sync ainda não tem workflow** que gere e publique o site.
+- **Os links de e-mail usam `token_hash`** (modelos "Confirm signup" e "Reset password" do Supabase editados à mão): as páginas `entrar` e `redefinir-senha` conferem o código com `verifyOtp`. Se os modelos voltarem ao padrão, o link só funciona no navegador em que foi pedido.
 
 ## Guia rápido
 | Tarefa | Onde mexer |
@@ -320,6 +252,6 @@ sequenceDiagram
 | Nova regra de pedido ou erro do banco | Nova migration `000N_*.sql` (+ teste em `db.test.mjs`) e uma linha em `mensagemErro()` |
 | Aplicar migrations | `.\site\scripts\run-aplicar-migrations.ps1` |
 | Sincronizar o ERP | `.\site\scripts\run-sync-erp.ps1 [-Modo estoque] [-DryRun]` (com VPN) |
-| Regras de bloqueio de produto | `config/product-filters.json` (vale para os dois pipelines) |
+| Regras de bloqueio de produto | `config/product-filters.json` |
 | Fotos | Enviar para `fotos-entrada/` (Action) ou rodar `node scripts/fotos-produtos.mjs` dentro de `site/` |
-| Ver o site novo | `cd site && npm run build && npm run preview` (ou a configuração "site-novo" em `.claude/launch.json`) |
+| Ver o site | `cd site && npm run build && npm run preview` (ou a configuração "site-novo" em `.claude/launch.json`) |

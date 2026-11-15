@@ -2,12 +2,6 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "site",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8000"],
-      "port": 8000
-    },
-    {
       "name": "site-novo",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "site", "run", "preview", "--", "--port", "4321"],

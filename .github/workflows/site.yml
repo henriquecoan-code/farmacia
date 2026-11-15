@@ -1,17 +1,16 @@
-# Publica o GitHub Pages: o site antigo continua na raiz e o site novo (site/, Astro) entra em /novo/.
-#   https://henriquecoan-code.github.io/farmacia/        -> site antigo
-#   https://henriquecoan-code.github.io/farmacia/novo/   -> site novo
+# Publica o site (site/, Astro) na raiz do GitHub Pages:
+#   https://henriquecoan-code.github.io/farmacia/
 # Requer, uma única vez: Settings -> Pages -> Source = "GitHub Actions".
-# Na troca definitiva (domínio .com.br), o site novo passa para a raiz: ver docs/CODEBASE_MAP.md.
+# Com o domínio .com.br: trocar SITE_URL pelo domínio e BASE_PATH por "/" (e configurar o domínio no Pages).
 name: Publicar site
 
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - 'fotos-entrada/**'
-      - '**.md'
+    paths:
+      - 'site/**'
+      - 'config/**'
+      - '.github/workflows/site.yml'
   # O sync do ERP avisa quando o catálogo muda (site/scripts/sync-erp.mjs -> dispararBuild)
   repository_dispatch:
     types: [catalogo-atualizado]
@@ -59,11 +58,11 @@ jobs:
         run: npm run test:db
 
       # Lê os produtos do Supabase. Se o Supabase não responder, o build falha e o site publicado não muda.
-      - name: Gerar o site novo
+      - name: Gerar o site
         working-directory: site
         env:
           SITE_URL: https://henriquecoan-code.github.io
-          BASE_PATH: /farmacia/novo
+          BASE_PATH: /farmacia
           # Endereço e chave pública do Supabase (a mesma que vai no navegador; não é segredo)
           PUBLIC_SUPABASE_URL: https://ytcqzpasqydnbhxmrkrc.supabase.co
           PUBLIC_SUPABASE_ANON_KEY: sb_publishable_ioyB0TpE0wC5K6pILX8g0w_qd9c6arD
@@ -77,22 +76,9 @@ jobs:
           echo "Páginas de produto: $paginas"
           if [ "$paginas" -lt 500 ]; then echo "Catálogo pequeno demais ($paginas produtos): não publica."; exit 1; fi
 
-      - name: Montar a pasta publicada
-        run: |
-          mkdir _pages
-          # Site antigo na raiz, sem o que não é página (código do site novo, scripts, testes, logs)
-          rsync -a ./ _pages/ \
-            --exclude '.git*' --exclude '_pages' --exclude 'node_modules' --exclude 'site' \
-            --exclude 'scripts' --exclude 'functions' --exclude 'tests' --exclude 'docs' \
-            --exclude 'fotos-entrada' --exclude '*.log' --exclude '*.md' --exclude 'desktop.ini' \
-            --exclude 'package.json' --exclude 'package-lock.json' --exclude 'firebase.json' --exclude 'firestore.rules'
-          mkdir _pages/novo
-          cp -r site/dist/. _pages/novo/
-          touch _pages/.nojekyll
-
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _pages
+          path: site/dist
 
   deploy:
     needs: build
