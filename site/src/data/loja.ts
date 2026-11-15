@@ -8,20 +8,26 @@ export const loja = {
   razaoSocial: 'Jucenir Gazola Coan',
   cnpj: '00.162.606/0001-23',
   endereco: {
-    logradouro: 'Rua Walter Veterlly, 102',
+    logradouro: 'Rua Walter Vetterli, 102',
     bairro: 'Centro',
     cidade: 'Lauro Müller',
     uf: 'SC',
-    cep: `${PREENCHER}: CEP da loja`,
+    cep: '88880-000',
   },
   telefone: '(48) 3464-3201',
   whatsapp: '554834643201',
   email: 'fciasaobenedito@gmail.com',
-  horario: `${PREENCHER}: horário de funcionamento`,
-  afe: `${PREENCHER}: nº AFE (Anvisa)`,
-  licencaSanitaria: `${PREENCHER}: nº da licença sanitária`,
-  farmaceutico: `${PREENCHER}: nome do(a) farmacêutico(a)`,
-  crf: `${PREENCHER}: CRF-SC nº`,
+  // Horário conforme a Certidão de Regularidade CRF-SC 2026.
+  horario: 'Loja física: segunda a sexta, das 8h30 às 21h; sábado, das 8h30 às 19h; domingo fechado. Entregas em horário comercial.',
+  // Consulta pública de funcionamento de empresas da Anvisa (14/11/2026): autorização ativa, área Farmácia.
+  afe: '7.72129-9',
+  // Alvará Sanitário nº 23/2026, emitido em 18/03/2026, válido até 29/03/2027.
+  licencaSanitaria: 'Alvará Sanitário nº 23/2026 – Vigilância Sanitária de Lauro Müller (válido até 29/03/2027)',
+  // Responsáveis técnicos na Certidão de Regularidade CRF-SC 2026 (válida até 31/03/2027).
+  farmaceuticos: [
+    { nome: 'Guilherme Coan', crf: 'CRF-SC 6892' },
+    { nome: 'Tainá de Souza Ribeiro', crf: 'CRF-SC 19951' },
+  ],
   encarregadoLgpd: 'Jucenir Gazola Coan',
   entregas: [
     { cidade: 'Lauro Müller', regra: 'entrega imediata em horário comercial' },
@@ -33,5 +39,8 @@ export const loja = {
 export const enderecoCompleto = () =>
   `${loja.endereco.logradouro}, ${loja.endereco.bairro}, ${loja.endereco.cidade} - ${loja.endereco.uf}`;
 
-export const linkWhatsApp = (texto?: string) =>
+export const farmaceuticosTexto = () =>
+  loja.farmaceuticos.map((f) => `${f.nome} (${f.crf})`).join(' e ');
+
+export const linkWhatsApp =(texto?: string) =>
   `https://wa.me/${loja.whatsapp}${texto ? `?text=${encodeURIComponent(texto)}` : ''}`;

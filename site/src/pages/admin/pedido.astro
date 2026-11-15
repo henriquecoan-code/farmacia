@@ -1,0 +1,151 @@
+---
+import Admin from '../../layouts/Admin.astro';
+import { u } from '../../lib/url';
+import { loja } from '../../data/loja';
+---
+<Admin title="Pedido" ativo="pedidos">
+  <p class="nao-imprimir voltar"><a href={u('/admin/')}>← Pedidos</a></p>
+  <div class="pedido" data-pedido hidden>
+    <div class="adm-cab">
+      <h1 data-titulo></h1>
+      <span class="status" data-status></span>
+    </div>
+    <p class="aviso aviso--receita" data-receita hidden><strong>Conferir receita:</strong> o pedido tem medicamento de venda sob prescrição.</p>
+
+    <div class="det-grade">
+      <section class="painel">
+        <h2>Itens para separar</h2>
+        <table class="tabela itens">
+          <thead><tr><th>Cód.</th><th>Produto</th><th>Qtd</th><th>Unit.</th><th>Total</th></tr></thead>
+          <tbody data-itens></tbody>
+        </table>
+        <dl class="totais">
+          <dt>Subtotal</dt><dd data-subtotal></dd>
+          <dt>Frete</dt><dd data-frete></dd>
+          <dt class="total">Total</dt><dd class="total" data-total></dd>
+        </dl>
+      </section>
+
+      <div class="lado">
+        <section class="painel">
+          <h2>Cliente e entrega</h2>
+          <dl class="ficha">
+            <dt>Cliente</dt><dd data-cliente></dd>
+            <dt>Telefone</dt><dd data-telefone></dd>
+            <dt>E-mail</dt><dd data-email></dd>
+            <dt>Entrega</dt><dd data-entrega></dd>
+            <dt>Endereço</dt><dd data-endereco></dd>
+            <dt>Pagamento</dt><dd data-pagamento></dd>
+            <dt>Observação</dt><dd data-obs></dd>
+          </dl>
+        </section>
+
+        <section class="painel nao-imprimir">
+          <h2>Ações</h2>
+          <div class="acoes" data-acoes></div>
+          <div class="acoes acoes--extra">
+            <button type="button" class="btn btn--secundario" data-imprimir>Imprimir separação</button>
+            <a class="btn btn--whats" data-whats target="_blank" rel="noopener">WhatsApp do cliente</a>
+          </div>
+          <p class="msg" data-msg hidden></p>
+        </section>
+
+        <section class="painel nao-imprimir">
+          <h2>Histórico</h2>
+          <ol class="historico" data-historico></ol>
+        </section>
+      </div>
+    </div>
+    <p class="rodape-impressao">{loja.nomeFantasia} · {loja.telefone}</p>
+  </div>
+
+  <script>
+    import { exigirEquipe, proximosStatus } from '../../scripts/admin';
+    import { cliente, brl, dataHora, esc, rotuloStatus, NOME_PAGAMENTO, NOME_ENTREGA, mensagemErro } from '../../scripts/sessao';
+
+    await exigirEquipe();
+    const sb = cliente();
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector<T>(s)!;
+    const id = new URLSearchParams(location.search).get('id') || '';
+    const msg = $('[data-msg]');
+    const mostrar = (t: string, ok = false) => { msg.textContent = t; msg.hidden = !t; msg.className = `msg ${ok ? 'msg--ok' : 'msg--erro'}`; };
+
+    async function carregar() {
+      const { data: p, error } = await sb.from('pedidos')
+        .select('*, pedido_itens(cod_red, nome, quantidade, preco_unit, total, tipo_venda), pedido_status_log(para, em)')
+        .eq('id', id).maybeSingle();
+      if (error || !p) { document.querySelector('[data-admin-conteudo]')!.innerHTML = `<p class="painel">${esc(error ? mensagemErro(error) : 'Pedido não encontrado.')}</p>`; return; }
+
+      document.title = `Pedido ${p.numero} | Painel`;
+      $('[data-titulo]').textContent = `Pedido nº ${p.numero}`;
+      const st = $('[data-status]');
+      st.textContent = rotuloStatus(p.status, p.pagamento);
+      st.className = `status status--${p.status}`;
+      $('[data-receita]').hidden = !p.tem_prescricao;
+      $('[data-itens]').innerHTML = (p.pedido_itens ?? []).map((i: any) => `<tr>
+        <td>${i.cod_red}</td><td>${esc(i.nome)}${i.tipo_venda === 'prescricao' ? ' <span class="tag-receita">receita</span>' : ''}</td>
+        <td><strong>${i.quantidade}</strong></td><td>${brl(i.preco_unit)}</td><td>${brl(i.total)}</td></tr>`).join('');
+      $('[data-subtotal]').textContent = brl(p.subtotal);
+      $('[data-frete]').textContent = Number(p.frete) ? brl(p.frete) : 'Grátis';
+      $('[data-total]').textContent = brl(p.total);
+      $('[data-cliente]').textContent = p.cliente_nome ?? (p.anonimizado ? '(conta excluída)' : '—');
+      $('[data-telefone]').textContent = p.cliente_telefone ?? '—';
+      $('[data-email]').textContent = p.cliente_email ?? '—';
+      $('[data-entrega]').textContent = NOME_ENTREGA[p.entrega] ?? p.entrega;
+      const e = p.endereco;
+      $('[data-endereco]').textContent = e?.logradouro
+        ? `${e.logradouro}, ${e.numero}${e.complemento ? ` - ${e.complemento}` : ''} · ${e.bairro} · ${e.cidade}/${e.uf} · CEP ${e.cep}` : (e ? `${e.cidade}/${e.uf}` : '—');
+      $('[data-pagamento]').textContent = `${NOME_PAGAMENTO[p.pagamento] ?? p.pagamento}${p.pago_em ? ` · pago em ${dataHora(p.pago_em)}` : ''}`;
+      $('[data-obs]').textContent = p.observacao || '—';
+      const tel = String(p.cliente_telefone ?? '').replace(/\D/g, '');
+      const whats = $<HTMLAnchorElement>('[data-whats]');
+      whats.hidden = tel.length < 10;
+      whats.href = `https://wa.me/55${tel.replace(/^55/, '')}?text=${encodeURIComponent(`Olá! Aqui é da Farmácia São Benedito, sobre o seu pedido nº ${p.numero}.`)}`;
+
+      const acoes = proximosStatus(p.status, p.entrega);
+      $('[data-acoes]').innerHTML = acoes.length
+        ? acoes.map((a) => `<button type="button" class="btn ${a.perigo ? 'btn--perigo' : 'btn--primario'}" data-para="${a.para}">${esc(a.rotulo)}</button>`).join('')
+        : '<p class="nota">Pedido finalizado.</p>';
+      const hist = [...(p.pedido_status_log ?? [])].sort((a: any, b: any) => a.em.localeCompare(b.em));
+      $('[data-historico]').innerHTML = hist.map((h: any) => `<li><strong>${esc(rotuloStatus(h.para, p.pagamento))}</strong> <span>${dataHora(h.em)}</span></li>`).join('');
+      $('[data-pedido]').hidden = false;
+    }
+
+    $('[data-acoes]').addEventListener('click', async (ev) => {
+      const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-para]');
+      if (!b) return;
+      if (b.dataset.para === 'cancelado' && !confirm('Cancelar este pedido? O cliente verá o pedido como cancelado.')) return;
+      b.disabled = true;
+      const { error } = await sb.rpc('admin_mudar_status', { p_pedido_id: id, p_status: b.dataset.para });
+      if (error) { b.disabled = false; return mostrar(mensagemErro(error)); }
+      mostrar('Status atualizado.', true);
+      carregar();
+    });
+    $('[data-imprimir]').addEventListener('click', () => window.print());
+
+    carregar();
+  </script>
+</Admin>
+
+<style>
+  .voltar { margin: 0 0 8px; }
+  .det-grade { display: grid; gap: 12px; }
+  @media (min-width: 900px) { .det-grade { grid-template-columns: 1.4fr 1fr; align-items: start; } }
+  .lado { display: grid; gap: 12px; }
+  .lado .painel + .painel { margin-top: 0; }
+  .itens { font-size: .9rem; }
+  .totais { display: grid; grid-template-columns: 1fr auto; gap: 4px; margin: 10px 0 0; }
+  .totais dd { margin: 0; text-align: right; }
+  .totais .total { font-weight: 800; font-size: 1.1rem; }
+  .ficha { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: .88rem; margin: 0; }
+  .ficha dt { color: var(--texto-3); }
+  .ficha dd { margin: 0; overflow-wrap: anywhere; }
+  .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+  .acoes--extra { margin-top: 10px; }
+  .historico { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: .86rem; }
+  :global(.historico span) { color: var(--texto-3); }
+  .aviso { margin: 0 0 10px; }
+  .nota { color: var(--texto-3); margin: 0; }
+  .rodape-impressao { display: none; }
+  @media print { .rodape-impressao { display: block; margin-top: 16px; font-size: .8rem; } .det-grade { grid-template-columns: 1fr 1fr; } }
+</style>

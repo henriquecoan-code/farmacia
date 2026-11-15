@@ -1,0 +1,57 @@
+---
+// Layout das páginas com produtos: submenu lateral (largura de 1 card) + conteúdo (4 cards por linha).
+// Abaixo de 1000px o submenu some (o menu de seções do topo e os atalhos de tipo assumem).
+import { SECOES } from '../lib/catalogo';
+import { MENU_SECAO } from '../lib/secoes';
+import { urlSecao } from '../lib/url';
+import { linkWhatsApp } from '../data/loja';
+
+interface Props { secao?: string; tipo?: string; ofertas?: boolean }
+const { secao, tipo } = Astro.props;
+const itens = SECOES.map((s) => ({ ...s, ...MENU_SECAO[s.slug] }));
+---
+<div class="catalogo">
+  <aside class="submenu" aria-label="Departamentos">
+    <nav class="submenu__caixa">
+      <ul>
+        {itens.map((s) => (
+          <li>
+            <a href={urlSecao(s.slug)} aria-current={secao === s.slug && !tipo ? 'page' : undefined} class:list={['submenu__item', { ativo: secao === s.slug }]}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={s.icone} />
+              <span>{s.curto}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+    <a class="submenu__whats" href={linkWhatsApp('Olá! Tenho uma dúvida sobre um medicamento.')} target="_blank" rel="noopener">
+      <strong>Dúvidas?</strong><span>Fale com nossa equipe</span>
+    </a>
+  </aside>
+  <div class="catalogo__conteudo">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .catalogo { display: block; }
+  .submenu { display: none; }
+  @media (min-width: 1000px) {
+    /* 5 colunas iguais: submenu ocupa 1 (largura de um card), conteúdo 4 */
+    .catalogo { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; align-items: start; padding-top: 12px; }
+    .submenu { display: grid; gap: 8px; position: sticky; top: 118px; }
+    .catalogo__conteudo { grid-column: span 4; min-width: 0; }
+    .catalogo__conteudo :global(.grade) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+  .submenu__caixa { background: #fff; border: 1px solid var(--borda); border-radius: 10px; padding: 6px; }
+  .submenu ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .submenu__item {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px;
+    color: var(--texto); text-decoration: none; font-weight: 600; font-size: .88rem;
+  }
+  .submenu__item svg { color: var(--azul); flex: none; }
+  .submenu__item:hover, .submenu__item.ativo { background: var(--azul-claro); color: var(--azul); }
+  .submenu__whats { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: #15803d; color: #fff; text-decoration: none; font-size: .8rem; }
+  .submenu__whats:hover { background: #166534; color: #fff; }
+  .submenu__whats span { opacity: .9; }
+</style>

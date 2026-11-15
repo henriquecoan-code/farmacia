@@ -1,0 +1,50 @@
+---
+import Base from '../../layouts/Base.astro';
+import { u } from '../../lib/url';
+---
+<Base title="Meus pedidos" noindex>
+  <nav class="migalhas" aria-label="Você está em"><ol><li><a href={u('/conta/')}>Minha conta</a></li><li aria-current="page">Meus pedidos</li></ol></nav>
+  <h1>Meus pedidos</h1>
+  <p class="carregando" data-carregando>Carregando…</p>
+  <ul class="pedidos" data-lista></ul>
+
+  <script>
+    import { cliente, exigirLogin, mensagemErro, brl, dataHora, esc, rotuloStatus, BASE } from '../../scripts/sessao';
+    const sb = cliente();
+    await exigirLogin();
+    const lista = document.querySelector<HTMLElement>('[data-lista]')!;
+    const { data, error } = await sb.from('pedidos')
+      .select('id, numero, status, pagamento, total, criado_em, entrega, pedido_itens(quantidade)')
+      .order('criado_em', { ascending: false });
+    document.querySelector<HTMLElement>('[data-carregando]')!.hidden = true;
+    if (error) {
+      lista.innerHTML = `<li class="msg msg--erro">${esc(mensagemErro(error))}</li>`;
+    } else if (!data?.length) {
+      lista.innerHTML = `<li class="painel">Você ainda não fez pedidos. <a href="${BASE}/">Ver produtos</a></li>`;
+    } else {
+      lista.innerHTML = data.map((p: any) => {
+        const n = (p.pedido_itens ?? []).reduce((s: number, i: any) => s + i.quantidade, 0);
+        return `<li><a class="pedido" href="${BASE}/conta/pedido/?id=${p.id}">
+          <span class="pedido__num">Pedido nº ${p.numero}</span>
+          <span class="status status--${esc(p.status)}">${esc(rotuloStatus(p.status, p.pagamento))}</span>
+          <span class="pedido__info">${dataHora(p.criado_em)} · ${n} ${n === 1 ? 'item' : 'itens'}</span>
+          <strong class="pedido__total">${brl(p.total)}</strong>
+        </a></li>`;
+      }).join('');
+    }
+  </script>
+</Base>
+
+<style>
+  h1 { margin-top: 4px; }
+  .pedidos { list-style: none; padding: 0; margin: 0 0 24px; display: grid; gap: 8px; }
+  :global(.pedido) { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; background: #fff; border: 1px solid var(--borda); border-radius: 12px; padding: 12px 14px; text-decoration: none; color: var(--texto); box-shadow: var(--sombra); }
+  :global(.pedido:hover) { border-color: var(--azul); }
+  :global(.pedido__num) { font-weight: 700; }
+  :global(.pedido__info) { font-size: .82rem; color: var(--texto-3); }
+  :global(.pedido__total) { text-align: right; }
+  :global(.status) { justify-self: end; font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--azul-claro); color: var(--azul); text-transform: uppercase; }
+  :global(.status--entregue) { background: var(--verde-claro); color: var(--verde); }
+  :global(.status--cancelado) { background: #f1f5f9; color: var(--texto-3); }
+  :global(.status--aguardando_pagamento) { background: var(--ambar-claro); color: var(--ambar); }
+</style>

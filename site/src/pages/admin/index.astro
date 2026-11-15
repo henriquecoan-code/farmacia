@@ -1,0 +1,110 @@
+---
+import Admin from '../../layouts/Admin.astro';
+---
+<Admin title="Pedidos" ativo="pedidos">
+  <div class="adm-cab">
+    <h1>Pedidos</h1>
+    <span class="atualizado" data-atualizado></span>
+  </div>
+  <div class="filtros" data-filtros>
+    <button type="button" class="chip" data-filtro="abertos" aria-pressed="true">Em aberto <b data-n="abertos"></b></button>
+    <button type="button" class="chip" data-filtro="aguardando_pagamento" aria-pressed="false">Recebidos <b data-n="aguardando_pagamento"></b></button>
+    <button type="button" class="chip" data-filtro="pago" aria-pressed="false">Pagos <b data-n="pago"></b></button>
+    <button type="button" class="chip" data-filtro="separando" aria-pressed="false">Em separação <b data-n="separando"></b></button>
+    <button type="button" class="chip" data-filtro="saida" aria-pressed="false">Saiu / pronto <b data-n="saida"></b></button>
+    <button type="button" class="chip" data-filtro="entregue" aria-pressed="false">Entregues <b data-n="entregue"></b></button>
+    <button type="button" class="chip" data-filtro="cancelado" aria-pressed="false">Cancelados <b data-n="cancelado"></b></button>
+  </div>
+  <div class="tabela-rolagem">
+    <table class="tabela">
+      <thead><tr><th>Nº</th><th>Feito em</th><th>Cliente</th><th>Entrega</th><th>Pagamento</th><th>Itens</th><th>Total</th><th>Status</th></tr></thead>
+      <tbody data-linhas><tr><td colspan="8">Carregando…</td></tr></tbody>
+    </table>
+  </div>
+
+  <script>
+    import { exigirEquipe, urlAdmin } from '../../scripts/admin';
+    import { cliente, brl, dataHora, esc, rotuloStatus, NOME_PAGAMENTO, NOME_ENTREGA, mensagemErro } from '../../scripts/sessao';
+
+    await exigirEquipe();
+    const sb = cliente();
+    const linhas = document.querySelector<HTMLElement>('[data-linhas]')!;
+    const ABERTOS = ['aguardando_pagamento', 'pago', 'separando', 'enviado', 'pronto_retirada'];
+    const GRUPOS: Record<string, string[]> = { abertos: ABERTOS, saida: ['enviado', 'pronto_retirada'] };
+    let filtro = 'abertos';
+    let ultimoNumero = 0;
+    const tituloOriginal = document.title;
+
+    async function carregar() {
+      const status = GRUPOS[filtro] ?? [filtro];
+      const [{ data: resumo }, { data, error }] = await Promise.all([
+        sb.rpc('admin_resumo_pedidos'),
+        sb.from('pedidos')
+          .select('id, numero, status, pagamento, entrega, total, criado_em, cliente_nome, cliente_telefone, tem_prescricao, endereco, pedido_itens(quantidade)')
+          .in('status', status)
+          .order('criado_em', { ascending: filtro !== 'abertos' ? false : true })
+          .limit(200),
+      ]);
+      // contagens
+      const r: Record<string, number> = resumo ?? {};
+      const soma = (lista: string[]) => lista.reduce((n, s) => n + (r[s] ?? 0), 0);
+      document.querySelectorAll<HTMLElement>('[data-n]').forEach((el) => {
+        const k = el.dataset.n!;
+        const n = GRUPOS[k] ? soma(GRUPOS[k]) : (r[k] ?? 0);
+        el.textContent = n ? String(n) : '';
+      });
+      // aviso de pedido novo (aba em segundo plano)
+      const maior = Math.max(0, ...((data ?? []) as any[]).map((p) => Number(p.numero)));
+      if (ultimoNumero && maior > ultimoNumero && document.hidden) document.title = `🔔 Novo pedido · ${tituloOriginal}`;
+      if (maior > ultimoNumero) ultimoNumero = maior;
+
+      if (error) { linhas.innerHTML = `<tr><td colspan="8">${esc(mensagemErro(error))}</td></tr>`; return; }
+      if (!data?.length) { linhas.innerHTML = '<tr><td colspan="8">Nenhum pedido aqui.</td></tr>'; return; }
+      linhas.innerHTML = (data as any[]).map((p) => {
+        const n = (p.pedido_itens ?? []).reduce((s: number, i: any) => s + i.quantidade, 0);
+        const cidade = p.endereco?.cidade ? ` · ${esc(p.endereco.cidade)}` : '';
+        return `<tr data-href="${urlAdmin(`/pedido/?id=${p.id}`)}" tabindex="0">
+          <td><strong>${p.numero}</strong></td>
+          <td>${dataHora(p.criado_em)}</td>
+          <td>${esc(p.cliente_nome ?? '—')}<br><small>${esc(p.cliente_telefone ?? '')}</small></td>
+          <td>${esc(NOME_ENTREGA[p.entrega] ?? p.entrega)}${cidade}</td>
+          <td>${esc(NOME_PAGAMENTO[p.pagamento] ?? p.pagamento)}</td>
+          <td>${n}${p.tem_prescricao ? ' <span class="tag-receita">receita</span>' : ''}</td>
+          <td><strong>${brl(p.total)}</strong></td>
+          <td><span class="status status--${esc(p.status)}">${esc(rotuloStatus(p.status, p.pagamento))}</span></td>
+        </tr>`;
+      }).join('');
+      document.querySelector('[data-atualizado]')!.textContent = `Atualizado às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+
+    document.querySelector('[data-filtros]')!.addEventListener('click', (ev) => {
+      const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-filtro]');
+      if (!b) return;
+      filtro = b.dataset.filtro!;
+      document.querySelectorAll('[data-filtro]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      carregar();
+    });
+    linhas.addEventListener('click', (ev) => {
+      const tr = (ev.target as HTMLElement).closest<HTMLElement>('tr[data-href]');
+      if (tr) location.href = tr.dataset.href!;
+    });
+    linhas.addEventListener('keydown', (ev) => {
+      const tr = (ev.target as HTMLElement).closest<HTMLElement>('tr[data-href]');
+      if (tr && ev.key === 'Enter') location.href = tr.dataset.href!;
+    });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) document.title = tituloOriginal; });
+
+    await carregar();
+    setInterval(carregar, 60_000); // novos pedidos aparecem sozinhos
+  </script>
+</Admin>
+
+<style>
+  .atualizado { color: var(--texto-3); font-size: .8rem; }
+  .filtros { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chip { border: 1px solid #cbd5e1; background: #fff; color: var(--texto-2); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: .84rem; cursor: pointer; }
+  .chip[aria-pressed='true'] { background: var(--azul); border-color: var(--azul); color: #fff; }
+  .chip b { font-weight: 700; margin-left: 2px; }
+  :global(tr[data-href]) { cursor: pointer; }
+  :global(.tabela small) { color: var(--texto-3); }
+</style>

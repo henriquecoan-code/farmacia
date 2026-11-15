@@ -1,0 +1,116 @@
+---
+import Base from '../layouts/Base.astro';
+import { u } from '../lib/url';
+---
+<Base title="Entrar ou criar conta" noindex>
+  <div class="pagina-estreita">
+    <div class="abas" role="tablist">
+      <button type="button" role="tab" aria-selected="true" data-aba="entrar">Entrar</button>
+      <button type="button" role="tab" aria-selected="false" data-aba="criar">Criar conta</button>
+    </div>
+
+    <section class="painel" data-painel="entrar">
+      <h1 class="titulo">Entrar</h1>
+      <form class="form" data-form="entrar">
+        <label class="campo"><span>E-mail</span><input name="email" type="email" autocomplete="email" required /></label>
+        <label class="campo"><span>Senha</span><input name="senha" type="password" autocomplete="current-password" required /></label>
+        <p class="msg" data-msg hidden></p>
+        <button class="btn btn--primario btn--bloco" type="submit">Entrar</button>
+        <button class="btn--link" type="button" data-esqueci>Esqueci a senha</button>
+      </form>
+    </section>
+
+    <section class="painel" data-painel="criar" hidden>
+      <h1 class="titulo">Criar conta</h1>
+      <form class="form" data-form="criar">
+        <label class="campo"><span>Nome completo</span><input name="nome" autocomplete="name" required minlength="3" /></label>
+        <label class="campo"><span>E-mail</span><input name="email" type="email" autocomplete="email" required /></label>
+        <label class="campo"><span>Senha <small>(mínimo 8 caracteres)</small></span><input name="senha" type="password" autocomplete="new-password" required minlength="8" /></label>
+        <label class="check"><input type="checkbox" name="aceite" required />
+          <span>Tenho 18 anos ou mais e li e aceito os <a href={u('/termos/')} target="_blank">Termos de Uso</a> e a <a href={u('/privacidade/')} target="_blank">Política de Privacidade</a>.</span></label>
+        <p class="msg" data-msg hidden></p>
+        <button class="btn btn--primario btn--bloco" type="submit">Criar conta</button>
+      </form>
+    </section>
+  </div>
+
+  <script>
+    import { cliente, destinoVolta, mensagemErro, usuarioAtual, BASE, VERSAO_POLITICA } from '../scripts/sessao';
+
+    const sb = cliente();
+    const mostrar = (form: HTMLFormElement, texto: string, ok = false) => {
+      const el = form.querySelector<HTMLElement>('[data-msg]')!;
+      el.textContent = texto; el.hidden = !texto;
+      el.className = `msg ${ok ? 'msg--ok' : 'msg--erro'}`;
+    };
+    const ocupado = (form: HTMLFormElement, sim: boolean) => {
+      const b = form.querySelector<HTMLButtonElement>('button[type=submit]')!;
+      b.disabled = sim; b.dataset.txt ??= b.textContent!; b.textContent = sim ? 'Aguarde…' : b.dataset.txt;
+    };
+
+    // Já logado (ou voltando do link de confirmação por e-mail): segue em frente
+    usuarioAtual().then((u) => { if (u) location.replace(destinoVolta()); });
+    sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN') location.replace(destinoVolta()); });
+
+    // Abas
+    const abrir = (aba: string) => {
+      document.querySelectorAll<HTMLButtonElement>('[data-aba]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.aba === aba)));
+      document.querySelectorAll<HTMLElement>('[data-painel]').forEach((p) => { p.hidden = p.dataset.painel !== aba; });
+    };
+    document.querySelectorAll<HTMLButtonElement>('[data-aba]').forEach((b) => b.addEventListener('click', () => abrir(b.dataset.aba!)));
+    if (location.hash === '#criar') abrir('criar');
+
+    // Entrar
+    const fEntrar = document.querySelector<HTMLFormElement>('[data-form="entrar"]')!;
+    fEntrar.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const d = new FormData(fEntrar);
+      ocupado(fEntrar, true); mostrar(fEntrar, '');
+      const { error } = await sb.auth.signInWithPassword({ email: String(d.get('email')).trim(), password: String(d.get('senha')) });
+      ocupado(fEntrar, false);
+      if (error) return mostrar(fEntrar, mensagemErro(error));
+      location.replace(destinoVolta());
+    });
+
+    // Esqueci a senha
+    document.querySelector('[data-esqueci]')!.addEventListener('click', async () => {
+      const email = String(new FormData(fEntrar).get('email') || '').trim();
+      if (!email) return mostrar(fEntrar, 'Digite seu e-mail acima e clique de novo em "Esqueci a senha".');
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}${BASE}/redefinir-senha/` });
+      if (error) return mostrar(fEntrar, mensagemErro(error));
+      mostrar(fEntrar, 'Se houver uma conta com este e-mail, enviamos um link para criar uma nova senha.', true);
+    });
+
+    // Criar conta
+    const fCriar = document.querySelector<HTMLFormElement>('[data-form="criar"]')!;
+    fCriar.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const d = new FormData(fCriar);
+      if (String(d.get('senha')).length < 8) return mostrar(fCriar, 'A senha precisa ter pelo menos 8 caracteres.');
+      ocupado(fCriar, true); mostrar(fCriar, '');
+      const { data, error } = await sb.auth.signUp({
+        email: String(d.get('email')).trim(),
+        password: String(d.get('senha')),
+        options: {
+          // o gatilho do banco cria o perfil com nome e o aceite da política (versão + data)
+          data: { nome: String(d.get('nome')).trim(), aceite_politica_versao: VERSAO_POLITICA },
+          emailRedirectTo: `${location.origin}${BASE}/entrar/?volta=${encodeURIComponent(new URLSearchParams(location.search).get('volta') || '/conta/')}`,
+        },
+      });
+      ocupado(fCriar, false);
+      if (error) return mostrar(fCriar, mensagemErro(error));
+      if (data.session) return location.replace(destinoVolta());
+      // Confirmação de e-mail ligada no Supabase
+      fCriar.reset();
+      mostrar(fCriar, 'Conta criada! Enviamos um link de confirmação para o seu e-mail. Abra o link para ativar a conta.', true);
+    });
+  </script>
+</Base>
+
+<style>
+  .titulo { font-size: 1.2rem; }
+  .abas { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: #e2e8f0; padding: 4px; border-radius: 12px; margin-bottom: 12px; }
+  .abas button { border: 0; background: none; border-radius: 9px; padding: 9px; font: inherit; font-weight: 600; color: var(--texto-2); cursor: pointer; }
+  .abas button[aria-selected='true'] { background: #fff; color: var(--azul); box-shadow: var(--sombra); }
+  .btn--link { justify-self: center; font-size: .88rem; }
+</style>

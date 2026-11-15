@@ -1,4 +1,6 @@
 ---
+// Card de produto. A busca (src/scripts/card-html.ts) gera o mesmo HTML no navegador:
+// ao mudar a estrutura aqui, mude lá também. Estilos em styles/produto-card.css.
 import type { Produto } from '../lib/catalogo';
 import { brl, temDesconto, percentualDesconto } from '../lib/catalogo';
 import { urlProduto } from '../lib/url';
@@ -6,39 +8,30 @@ import ProdutoImagem from './ProdutoImagem.astro';
 
 interface Props { produto: Produto; eager?: boolean }
 const { produto: p, eager = false } = Astro.props;
-// RDC 96/2008: "de/por" e % de desconto só para MIP (prescrição mostra apenas o preço)
-const desconto = temDesconto(p) && p.tipo_venda === 'mip';
+const desconto = temDesconto(p);
 ---
 <article class="card">
   <a class="card__link" href={urlProduto(p.slug)}>
     <ProdutoImagem produto={p} eager={eager} />
     <div class="card__selos">
-      {p.tipo_venda === 'prescricao' && <span class="selo selo--receita">Exige receita</span>}
-      {desconto && <span class="selo selo--desconto">-{percentualDesconto(p)}%</span>}
     </div>
     <h3 class="card__nome">{p.nome}</h3>
     {p.laboratorio && <p class="card__lab">{p.laboratorio}</p>}
   </a>
   <div class="card__preco">
-    {desconto && <s>{brl(p.preco_maximo)}</s>}
+    {desconto && <span class="card__de"><s>{brl(p.preco_maximo)}</s><span class="selo selo--desconto">-{percentualDesconto(p)}%</span></span>}
     <strong>{brl(p.preco)}</strong>
   </div>
-  <button type="button" class="btn btn--secundario card__add" data-add-carrinho
-          data-produto={JSON.stringify({ cod_red: p.cod_red, slug: p.slug, nome: p.nome, preco: p.preco, estoque: p.estoque, tipo_venda: p.tipo_venda })}>
-    Adicionar
-  </button>
+  <div class="card__comprar">
+    <div class="qtd-mini">
+      <button type="button" data-qtd-passo="-1" aria-label="Diminuir quantidade">−</button>
+      <input type="number" inputmode="numeric" min="1" max={p.estoque} value="1" aria-label={`Quantidade de ${p.nome}`} />
+      <button type="button" data-qtd-passo="1" aria-label="Aumentar quantidade">+</button>
+    </div>
+    <button type="button" class="btn btn--primario card__add" data-add-carrinho
+            data-produto={JSON.stringify({ cod_red: p.cod_red, slug: p.slug, nome: p.nome, preco: p.preco, estoque: p.estoque, tipo_venda: p.tipo_venda })}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><path d="M14 2v6M11 5h6"/></svg>
+      <span class="card__add-txt">Adicionar</span>
+    </button>
+  </div>
 </article>
-
-<style>
-  .card { background: #fff; border: 1px solid var(--borda); border-radius: var(--raio); padding: 10px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--sombra); min-width: 0; }
-  .card__link { color: inherit; text-decoration: none; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-  .card__link:hover .card__nome { color: var(--azul); }
-  .card__selos { display: flex; gap: 4px; flex-wrap: wrap; min-height: 20px; }
-  .card__nome { font-size: .9rem; font-weight: 600; margin: 0; line-height: 1.3;
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-  .card__lab { margin: 0; font-size: .75rem; color: var(--texto-3); text-transform: uppercase; letter-spacing: .02em; }
-  .card__preco { display: flex; flex-direction: column; }
-  .card__preco s { font-size: .8rem; color: var(--texto-3); }
-  .card__preco strong { font-size: 1.15rem; color: var(--texto); }
-  .card__add { min-height: 40px; }
-</style>

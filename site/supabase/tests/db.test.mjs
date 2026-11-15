@@ -117,11 +117,10 @@ test('criar_pedido recusa produto oculto, bloqueado, sem estoque ou acima do est
   await rejects(as('anon', null, () => rows(`select public.criar_pedido('[{"cod_red":1,"quantidade":1}]', 'retirada', 'pix')`)), /permission denied/);
 });
 
-test('item de prescrição exige declaração de receita', async () => {
+test('item de prescrição entra sem declaração e o pedido fica marcado (0005)', async () => {
   const itens = JSON.stringify([{ cod_red: 2, quantidade: 1 }]);
-  await rejects(as('authenticated', U.a, () => rows(`select public.criar_pedido($1, 'retirada', 'pix')`, [itens])), /declaracao_receita_necessaria/);
   const [{ r }] = await as('authenticated', U.a, () =>
-    rows(`select public.criar_pedido($1, 'retirada', 'pix', null, 1, true) as r`, [itens]));
+    rows(`select public.criar_pedido($1, 'retirada', 'pix') as r`, [itens]));
   assert.equal(r.tem_prescricao, true);
   assert.equal(Number(r.frete), 0);
 });
@@ -160,6 +159,26 @@ test('equipe edita só campos editoriais', async () => {
     rows(`select public.admin_atualizar_produto(3, '{"liberado_manual": true, "descricao": "ok"}')`));
   const vis = await as('anon', null, () => rows('select cod_red from public.produtos_publicos where cod_red = 3'));
   assert.equal(vis.length, 1);
+});
+
+test('resumo de pedidos só para a equipe (0006)', async () => {
+  const [{ r }] = await as('authenticated', U.equipe, () => rows('select public.admin_resumo_pedidos() as r'));
+  assert.ok(Object.values(r).reduce((a, b) => a + b, 0) >= 2);
+  const [{ r: rc }] = await as('authenticated', U.a, () => rows('select public.admin_resumo_pedidos() as r'));
+  assert.equal(rc, null);
+  await rejects(as('anon', null, () => rows('select public.admin_resumo_pedidos()')), /permission denied/);
+});
+
+test('equipe oculta produto, corrige tipo e o destaque de prescrição não aparece', async () => {
+  await as('authenticated', U.equipe, () =>
+    rows(`select public.admin_atualizar_produto(1, '{"tipo_venda_manual": "prescricao", "destaque": true}')`));
+  let [v] = await as('anon', null, () => rows('select tipo_venda, destaque from public.produtos_publicos where cod_red = 1'));
+  assert.deepEqual(v, { tipo_venda: 'prescricao', destaque: false });
+  await as('authenticated', U.equipe, () =>
+    rows(`select public.admin_atualizar_produto(1, '{"tipo_venda_manual": null, "publicado": false}')`));
+  const oculto = await as('anon', null, () => rows('select 1 from public.produtos_publicos where cod_red = 1'));
+  assert.equal(oculto.length, 0);
+  await as('authenticated', U.equipe, () => rows(`select public.admin_atualizar_produto(1, '{"publicado": true}')`));
 });
 
 test('LGPD: exportar e excluir conta anonimiza pedidos', async () => {

@@ -1,0 +1,135 @@
+---
+import Base from '../../layouts/Base.astro';
+import { u } from '../../lib/url';
+import { linkWhatsApp } from '../../data/loja';
+---
+<Base title="Pedido" noindex>
+  <nav class="migalhas" aria-label="Você está em"><ol><li><a href={u('/conta/')}>Minha conta</a></li><li><a href={u('/conta/pedidos/')}>Meus pedidos</a></li><li aria-current="page">Pedido</li></ol></nav>
+  <p class="msg msg--ok sucesso" data-sucesso hidden>Pedido recebido! A farmácia vai confirmar pelo WhatsApp ou telefone.</p>
+  <p class="carregando" data-carregando>Carregando…</p>
+  <div class="pedido-det" data-conteudo hidden>
+    <header class="cab">
+      <h1 data-titulo></h1>
+      <span class="status" data-status></span>
+      <p class="cab__data" data-data></p>
+    </header>
+
+    <div class="grade-pedido">
+      <section class="painel">
+        <h2>Itens</h2>
+        <ul class="itens" data-itens></ul>
+        <dl class="totais">
+          <dt>Subtotal</dt><dd data-subtotal></dd>
+          <dt>Frete</dt><dd data-frete></dd>
+          <dt class="total">Total</dt><dd class="total" data-total></dd>
+        </dl>
+        <p class="aviso aviso--receita" data-receita hidden>Tem medicamento de venda sob prescrição: apresente a receita na entrega ou retirada.</p>
+      </section>
+      <div>
+        <section class="painel">
+          <h2>Entrega e pagamento</h2>
+          <dl class="ficha">
+            <dt>Entrega</dt><dd data-entrega></dd>
+            <dt>Endereço</dt><dd data-endereco></dd>
+            <dt>Pagamento</dt><dd data-pagamento></dd>
+            <dt>Observação</dt><dd data-obs></dd>
+          </dl>
+        </section>
+        <section class="painel">
+          <h2>Andamento</h2>
+          <ol class="linha-tempo" data-historico></ol>
+          <div class="acoes">
+            <a class="btn btn--whats" data-whats target="_blank" rel="noopener">Falar sobre este pedido</a>
+            <button class="btn btn--perigo" type="button" data-cancelar hidden>Cancelar pedido</button>
+          </div>
+          <p class="msg" data-msg hidden></p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script define:vars={{ whatsBase: linkWhatsApp() }} is:inline>window.__whatsBase = whatsBase;</script>
+  <script>
+    import { cliente, exigirLogin, mensagemErro, brl, dataHora, esc, STATUS_PEDIDO, rotuloStatus, NOME_PAGAMENTO, NOME_ENTREGA, BASE } from '../../scripts/sessao';
+    const sb = cliente();
+    await exigirLogin();
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector<T>(s)!;
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id') || '';
+    if (params.get('novo')) $('[data-sucesso]').hidden = false;
+
+    async function carregar() {
+      const { data: p, error } = await sb.from('pedidos')
+        .select('*, pedido_itens(cod_red, nome, quantidade, preco_unit, total, tipo_venda), pedido_status_log(para, em)')
+        .eq('id', id).maybeSingle();
+      $('[data-carregando]').hidden = true;
+      if (error || !p) {
+        $('[data-carregando]').hidden = false;
+        $('[data-carregando]').textContent = error ? mensagemErro(error) : 'Pedido não encontrado.';
+        return;
+      }
+      document.title = `Pedido nº ${p.numero} | Farmácia São Benedito`;
+      $('[data-titulo]').textContent = `Pedido nº ${p.numero}`;
+      const st = $('[data-status]');
+      st.textContent = rotuloStatus(p.status, p.pagamento);
+      st.className = `status status--${p.status}`;
+      $('[data-data]').textContent = `Feito em ${dataHora(p.criado_em)}`;
+      $('[data-itens]').innerHTML = (p.pedido_itens ?? []).map((i: any) =>
+        `<li><span>${i.quantidade}× ${esc(i.nome)}</span><span>${brl(i.total)}</span></li>`).join('');
+      $('[data-subtotal]').textContent = brl(p.subtotal);
+      $('[data-frete]').textContent = Number(p.frete) ? brl(p.frete) : 'Grátis';
+      $('[data-total]').textContent = brl(p.total);
+      $('[data-receita]').hidden = !p.tem_prescricao;
+      $('[data-entrega]').textContent = NOME_ENTREGA[p.entrega] ?? p.entrega;
+      const e = p.endereco;
+      $('[data-endereco]').textContent = e ? `${e.logradouro}, ${e.numero}${e.complemento ? ` - ${e.complemento}` : ''} · ${e.bairro} · ${e.cidade}/${e.uf}` : '—';
+      $('[data-pagamento]').textContent = NOME_PAGAMENTO[p.pagamento] ?? p.pagamento;
+      $('[data-obs]').textContent = p.observacao || '—';
+      const hist = [...(p.pedido_status_log ?? [])].sort((a: any, b: any) => a.em.localeCompare(b.em));
+      $('[data-historico]').innerHTML = hist.map((h: any) =>
+        `<li><strong>${esc(rotuloStatus(h.para, p.pagamento))}</strong><span>${dataHora(h.em)}</span></li>`).join('');
+      $<HTMLAnchorElement>('[data-whats]').href = `${(window as any).__whatsBase}?text=${encodeURIComponent(`Olá! Sobre o meu pedido nº ${p.numero}.`)}`;
+      $('[data-cancelar]').hidden = p.status !== 'aguardando_pagamento';
+      $('[data-conteudo]').hidden = false;
+    }
+
+    $('[data-cancelar]').addEventListener('click', async () => {
+      if (!confirm('Cancelar este pedido?')) return;
+      const { error } = await sb.rpc('cancelar_meu_pedido', { p_pedido_id: id });
+      const msg = $('[data-msg]');
+      msg.hidden = false;
+      msg.className = `msg ${error ? 'msg--erro' : 'msg--ok'}`;
+      msg.textContent = error ? mensagemErro(error) : 'Pedido cancelado.';
+      if (!error) carregar();
+    });
+
+    carregar();
+  </script>
+</Base>
+
+<style>
+  .sucesso { margin: 10px 0; }
+  .cab { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 0 12px; }
+  .cab h1 { margin: 0; }
+  .cab__data { flex-basis: 100%; margin: 0; color: var(--texto-3); font-size: .85rem; }
+  .grade-pedido { display: grid; gap: 12px; padding-bottom: 24px; }
+  @media (min-width: 860px) { .grade-pedido { grid-template-columns: 1.2fr 1fr; align-items: start; } }
+  .grade-pedido > div > .painel + .painel { margin-top: 12px; }
+  .itens { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: .88rem; }
+  :global(.itens li) { display: flex; justify-content: space-between; gap: 8px; }
+  .totais { display: grid; grid-template-columns: 1fr auto; gap: 4px; margin: 10px 0 0; font-size: .9rem; border-top: 1px solid var(--borda); padding-top: 10px; }
+  .totais dd { margin: 0; text-align: right; }
+  .totais .total { font-weight: 800; font-size: 1.05rem; }
+  .ficha { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: .88rem; margin: 0; }
+  .ficha dt { color: var(--texto-3); }
+  .ficha dd { margin: 0; overflow-wrap: anywhere; }
+  .linha-tempo { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 6px; font-size: .88rem; }
+  :global(.linha-tempo li) { display: flex; justify-content: space-between; gap: 8px; }
+  :global(.linha-tempo span) { color: var(--texto-3); }
+  .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+  .aviso { margin: 10px 0 0; }
+  :global(.status) { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--azul-claro); color: var(--azul); text-transform: uppercase; }
+  :global(.status--entregue) { background: var(--verde-claro); color: var(--verde); }
+  :global(.status--cancelado) { background: #f1f5f9; color: var(--texto-3); }
+  :global(.status--aguardando_pagamento) { background: var(--ambar-claro); color: var(--ambar); }
+</style>

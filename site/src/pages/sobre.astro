@@ -2,7 +2,7 @@
 import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import fachada from '../assets/fachada.jpg';
-import { loja, enderecoCompleto, linkWhatsApp, PREENCHER } from '../data/loja';
+import { loja, enderecoCompleto, linkWhatsApp, farmaceuticosTexto, PREENCHER } from '../data/loja';
 import { u } from '../lib/url';
 const marcar = (v: string) => v.startsWith(PREENCHER) ? `<span class="preencher">${v}</span>` : v;
 ---
@@ -35,7 +35,7 @@ const marcar = (v: string) => v.startsWith(PREENCHER) ? `<span class="preencher"
         <dt>Telefone</dt><dd>{loja.telefone}</dd>
         <dt>E-mail</dt><dd><a href={`mailto:${loja.email}`}>{loja.email}</a></dd>
         <dt>Horário</dt><dd set:html={marcar(loja.horario)} />
-        <dt>Farmacêutico(a) responsável</dt><dd set:html={`${marcar(loja.farmaceutico)} — ${marcar(loja.crf)}`} />
+        <dt>Farmacêuticos responsáveis</dt><dd>{farmaceuticosTexto()}</dd>
         <dt>AFE (Anvisa)</dt><dd set:html={marcar(loja.afe)} />
         <dt>Licença sanitária</dt><dd set:html={marcar(loja.licencaSanitaria)} />
       </dl>

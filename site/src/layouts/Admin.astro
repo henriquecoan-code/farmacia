@@ -1,0 +1,79 @@
+---
+// Layout do painel da equipe: sem cabeçalho da loja, fora da busca e dos buscadores.
+import '../styles/global.css';
+import { u } from '../lib/url';
+
+interface Props { title: string; ativo?: 'pedidos' | 'produtos' }
+const { title, ativo } = Astro.props;
+---
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} | Painel · Farmácia São Benedito</title>
+    <link rel="icon" type="image/png" sizes="32x32" href={u('/img/favicon-32.png')} />
+  </head>
+  <body class="admin">
+    <header class="adm-topo">
+      <div class="container adm-topo__in">
+        <a class="adm-marca" href={u('/admin/')}><img src={u('/img/logo-192.png')} alt="" width="32" height="32" /> Painel da farmácia</a>
+        <nav class="adm-nav">
+          <a href={u('/admin/')} aria-current={ativo === 'pedidos' ? 'page' : undefined}>Pedidos</a>
+          <a href={u('/admin/produtos/')} aria-current={ativo === 'produtos' ? 'page' : undefined}>Produtos</a>
+          <a href={u('/')} target="_blank">Ver loja ↗</a>
+          <button type="button" class="btn--link" data-adm-sair>Sair</button>
+        </nav>
+      </div>
+    </header>
+    <main class="container adm-main">
+      <p class="carregando" data-admin-carregando>Carregando…</p>
+      <section class="painel" data-admin-negado hidden>
+        <h1>Acesso restrito</h1>
+        <p>Esta área é só para a equipe da farmácia. Se você é da equipe, peça para liberarem o seu acesso.</p>
+        <a class="btn btn--secundario" href={u('/')}>Ir para a loja</a>
+      </section>
+      <div data-admin-conteudo hidden>
+        <slot />
+      </div>
+    </main>
+    <script>
+      import { cliente, BASE } from '../scripts/sessao';
+      document.querySelector('[data-adm-sair]')?.addEventListener('click', async () => {
+        await cliente().auth.signOut();
+        location.replace(`${BASE}/entrar/?volta=/admin/`);
+      });
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  body.admin { background: #f1f5f9; }
+  .adm-topo { background: #0f172a; color: #fff; position: sticky; top: 0; z-index: 10; }
+  .adm-topo__in { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 8px; padding-bottom: 8px; flex-wrap: wrap; }
+  .adm-marca { display: flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; }
+  .adm-nav { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .adm-nav a, .adm-nav .btn--link { color: #cbd5e1; text-decoration: none; padding: 6px 10px; border-radius: 8px; font-size: .9rem; }
+  .adm-nav a[aria-current='page'], .adm-nav a:hover { background: #1e293b; color: #fff; }
+  .adm-main { padding-top: 14px; padding-bottom: 32px; }
+  .adm-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .adm-cab h1 { margin: 0; }
+  .tabela { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--borda); border-radius: 10px; overflow: hidden; font-size: .88rem; }
+  .tabela th, .tabela td { padding: 8px 10px; border-bottom: 1px solid var(--borda); text-align: left; vertical-align: middle; }
+  .tabela th { background: #f8fafc; font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--texto-3); }
+  .tabela tr:last-child td { border-bottom: 0; }
+  .tabela tbody tr:hover { background: #f8fafc; }
+  .tabela-rolagem { overflow-x: auto; }
+  .status { display: inline-block; font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--azul-claro); color: var(--azul); text-transform: uppercase; white-space: nowrap; }
+  .status--entregue { background: var(--verde-claro); color: var(--verde); }
+  .status--cancelado { background: #e2e8f0; color: var(--texto-3); }
+  .status--aguardando_pagamento { background: var(--ambar-claro); color: var(--ambar); }
+  .status--separando { background: #ede9fe; color: #6d28d9; }
+  .tag-receita { display: inline-block; font-size: .7rem; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: #fee2e2; color: var(--vermelho); }
+  @media print {
+    .adm-topo, .nao-imprimir { display: none !important; }
+    body.admin { background: #fff; }
+    .painel { box-shadow: none; border: 0; padding: 0; }
+  }
+</style>
