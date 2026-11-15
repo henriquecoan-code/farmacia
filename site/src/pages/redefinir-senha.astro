@@ -18,10 +18,18 @@ import Base from '../layouts/Base.astro';
     const msg = form.querySelector<HTMLElement>('[data-msg]')!;
     const mostrar = (t: string, ok = false) => { msg.textContent = t; msg.hidden = !t; msg.className = `msg ${ok ? 'msg--ok' : 'msg--erro'}`; };
 
-    // O link do e-mail abre esta página já com a sessão de recuperação (detectSessionInUrl)
-    setTimeout(async () => {
-      if (!(await usuarioAtual())) mostrar('Link inválido ou expirado. Peça um novo em "Entrar" → "Esqueci a senha".');
-    }, 1500);
+    // O link do e-mail traz ?token_hash=…&type=recovery (modelo de e-mail do Supabase). Conferir o código
+    // aqui funciona em qualquer navegador ou aparelho, não só naquele em que a pessoa pediu a troca.
+    const invalido = 'Link inválido ou expirado. Peça um novo em "Entrar" → "Esqueci a senha".';
+    const tokenHash = new URLSearchParams(location.search).get('token_hash');
+    if (tokenHash) {
+      const { error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+      history.replaceState(null, '', location.pathname); // o código só vale uma vez
+      if (error && !(await usuarioAtual())) mostrar(invalido);
+    } else {
+      // Link no formato antigo: a sessão de recuperação vem pela própria URL (detectSessionInUrl)
+      setTimeout(async () => { if (!(await usuarioAtual())) mostrar(invalido); }, 1500);
+    }
 
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();

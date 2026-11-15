@@ -72,6 +72,15 @@ import { u } from '../lib/url';
       location.replace(destinoVolta());
     });
 
+    // Link de confirmação da conta (?token_hash=…, modelo de e-mail do Supabase): vale em qualquer
+    // navegador ou aparelho. Ao confirmar, o SIGNED_IN acima leva a pessoa adiante.
+    const tokenHash = new URLSearchParams(location.search).get('token_hash');
+    if (tokenHash) {
+      sb.auth.verifyOtp({ token_hash: tokenHash, type: 'email' }).then(({ error }) => {
+        if (error) mostrar(fEntrar, 'Link de confirmação inválido ou já usado. Se a conta já foi confirmada, é só entrar com o e-mail e a senha.');
+      });
+    }
+
     // Esqueci a senha
     document.querySelector('[data-esqueci]')!.addEventListener('click', async () => {
       const email = String(new FormData(fEntrar).get('email') || '').trim();
