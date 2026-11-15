@@ -70,6 +70,8 @@ graph TB
 ├── docs/                 SEGURANCA-FIRESTORE.md, este mapa
 ├── fotos-entrada/        fotos do celular para processar (gatilho do Action)
 ├── .github/workflows/fotos-produtos.yml
+├── .github/workflows/site.yml   publica o Pages: site antigo na raiz + site novo em /novo/ (push na main,
+│                                aviso do sync "catalogo-atualizado", fim do workflow de fotos e todo dia às 03:30)
 ├── .claude/              launch.json (previews "site" e "site-novo"), skill fotos-produtos
 └── site/                 SITE NOVO
     ├── astro.config.mjs  SITE_URL / BASE_PATH por variável de ambiente
