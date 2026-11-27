@@ -31,7 +31,7 @@ jobs:
 
       - name: Instalar dependências
         working-directory: site
-        run: npm ci
+        run: npm ci --onnxruntime-node-install-cuda=skip
 
       - name: Tratar fotos
         working-directory: site

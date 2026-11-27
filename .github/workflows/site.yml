@@ -50,7 +50,7 @@ jobs:
 
       - name: Instalar dependências
         working-directory: site
-        run: npm ci
+        run: npm ci --onnxruntime-node-install-cuda=skip
 
       # Garante que as regras do banco (RLS, criar_pedido) continuam valendo antes de publicar
       - name: Testes do banco
